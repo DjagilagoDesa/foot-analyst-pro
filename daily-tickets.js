@@ -12,24 +12,19 @@ function longDailySelections(results){
  return selected;
 }
 function mixedDailySelections(results){
- const groups=[['home_or_draw','away_or_draw'],['over_1_5','over_2_5','under_1_5','under_2_5'],['btts','btts_no']];
- const used=new Set(),teams=new Set(),selected=[];
- for(const keys of groups){
-  const options=[];
-  for(const r of results){
-   const markets=ticketMarkets(r.analysis.prediction?.markets||{});
-   if(used.has(String(r.match.id))||teams.has(String(r.match.home.id))||teams.has(String(r.match.away.id)))continue;
-   for(const market of keys){const probability=markets[market];if(Number.isFinite(probability)&&probability>=50&&probability<100)options.push({...r,choice:{market,probability}});}
-  }
-  options.sort((a,b)=>b.choice.probability-a.choice.probability);
-  if(!options.length)return [];
-  const r=options[0];selected.push(r);used.add(String(r.match.id));teams.add(String(r.match.home.id));teams.add(String(r.match.away.id));
+ const candidates=results.map(r=>({...r,choice:ticketSelection(r.analysis.prediction?.markets||{},'mixed')}))
+  .filter(r=>r.choice).sort((a,b)=>b.choice.probability-a.choice.probability);
+ const teams=new Set(),selected=[];
+ for(const r of candidates){
+  const home=String(r.match.home.id),away=String(r.match.away.id);
+  if(teams.has(home)||teams.has(away))continue;
+  selected.push(r);teams.add(home);teams.add(away);if(selected.length===3)break;
  }
- return selected;
+ return selected.length===3?selected:[];
 }
 (()=>{
  const get=id=>document.getElementById(id),esc=escapeHtml;
- const labels={home:'Victoire domicile',away:'Victoire extérieur',home_or_draw:'Double chance 1X',away_or_draw:'Double chance X2',over_1_5:'Plus de 1,5 but',over_2_5:'Plus de 2,5 buts',under_1_5:'Moins de 1,5 but',under_2_5:'Moins de 2,5 buts',btts_no:'Les deux équipes marquent : non',btts:'Les deux équipes marquent'};
+ const labels={home_or_draw_and_btts:"1X + les deux équipes marquent",home_or_draw_and_btts_no:"1X + les deux équipes marquent : non",home_or_draw_and_over_1_5:"1X + plus de 1,5 but",home_or_draw_and_over_2_5:"1X + plus de 2,5 buts",home_or_draw_and_under_1_5:"1X + moins de 1,5 but",home_or_draw_and_under_2_5:"1X + moins de 2,5 buts",away_or_draw_and_btts:"X2 + les deux équipes marquent",away_or_draw_and_btts_no:"X2 + les deux équipes marquent : non",away_or_draw_and_over_1_5:"X2 + plus de 1,5 but",away_or_draw_and_over_2_5:"X2 + plus de 2,5 buts",away_or_draw_and_under_1_5:"X2 + moins de 1,5 but",away_or_draw_and_under_2_5:"X2 + moins de 2,5 buts",home:'Victoire domicile',away:'Victoire extérieur',home_or_draw:'Double chance 1X',away_or_draw:'Double chance X2',over_1_5:'Plus de 1,5 but',over_2_5:'Plus de 2,5 buts',under_1_5:'Moins de 1,5 but',under_2_5:'Moins de 2,5 buts',btts_no:'Les deux équipes marquent : non',btts:'Les deux équipes marquent'};
  const message=(t,error=false)=>'<div class="message '+(error?'error':'')+'">'+esc(t)+'</div>';
  function renderLongTicket(results,locked){
   const selected=longDailySelections(results),title='Ticket 4 · Grand combiné · 5 à 8 matchs';
@@ -65,8 +60,8 @@ function mixedDailySelections(results){
    }
    notice.innerHTML=message(day+' · '+total+' rencontre(s) à venir retrouvée(s). Les 16 prochaines au maximum sont examinées dans l’ordre horaire jusqu’à obtenir 8 analyses. Ce n’est pas une sélection exhaustive des meilleurs paris.'+(feed.partial?' Couverture partielle.':''));
    if(locked&&results.length===0){renderLockedAnalysis(out);return;}
-   const profiles=[['prudent','Ticket 1 · Prudent',2],['balanced','Ticket 2 · Équilibré',3],['offensive','Ticket 3 · Offensif',3],['long','Ticket 4 · Grand combiné',0],['mixed','Ticket 5 · Double chance & buts',3]];
-   out.innerHTML=profiles.map(([profile,title,count])=>{
+   const profiles=[['prudent','Ticket 1 · Prudent',2],['balanced','Ticket 2 · Équilibré',3],['offensive','Ticket 3 · Offensif',3],['long','Ticket 4 · Grand combiné',0],['mixed','Ticket 5 · Double chance + buts sur chaque match',3]];
+   out.innerHTML='<div class="message">Ticket 5 : chaque ligne combine une double chance avec une condition sur les buts du même match. Les probabilités sont calculées sur les scores qui remplissent les deux conditions, sans multiplier les probabilités séparées.</div>'+profiles.map(([profile,title,count])=>{
     if(profile==='long')return renderLongTicket(results,locked);
     const choices=(profile==='mixed'?mixedDailySelections(results):results.map(r=>({...r,choice:ticketSelection(r.analysis.prediction.markets,profile)})).filter(r=>r.choice).sort((a,b)=>b.choice.probability-a.choice.probability));
     const selected=[],teams=new Set();
@@ -83,6 +78,7 @@ function mixedDailySelections(results){
   finally{busy=false;get('generateDailyTickets').disabled=false;await window.Accounts.afterAnalysis();}
  };
 })();
+
 
 
 

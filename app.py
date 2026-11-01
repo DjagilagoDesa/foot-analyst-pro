@@ -121,6 +121,12 @@ def probabilities(home,away):
         for j in range(12):
             p=poisson(i,lh)*poisson(j,la)
             outcomes['home' if i>j else 'draw' if i==j else 'away']+=p
+            goal_conditions={'btts':i>0 and j>0,'btts_no':i==0 or j==0,
+                             'over_1_5':i+j>=2,'over_2_5':i+j>=3,
+                             'under_1_5':i+j<2,'under_2_5':i+j<3}
+            for side,side_ok in [('home_or_draw',i>=j),('away_or_draw',j>=i)]:
+                for goal,goal_ok in goal_conditions.items():
+                    if side_ok and goal_ok:outcomes[side+'_and_'+goal]+=p
             if i+j<2: outcomes['under_1_5']+=p
             if i+j<3: outcomes['under_2_5']+=p
             if i==0 or j==0: outcomes['btts_no']+=p
@@ -422,6 +428,7 @@ init_tracking(app,fetch,ESPN,LEAGUES)
 
 if __name__=='__main__':
     app.run(host='0.0.0.0',port=int(os.environ.get('PORT','10000')))
+
 
 
 

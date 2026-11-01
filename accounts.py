@@ -446,6 +446,12 @@ def metered_analysis(func):
                            preview_sections=['Jugement du match','Arguments des deux équipes',
                                              'Surprises possibles','Confrontations passées','Probabilités'])
         if cached is not None:
+            if (cached.get('prediction') and cached.get('home') and cached.get('away')
+                    and 'home_or_draw_and_btts' not in cached['prediction'].get('markets',{})):
+                from app import probabilities
+                cached['prediction']=probabilities(cached['home'],cached['away'])
+                with database() as db:
+                    db.execute("UPDATE account_analyses SET result=? WHERE user_id=? AND request_key=? AND status='complete'",(json.dumps(cached,ensure_ascii=False),user['id'],key))
             from analysis_report import report
             if cached.get('prediction') and not cached.get('report'):
                 cached['report']=report(cached)
@@ -463,6 +469,7 @@ def metered_analysis(func):
             finish_analysis(user['id'],analysis_id)
             raise
     return wrapper
+
 
 
 

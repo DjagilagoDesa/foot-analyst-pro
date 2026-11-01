@@ -9,10 +9,13 @@ from accounts import database, current_user, write_guard, body, rate_limit, Acco
 
 MARKETS={'home','away','draw','home_or_draw','away_or_draw','over_1_5','over_2_5','under_1_5','under_2_5','btts','btts_no'}
 
+MARKETS.update(side+'_and_'+goal for side in ('home_or_draw','away_or_draw') for goal in ('btts','btts_no','over_1_5','over_2_5','under_1_5','under_2_5'))
+
 def resolve(market,home,away):
-    return {'home':home>away,'away':away>home,'draw':home==away,
+    outcomes={'home':home>away,'away':away>home,'draw':home==away,
             'home_or_draw':home>=away,'away_or_draw':away>=home,
-            'over_1_5':home+away>=2,'over_2_5':home+away>=3,'under_1_5':home+away<2,'under_2_5':home+away<3,'btts_no':home==0 or away==0,'btts':home>0 and away>0}[market]
+            'over_1_5':home+away>=2,'over_2_5':home+away>=3,'under_1_5':home+away<2,'under_2_5':home+away<3,'btts_no':home==0 or away==0,'btts':home>0 and away>0}
+    return all(outcomes[part] for part in market.split('_and_'))
 
 
 def fixture_info(data):
@@ -112,4 +115,5 @@ def init_app(app, fetch, base, leagues):
                        total=sum(counts.values()),recent=recent,source_errors=errors,
                        note='Sélections enregistrées avant le coup d’envoi. Réussite = justes / (justes + fausses). En attente et annulées exclues du pourcentage. Chaque marché est compté une fois par match et par compte ; les sélections peuvent être corrélées. Les anciens paris non enregistrés ne sont pas reconstitués.')
     app.register_blueprint(bp)
+
 
