@@ -18,12 +18,14 @@ function longDailySelections(results){
  function renderLongTicket(results,locked){
   const selected=longDailySelections(results),title='Ticket 4 · Grand combiné · 5 à 8 matchs';
   if(selected.length<5)return '<div class="panel premium"><h2>'+title+'</h2>'+message('Ticket non proposé : '+selected.length+' sélection(s) admissible(s), minimum 5. Chaque choix doit atteindre 75 % dans le modèle et disposer de 10 matchs par équipe. Aucun ajout forcé.')+(locked?message('Ton accès gratuit est terminé. Premium est nécessaire pour poursuivre l’étude des autres rencontres.'):'')+'</div>';
+  toTrack.push(...selected.map(r=>({analysis:r.analysis,market:r.choice.market})));
   const joint=selected.reduce((p,r)=>p*r.choice.probability/100,1);
   return '<div class="panel premium"><h2>'+title+'</h2><p>'+selected.length+' matchs retenus · seuil de 75 % par sélection dans le modèle.</p>'+selected.map((r,i)=>'<div class="message"><strong>'+esc((i+1)+'. '+r.match.home.name+' – '+r.match.away.name)+'</strong><p class="gold">'+esc(labels[r.choice.market])+'</p><p>Probabilité modèle de ce choix : '+esc(r.choice.probability)+' %</p><details><summary>Voir les arguments et les surprises possibles</summary>'+renderAnalysisReport(r.analysis)+'</details></div>').join('')+message('Probabilité estimée que tout le combiné passe, sous hypothèse d’indépendance : '+(joint*100).toFixed(2).replace('.',',')+' %. Cote équitable théorique : '+(1/joint).toFixed(2).replace('.',',')+' ; ce n’est pas une cote bookmaker.')+message('Probabilités individuelles élevées ne signifie pas forte confiance dans le ticket complet. Le seuil de 75 % est un filtre, pas un taux de réussite vérifié. Les absences et compositions ne sont pas contrôlées et des dépendances peuvent subsister entre matchs.')+'</div>';
  }
+ let toTrack=[];
  let busy=false;
  get('generateDailyTickets').onclick=async()=>{
-  if(busy)return;busy=true;get('generateDailyTickets').disabled=true;
+  if(busy)return;toTrack=[];busy=true;get('generateDailyTickets').disabled=true;
   const out=get('automaticTicketsResult'),notice=get('automaticTicketsNotice');notice.innerHTML='';
   const day=new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Paris'}),results=[],skipped=[];let locked=false;
   out.innerHTML=message('Recherche des rencontres à venir du '+day+'…');
@@ -53,12 +55,16 @@ function longDailySelections(results){
     const selected=[],teams=new Set();
     for(const r of choices){if(teams.has(String(r.match.home.id))||teams.has(String(r.match.away.id)))continue;selected.push(r);teams.add(String(r.match.home.id));teams.add(String(r.match.away.id));if(selected.length===count)break;}
     if(selected.length<count)return '<div class="panel"><h2>'+title+'</h2>'+message('Pas assez de matchs distincts disposant de données suffisantes pour ce profil. Aucun ticket artificiellement complété.')+'</div>';
+    toTrack.push(...selected.map(r=>({analysis:r.analysis,market:r.choice.market})));
     const joint=selected.reduce((p,r)=>p*r.choice.probability/100,1);
     return '<div class="panel premium"><h2>'+title+'</h2>'+selected.map((r,i)=>'<div class="message"><strong>'+esc((i+1)+'. '+r.match.home.name+' – '+r.match.away.name)+'</strong><p class="gold">'+esc(labels[r.choice.market])+'</p><p>Probabilité du modèle : '+esc(r.choice.probability)+' %</p><details><summary>Lire l’analyse détaillée</summary>'+renderAnalysisReport(r.analysis)+'</details></div>').join('')+
      message('Probabilité combinée sous hypothèse d’indépendance : '+(joint*100).toFixed(2).replace('.',',')+' %. Cote équitable théorique : '+(1/joint).toFixed(2).replace('.',',')+' — ce n’est pas une cote bookmaker.')+'</div>';
    }).join('')+renderLongTicket(results,locked)+skipped.map(t=>message(t)).join('')+'<p class="fine">Les quatre tickets peuvent partager des matchs et des sélections : ce ne sont pas quatre tickets indépendants. Aucun gain garanti. Les profils utilisent les probabilités du modèle, sans connaître les cotes réelles ni vérifier les compositions.</p>';
+   const missed=await window.Tracking.record(toTrack);
+   if(missed)notice.innerHTML+=message(missed+' sélection(s) non enregistrée(s) dans le suivi : rencontre non vérifiable, déjà commencée ou ancienne analyse.');
   }catch(e){out.innerHTML=message('Tickets non finalisés : '+e.message,true);if(e.code==='login_required')window.Accounts.needsLogin(out);}
   finally{busy=false;get('generateDailyTickets').disabled=false;await window.Accounts.afterAnalysis();}
  };
 })();
+
 

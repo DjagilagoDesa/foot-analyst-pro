@@ -1,0 +1,20 @@
+/* Each ticket selection is recorded server-side before kickoff. */
+(()=>{
+ const get=id=>document.getElementById(id),esc=escapeHtml;
+ const market={home:'Victoire domicile',away:'Victoire extérieur',draw:'Match nul',home_or_draw:'Double chance 1X',away_or_draw:'Double chance X2',over_1_5:'Plus de 1,5 but',over_2_5:'Plus de 2,5 buts',btts:'Les deux marquent'};
+ window.Tracking={record:async picks=>{
+  let missed=0;
+  for(const pick of picks){
+   if(!pick.analysis.tracking_id){missed++;continue;}
+   try{await window.Accounts.request('/api/tracking/record',{analysis_id:pick.analysis.tracking_id,market:pick.market});}catch{missed++;}
+  }
+  return missed;
+ },load:async()=>{
+  const target=get('trackingResult');target.innerHTML='<div class="message">Vérification des résultats définitifs…</div>';
+  try{
+   const r=await fetch('/api/tracking/performance',{credentials:'same-origin',headers:{Accept:'application/json'}}),d=await r.json();if(!r.ok)throw Error(d.message||'Suivi indisponible');
+   target.innerHTML='<div class="analysis"><div class="stat"><span>Paris justes</span><b>'+esc(d.won)+'</b></div><div class="stat"><span>Paris pas justes</span><b>'+esc(d.lost)+'</b></div><div class="stat"><span>En attente</span><b>'+esc(d.pending)+'</b></div><div class="stat"><span>Réussite observée</span><b>'+(d.success_pct===null?'—':esc(d.success_pct)+' %')+'</b></div></div><div class="message"><strong>'+esc(d.won)+' paris justes · '+esc(d.lost)+' paris pas justes</strong><p>'+esc(d.void)+' annulé(s) ou non réglable(s) sur 90 minutes.</p></div>'+(d.success_pct===null?'<p class="fine">Le pourcentage apparaîtra après les premiers résultats vérifiés.</p>':'')+'<p class="fine">'+esc(d.note)+'</p>'+(d.source_errors?'<div class="message">Certains résultats restent à vérifier : source temporairement indisponible.</div>':'')+'<details><summary>Voir mes sélections suivies</summary>'+(d.recent||[]).map(p=>'<div class="message"><strong>'+esc(p.label)+'</strong><p>'+esc(market[p.market]||p.market)+'</p><p>'+esc({won:'✓ Juste',lost:'✗ Pas juste',pending:'⏳ En attente',void:'Annulé / non réglable'}[p.status])+(p.home_score!==null?' · '+esc(p.home_score)+' – '+esc(p.away_score):'')+'</p></div>').join('')+'</details>';
+  }catch(e){target.innerHTML='<div class="message">'+esc(e.message)+'</div>';if(/Connecte|connecte|connexion/i.test(e.message))window.Accounts.needsLogin(target);}
+ }};
+ get('refreshTracking').onclick=window.Tracking.load;
+})();

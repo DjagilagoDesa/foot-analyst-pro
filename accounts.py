@@ -18,12 +18,21 @@ COOKIE = 'foot_session'
 SESSION_DAYS = 14
 DUMMY_HASH = generate_password_hash(secrets.token_urlsafe(24))
 SCHEMA = (
+
+
     '''CREATE TABLE IF NOT EXISTS account_owner_access (slot TEXT PRIMARY KEY, user_id TEXT NOT NULL)''',
     '''CREATE TABLE IF NOT EXISTS account_users (
       id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, nickname TEXT NOT NULL,
       password_hash TEXT NOT NULL, recovery_hash TEXT NOT NULL,
       created_at BIGINT NOT NULL, trial_used INTEGER NOT NULL DEFAULT 0,
       premium_until BIGINT NOT NULL DEFAULT 0)''',
+    """CREATE TABLE IF NOT EXISTS account_predictions (
+      user_id TEXT NOT NULL REFERENCES account_users(id) ON DELETE CASCADE,
+      event_id TEXT NOT NULL, league TEXT NOT NULL, market TEXT NOT NULL,
+      probability REAL NOT NULL, label TEXT NOT NULL, home_id TEXT NOT NULL, away_id TEXT NOT NULL,
+      starts_at BIGINT NOT NULL, created_at BIGINT NOT NULL, status TEXT NOT NULL,
+      home_score INTEGER, away_score INTEGER, settled_at BIGINT,
+      PRIMARY KEY(user_id,event_id,market))""",
     '''CREATE TABLE IF NOT EXISTS account_sessions (
       token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES account_users(id) ON DELETE CASCADE,
       csrf_hash TEXT NOT NULL, expires_at BIGINT NOT NULL)''',
@@ -123,7 +132,7 @@ def init_app(app):
 
     @app.after_request
     def private_headers(response):
-        if request.path.startswith('/api/account') or request.path in ('/api/analyze', '/api/ticket', '/api/analyse-statistique'):
+        if request.path.startswith(('/api/account','/api/tracking')) or request.path in ('/api/analyze', '/api/ticket', '/api/analyse-statistique'):
             response.headers['Cache-Control'] = 'no-store'
             response.headers['Vary'] = 'Cookie'
         response.headers['X-Content-Type-Options'] = 'nosniff'
@@ -445,12 +454,16 @@ def metered_analysis(func):
             response=current_app.make_response(func(*args,**kwargs))
             result=response.get_json(silent=True)
             success=response.status_code==200 and isinstance(result,dict) and 'error' not in result and result.get('status','ok')=='ok'
+            if success:
+                result['tracking_id']=analysis_id
+                response.set_data(json.dumps(result,ensure_ascii=False))
             finish_analysis(user['id'],analysis_id,result if success else None)
             return response
         except Exception:
             finish_analysis(user['id'],analysis_id)
             raise
     return wrapper
+
 
 
 

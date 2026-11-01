@@ -94,7 +94,7 @@
     if(id(feedback))id(feedback).innerHTML=message('Traitement en cours…');
     try{await action();}catch(e){if(id(feedback))id(feedback).innerHTML=message(e.message,true);}finally{busy=false;buttons.forEach(b=>b.disabled=false);}
   }
-  function clearHistory(){for(const name of ['analysisResult','manualResult','customTicketResult','automaticTicketsResult','automaticTicketsNotice'])if(id(name))id(name).textContent='';if(id('analysisHistory'))id('analysisHistory').innerHTML=message('Connecte-toi pour retrouver ton historique.');}
+  function clearHistory(){for(const name of ['analysisResult','manualResult','customTicketResult','automaticTicketsResult','automaticTicketsNotice','trackingResult'])if(id(name))id(name).textContent='';if(id('analysisHistory'))id('analysisHistory').innerHTML=message('Connecte-toi pour retrouver ton historique.');}
   async function loadHistory(){
     const targets=['profileHistory','analysisHistory'].map(id).filter(Boolean);
     try{

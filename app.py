@@ -258,6 +258,7 @@ def analyze():
             if match['away_id']==team:return match['away']
         return 'Domicile' if team==home else 'Extérieur'
     result['home_name']=team_name(hm,home);result['away_name']=team_name(am,away)
+    result['event_id']=str(data.get('event_id',''))
     result['head_to_head']=confrontations
     if result.get('status')=='ok':result['report']=build_report(result, histories={'home':hm,'away':am})
     return jsonify(result)
@@ -274,6 +275,10 @@ def ticket():
 @app.get('/api/billing/catalog')
 def billing_catalog():
     return jsonify({'product_id':'foot_analyst_pro_premium_monthly','price_eur':'29.90','period':'month','trial_analyses':3,'purchase_available':False,'provider':'google_play','reason':'play_billing_setup_required'})
+
+@app.get('/tracking.js')
+def tracking_script():
+    return send_from_directory('.', 'tracking.js', mimetype='application/javascript')
 
 @app.get('/daily-tickets.js')
 def daily_tickets_script():
@@ -409,8 +414,12 @@ def stade_premium_v37():
     return send_from_directory(".", "stade_premium.png", mimetype="image/png")
 
 
+from tracking import init_app as init_tracking
+init_tracking(app,fetch,ESPN,LEAGUES)
+
 if __name__=='__main__':
     app.run(host='0.0.0.0',port=int(os.environ.get('PORT','10000')))
+
 
 
 

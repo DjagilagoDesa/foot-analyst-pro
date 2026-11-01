@@ -61,6 +61,8 @@ function ticketSelection(markets, profile){
     results.push({match:m,analysis:d,...leg});
    }
    if(failures.length){target.innerHTML=message('Ticket incomplet : aucun combiné global n’est présenté, car tous tes matchs n’ont pas pu être analysés.',true)+failures.map(x=>message(x,true)).join('')+message(results.length+' analyse(s) disponible(s) dans ton historique. Retire ou remplace les rencontres signalées puis réessaie.');return;}
+   const untracked=await window.Tracking.record(results.map(r=>({analysis:r.analysis,market:r.market})));
+   if(untracked)el('customNotice').innerHTML=message(untracked+' sélection(s) non enregistrée(s) dans le suivi : rencontre non vérifiable, déjà commencée ou ancienne analyse.');
    let joint=results.reduce((v,r)=>v*r.probability/100,1);
    const repeated=new Set(),teams=new Set();for(const r of results){for(const id of [r.match.home.id,r.match.away.id]){if(teams.has(String(id)))repeated.add(String(id));teams.add(String(id));}}
    const profileName={prudent:'Prudent',balanced:'Équilibré',offensive:'Offensif'}[profile];
@@ -74,3 +76,4 @@ function ticketSelection(markets, profile){
  openMatch=function(m,from){originalOpen(m,from);const button=document.createElement('button');button.type='button';button.className='day';button.textContent='＋ AJOUTER À MON TICKET';button.style.cssText='width:100%;max-width:none;margin:12px 0';button.onclick=()=>{show('dailyTickets');add(m);};el('detailContent').prepend(button);};
  draw();
 })();
+
