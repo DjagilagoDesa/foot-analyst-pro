@@ -117,7 +117,7 @@ def frontend_icon():
     return send_from_directory('.', 'icon.svg')
 
 @app.get('/api/health')
-def healthcheck(): return jsonify({'status':'ok','version':'45','sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
+def healthcheck(): return jsonify({'status':'ok','version':'46','sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
 
 @app.get('/api/leagues')
 def leagues(): return jsonify({'leagues':LEAGUES})
@@ -251,12 +251,18 @@ def _fixture(e, league):
     a=next((c for c in competitors if c.get('homeAway')=='away'),None)
     if not h or not a:return None
     ht=h.get('team') or {};at=a.get('team') or {}
-    state=(e.get('status') or comp.get('status') or {}).get('type') or {}
+    status=comp.get('status') or e.get('status') or {}
+    state=status.get('type') or {}
+    def score(value):
+        if isinstance(value,dict): value=value.get('displayValue',value.get('value'))
+        return str(value) if value is not None else None
     return {'id':str(e.get('id','')),'league':league,'date':e.get('date'),
       'home':{'id':str(ht.get('id','')),'name':ht.get('displayName') or ht.get('name') or 'Domicile','badge':_badge(ht)},
       'away':{'id':str(at.get('id','')),'name':at.get('displayName') or at.get('name') or 'Extérieur','badge':_badge(at)},
       'state':state.get('state','pre'),'completed':bool(state.get('completed')),
-      'home_score':h.get('score'),'away_score':a.get('score')}
+      'home_score':score(h.get('score')),'away_score':score(a.get('score')),
+      'status_name':state.get('name',''),'status_detail':state.get('shortDetail') or state.get('detail',''),
+      'clock':status.get('displayClock',''),'period':status.get('period')}
 
 @app.get('/api/fixtures')
 def fixtures():
@@ -269,17 +275,17 @@ def fixtures():
     if selected!='all' and selected not in LEAGUES:return jsonify({'error':'invalid_league'}),400
     leagues_to_check=LEAGUES if selected=='all' else [selected]
     def load(lg):
-        data=fetch(f'{ESPN}/{lg}/scoreboard',{'dates':d.strftime('%Y%m%d'),'limit':200},ttl=180 if d==datetime.now(timezone.utc).date() else 1800)
+        data=fetch(f'{ESPN}/{lg}/scoreboard',{'dates':d.strftime('%Y%m%d'),'limit':200},ttl=20 if abs((d-datetime.now(timezone.utc).date()).days)<=1 else 1800)
         return [x for e in data.get('events') or [] if (x:=_fixture(e,lg))]
     found=[];failed=[]
-    with ThreadPoolExecutor(max_workers=6) as pool:
+    with ThreadPoolExecutor(max_workers=len(leagues_to_check)) as pool:
         futures={pool.submit(load,lg):lg for lg in leagues_to_check}
         for future in as_completed(futures):
             try:found.extend(future.result())
             except (requests.RequestException,ValueError,KeyError):failed.append(futures[future])
     if len(failed)==len(leagues_to_check):return jsonify({'error':'upstream_unavailable','message':'Sources sportives temporairement indisponibles'}),503
     found.sort(key=lambda x:x.get('date') or '')
-    return jsonify({'events':found,'partial':bool(failed),'failed_leagues':failed,'source':'ESPN unofficial','date':day})
+    return jsonify({'events':found,'partial':bool(failed),'failed_leagues':failed,'source':'ESPN unofficial','date':day,'updated_at':datetime.now(timezone.utc).isoformat()})
 
 @app.get('/api/team-next')
 def team_next():
