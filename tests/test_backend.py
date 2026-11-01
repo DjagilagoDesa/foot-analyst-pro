@@ -46,12 +46,41 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(data['status'],'insufficient_data')
         self.assertNotIn('prediction',data)
 
+    def test_live_and_final_scores_are_preserved(self):
+        live=event(completed=False)
+        live['competitions'][0]['status']={'type':{'state':'in','completed':False,'name':'STATUS_IN_PROGRESS','shortDetail':"67'"},'displayClock':"67'",'period':2}
+        live['competitions'][0]['competitors'][0]['score']={'displayValue':'3','value':3}
+        result=server._fixture(live,'fra.1')
+        self.assertEqual(result['state'],'in')
+        self.assertEqual(result['home_score'],'3')
+        self.assertEqual(result['away_score'],'1')
+        self.assertEqual(result['clock'],"67'")
+        final=event()
+        final['status']['type'].update(state='post',name='STATUS_FULL_TIME',shortDetail='FT')
+        result=server._fixture(final,'fra.1')
+        self.assertTrue(result['completed'])
+        self.assertEqual(result['state'],'post')
+        self.assertEqual(result['home_score'],'2')
+
+    def test_fixture_feed_includes_every_status_and_short_cache(self):
+        today=datetime.now(timezone.utc).date().isoformat()
+        live=event(completed=False)
+        live['status']['type'].update(state='in',name='STATUS_IN_PROGRESS')
+        final=event()
+        final['status']['type'].update(state='post')
+        with patch.object(server,'fetch',return_value={'events':[live,final,event(completed=False,future=True)]}) as fetch:
+            response=self.client.get('/api/fixtures?league=fra.1&date='+today)
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(len(response.json['events']),3)
+        self.assertEqual(fetch.call_args.kwargs['ttl'],20)
+        self.assertIn('updated_at',response.json)
+
     def test_input_validation_and_asset_routes(self):
         self.assertEqual(self.client.get('/api/analyze?league=fra.1&home_id=1&away_id=1').status_code,400)
         self.assertEqual(self.client.get('/api/fixtures?date=invalid').status_code,400)
         self.assertEqual(self.client.post('/api/analyse-statistique',json=[]).status_code,400)
         with self.client.get('/stade_premium.png') as response:
             self.assertEqual(response.status_code,200)
-        self.assertEqual(self.client.get('/api/health').json['version'],'45')
+        self.assertEqual(self.client.get('/api/health').json['version'],'46')
 
 if __name__=='__main__': unittest.main()
