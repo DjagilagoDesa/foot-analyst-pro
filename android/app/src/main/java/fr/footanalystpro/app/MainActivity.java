@@ -17,7 +17,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 public class MainActivity extends Activity {
-    private static final String HOME = "https://foot-analyst-pro-v41.onrender.com/";
+    private static final String HOME = "https://foot-analyst-pro.onrender.com/";
     private WebView web;
     private LinearLayout root;
     private LinearLayout errorPanel;
