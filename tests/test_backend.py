@@ -81,6 +81,6 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(self.client.post('/api/analyse-statistique',json=[]).status_code,403)
         with self.client.get('/stade_premium.png') as response:
             self.assertEqual(response.status_code,200)
-        self.assertEqual(self.client.get('/api/health').json['version'],'47')
+        self.assertEqual(self.client.get('/api/health').json['version'],'48')
 
 if __name__=='__main__': unittest.main()

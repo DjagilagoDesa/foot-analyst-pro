@@ -1,7 +1,7 @@
 name: Backend and calendar checks
 on:
   push:
-    branches: [live-scores-v46, profile-v47]
+    branches: [live-scores-v46, profile-v47, analysis-premium-v48]
   pull_request:
     paths: ['app.py', 'accounts.py', 'profile.js', 'engine.py', 'index.html', 'tests/**', '.github/workflows/backend-checks.yml']
 permissions:
