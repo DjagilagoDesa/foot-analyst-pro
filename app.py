@@ -355,13 +355,15 @@ def team_next():
             candidates[f['id']]=f
     # Team schedules may omit upcoming fixtures. Scoreboards also find cup matches
     # before the next domestic game, across every competition the application covers.
-    dates=now.strftime('%Y%m%d')+'-'+(now+timedelta(days=14)).strftime('%Y%m%d')
     jobs=[]
-    with ThreadPoolExecutor(max_workers=16) as pool:
+    with ThreadPoolExecutor(max_workers=20) as pool:
         for season in (now.year-1,now.year,now.year+1):
             jobs.append((pool.submit(fetch,f'{ESPN}/{lg}/teams/{team}/schedule',{'season':season},120),lg,'schedule_'+str(season)))
+        priority={lg,'uefa.champions','uefa.europa'}
         for league in LEAGUES:
-            jobs.append((pool.submit(fetch,f'{ESPN}/{league}/scoreboard',{'dates':dates,'limit':1000},60),league,league))
+            for offset in range(8 if league in priority else 1):
+                day=(now+timedelta(days=offset)).strftime('%Y%m%d')
+                jobs.append((pool.submit(fetch,f'{ESPN}/{league}/scoreboard',{'dates':day,'limit':200},60),league,league+'_'+day))
         for job,league,label in jobs:
             try:
                 accept(job.result(),league);successes+=1
@@ -372,7 +374,7 @@ def team_next():
     if not successes:
         return jsonify({'error':'upstream_unavailable','message':'Les sources sportives sont temporairement indisponibles. Réessaie dans un instant.'}),503
     return jsonify({'event':None,'events':[],'partial':bool(failures),
-      'message':'Aucun match confirmé retrouvé : calendriers de cette équipe sur 90 jours et compétitions couvertes sur les 14 prochains jours. Certains calendriers peuvent être incomplets.'})
+      'message':'Aucun match confirmé retrouvé : calendriers de cette équipe sur 90 jours et championnat et coupes européennes sur les 7 prochains jours, autres compétitions couvertes aujourd’hui. Certains calendriers peuvent être incomplets.'})
 
 @app.get('/stadium.jpg')
 def stadium_asset():
