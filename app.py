@@ -20,7 +20,7 @@ def fetch(url, params=None, ttl=900):
     with LOCK:
         item = CACHE.get(key)
         if item and time.time()-item[0] < ttl: return item[1]
-    r = SESSION.get(url, params=params, timeout=12)
+    r = SESSION.get(url, params=params, timeout=(3, 5))
     r.raise_for_status()
     data = r.json()
     with LOCK:
@@ -36,6 +36,9 @@ def parse_events(data, team_id=None):
         if len(teams)!=2: continue
         state=(comp.get('status') or e.get('status') or {}).get('type') or {}
         if not state.get('completed'): continue
+        try:
+            if datetime.fromisoformat(e['date'].replace('Z','+00:00')) > datetime.now(timezone.utc): continue
+        except (KeyError, ValueError, TypeError): continue
         try:
             home=next(t for t in teams if t.get('homeAway')=='home')
             away=next(t for t in teams if t.get('homeAway')=='away')
@@ -56,14 +59,15 @@ def history(league,team_id,limit=12):
     now=datetime.now(timezone.utc)
     collected={}
     errors=[]
-    for season in (now.year,now.year-1,now.year-2):
-        try:
-            data=fetch(f'{ESPN}/{league}/teams/{team_id}/schedule',{'season':season},ttl=1800)
-            for match in parse_events(data,team_id):
-                if match['id']: collected[match['id']]=match
-        except (requests.RequestException,ValueError) as exc:
-            errors.append(f'{season}: {type(exc).__name__}')
-        if len(collected)>=limit: break
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        jobs={pool.submit(fetch,f'{ESPN}/{league}/teams/{team_id}/schedule',{'season':season},1800):season
+              for season in (now.year,now.year-1,now.year-2)}
+        for job in as_completed(jobs):
+            try:
+                for match in parse_events(job.result(),team_id):
+                    if match['id']: collected[match['id']]=match
+            except (requests.RequestException,ValueError) as exc:
+                errors.append(f'{jobs[job]}: {type(exc).__name__}')
     matches=sorted(collected.values(),key=lambda m:m.get('date') or '',reverse=True)
     return matches[:limit],errors
 
@@ -113,7 +117,7 @@ def frontend_icon():
     return send_from_directory('.', 'icon.svg')
 
 @app.get('/api/health')
-def healthcheck(): return jsonify({'status':'ok','version':'30','sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
+def healthcheck(): return jsonify({'status':'ok','version':'45','sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
 
 @app.get('/api/leagues')
 def leagues(): return jsonify({'leagues':LEAGUES})
@@ -156,7 +160,7 @@ def search_teams():
                         output.append({'id':team.get('id'),'name':name,'badge':logos[0].get('href') if logos else None,'league':league})
         return output
     found=[];errors=0
-    with ThreadPoolExecutor(max_workers=8) as pool:
+    with ThreadPoolExecutor(max_workers=len(LEAGUES)) as pool:
         futures=[pool.submit(one_league,lg) for lg in LEAGUES]
         for f in as_completed(futures):
             try: found.extend(f.result())
@@ -205,8 +209,11 @@ def analyze():
     away=request.args.get('away_id','')
     if league not in LEAGUES or not home.isdigit() or not away.isdigit() or home==away:
         return jsonify({'error':'provide valid league, home_id, away_id'}),400
-    hm,he=history(league,home)
-    am,ae=history(league,away)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        hf=pool.submit(history,league,home)
+        af=pool.submit(history,league,away)
+        hm,he=hf.result()
+        am,ae=af.result()
     hs,as_=summary(hm,home),summary(am,away)
     result={'league':league,'home_id':home,'away_id':away,'home':hs,'away':as_,'source':'ESPN unofficial API','data_quality':{'home_games':len(hm),'away_games':len(am),'source_errors':{'home':he,'away':ae}},'generated_at':datetime.now(timezone.utc).isoformat(),'disclaimer':'Statistical estimates are not certainties. Odds, injuries, lineups and xG are not included.'}
     if len(hm)<5 or len(am)<5:
@@ -228,8 +235,6 @@ def ticket():
     choices.sort(key=lambda c:c['estimated_probability'],reverse=True)
     return jsonify({'status':'ok','suggestions':choices[:3],'analysis':data,'warning':'No real bookmaker odds; not a verified value bet. Probabilities are model estimates, not guarantees.'})
 
-if __name__=='__main__':
-    app.run(host='0.0.0.0',port=int(os.environ.get('PORT','10000')))
 
 # V29: unified server-side fixture feed to avoid browser CORS failures.
 from datetime import timedelta
@@ -282,9 +287,17 @@ def team_next():
     if lg not in LEAGUES or not team.isdigit():return jsonify({'error':'invalid_team'}),400
     now=datetime.now(timezone.utc)
     candidates=[];failed=0
-    for season in (now.year-1,now.year,now.year+1):
+    def season_data(season):
         try:
-            data=fetch(f'{ESPN}/{lg}/teams/{team}/schedule',{'season':season},ttl=900)
+            return fetch(f'{ESPN}/{lg}/teams/{team}/schedule',{'season':season},ttl=900)
+        except (requests.RequestException,ValueError):return None
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        schedules=list(pool.map(season_data,(now.year-1,now.year,now.year+1)))
+    for data in schedules:
+        if data is None:
+            failed+=1
+            continue
+        try:
             for e in data.get('events') or []:
                 try:date=datetime.fromisoformat(e['date'].replace('Z','+00:00'))
                 except (ValueError,KeyError,TypeError):continue
@@ -319,3 +332,6 @@ def analyse_statistique():
 def stade_premium_v37():
     return send_from_directory(".", "stade_premium.png", mimetype="image/png")
 
+
+if __name__=='__main__':
+    app.run(host='0.0.0.0',port=int(os.environ.get('PORT','10000')))

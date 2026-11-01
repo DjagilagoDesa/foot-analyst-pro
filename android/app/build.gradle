@@ -1,0 +1,13 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'fr.footanalystpro.app'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'fr.footanalystpro.app'
+        minSdk 26
+        targetSdk 36
+        versionCode 1
+        versionName '0.45.0'
+    }
+    buildTypes { release { minifyEnabled true; shrinkResources true; proguardFiles getDefaultProguardFile('proguard-android-optimize.txt') } }
+}
