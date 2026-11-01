@@ -145,7 +145,7 @@ def frontend_icon():
     return send_from_directory('.', 'icon.svg')
 
 @app.get('/api/health')
-def healthcheck(): return jsonify({'status':'ok','version':'50','sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
+def healthcheck(): return jsonify({'status':'ok','version':'51','sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
 
 @app.get('/api/leagues')
 def leagues(): return jsonify({'leagues':LEAGUES})
@@ -167,11 +167,13 @@ def teams():
 
 
 def _normalize_team_name(value):
-    return ''.join(c for c in unicodedata.normalize('NFKD', str(value or '').casefold()) if not unicodedata.combining(c))
+    text = ''.join(c for c in unicodedata.normalize('NFKD', str(value or '').casefold()) if not unicodedata.combining(c))
+    return ' '.join(''.join(c if c.isalnum() else ' ' for c in text).split())
 
 @app.get('/api/search-teams')
 def search_teams():
     q=_normalize_team_name(request.args.get('q','').strip())
+    q = {'psg':'paris saint germain','om':'marseille','ol':'lyon','asse':'saint etienne','inter milan':'internazionale'}.get(q,q)
     if not q: return jsonify({'teams': []})
     if len(q)>80: return jsonify({'error':'query_too_long'}),400
     def one_league(league):
@@ -194,8 +196,8 @@ def search_teams():
             try: found.extend(f.result())
             except (requests.RequestException,ValueError,KeyError): errors+=1
     seen=set();teams=[]
-    for team in sorted(found,key=lambda t:(not _normalize_team_name(t['name']).startswith(q),len(t['name']),t['name'])):
-        key=(team['league'],str(team['id']))
+    for team in sorted(found,key=lambda t:(not _normalize_team_name(t['name']).startswith(q),len(t['name']),t['name'],LEAGUES.index(t['league']))):
+        key=str(team['id'])
         if key in seen:continue
         seen.add(key);teams.append(team)
     if errors==len(LEAGUES):return jsonify({'error':'sources_unavailable'}),502
@@ -337,29 +339,40 @@ def fixtures():
 def team_next():
     lg=request.args.get('league','');team=request.args.get('team_id','')
     if lg not in LEAGUES or not team.isdigit():return jsonify({'error':'invalid_team'}),400
-    now=datetime.now(timezone.utc)
-    candidates=[];failed=0
-    def season_data(season):
-        try:
-            return fetch(f'{ESPN}/{lg}/teams/{team}/schedule',{'season':season},ttl=900)
-        except (requests.RequestException,ValueError):return None
-    with ThreadPoolExecutor(max_workers=3) as pool:
-        schedules=list(pool.map(season_data,(now.year-1,now.year,now.year+1)))
-    for data in schedules:
-        if data is None:
-            failed+=1
-            continue
-        try:
-            for e in data.get('events') or []:
-                try:date=datetime.fromisoformat(e['date'].replace('Z','+00:00'))
-                except (ValueError,KeyError,TypeError):continue
-                if date < now-timedelta(hours=4) or date > now+timedelta(days=90):continue
-                f=_fixture(e,lg)
-                if f and team in (f['home']['id'],f['away']['id']) and not f['completed']:candidates.append(f)
-        except (requests.RequestException,ValueError):failed+=1
-    if candidates:return jsonify({'event':min(candidates,key=lambda x:x['date']),'source':'ESPN unofficial'})
-    if failed==3:return jsonify({'error':'upstream_unavailable'}),503
-    return jsonify({'event':None,'message':'Aucun prochain match confirmé dans les 90 jours couverts'})
+    now=datetime.now(timezone.utc); end=now+timedelta(days=90)
+    candidates={}; failures=[]; successes=0
+    def accept(data, league):
+        for event in data.get('events') or []:
+            f=_fixture(event,league)
+            if not f or f['completed'] or f['state']=='post':continue
+            if any(word in f['status_name'].upper() for word in ('POSTPONED','CANCELED','CANCELLED','ABANDONED','SUSPENDED')):continue
+            if team not in (f['home']['id'],f['away']['id']):continue
+            try:date=datetime.fromisoformat(f['date'].replace('Z','+00:00'))
+            except (ValueError,TypeError,AttributeError):continue
+            if date.tzinfo is None:continue
+            if date > end or (date < now and not (f['state']=='in' and date>=now-timedelta(hours=6))):continue
+            f['date']=date.astimezone(timezone.utc).isoformat()
+            candidates[f['id']]=f
+    # Team schedules may omit upcoming fixtures. Scoreboards also find cup matches
+    # before the next domestic game, across every competition the application covers.
+    dates=now.strftime('%Y%m%d')+'-'+(now+timedelta(days=14)).strftime('%Y%m%d')
+    jobs=[]
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        for season in (now.year-1,now.year,now.year+1):
+            jobs.append((pool.submit(fetch,f'{ESPN}/{lg}/teams/{team}/schedule',{'season':season},120),lg,'schedule_'+str(season)))
+        for league in LEAGUES:
+            jobs.append((pool.submit(fetch,f'{ESPN}/{league}/scoreboard',{'dates':dates,'limit':1000},60),league,league))
+        for job,league,label in jobs:
+            try:
+                accept(job.result(),league);successes+=1
+            except (requests.RequestException,ValueError,KeyError,TypeError):failures.append(label)
+    if candidates:
+        events=sorted(candidates.values(),key=lambda f:(f['state']!='in',f['date'],f['id']))
+        return jsonify({'event':events[0],'events':events[:10],'source':'ESPN unofficial','partial':bool(failures)})
+    if not successes:
+        return jsonify({'error':'upstream_unavailable','message':'Les sources sportives sont temporairement indisponibles. Réessaie dans un instant.'}),503
+    return jsonify({'event':None,'events':[],'partial':bool(failures),
+      'message':'Aucun match confirmé retrouvé : calendriers de cette équipe sur 90 jours et compétitions couvertes sur les 14 prochains jours. Certains calendriers peuvent être incomplets.'})
 
 @app.get('/stadium.jpg')
 def stadium_asset():
@@ -388,4 +401,5 @@ def stade_premium_v37():
 
 if __name__=='__main__':
     app.run(host='0.0.0.0',port=int(os.environ.get('PORT','10000')))
+
 
