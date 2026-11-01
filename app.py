@@ -5,9 +5,14 @@ from collections import defaultdict
 import requests
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
+from werkzeug.middleware.proxy_fix import ProxyFix
+from accounts import init_app as init_accounts, metered_analysis
 
 app = Flask(__name__)
-CORS(app, resources={r'/api/*': {'origins': '*'}})
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
+app.config['MAX_CONTENT_LENGTH'] = 32 * 1024
+init_accounts(app)
+CORS(app, resources={r'/api/(health|leagues|teams|search-teams|next-match|team-next|fixtures)$': {'origins': '*'}})
 SESSION = requests.Session()
 SESSION.headers.update({'User-Agent': 'FootAnalystPro/22 (football statistics)'})
 CACHE = {}
@@ -117,7 +122,7 @@ def frontend_icon():
     return send_from_directory('.', 'icon.svg')
 
 @app.get('/api/health')
-def healthcheck(): return jsonify({'status':'ok','version':'46','sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
+def healthcheck(): return jsonify({'status':'ok','version':'47','sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
 
 @app.get('/api/leagues')
 def leagues(): return jsonify({'leagues':LEAGUES})
@@ -202,11 +207,11 @@ def next_match():
     if len(failures)==2:return jsonify({'error':'upstream_unavailable','details':failures}),502
     return jsonify({'events':[],'source':'ESPN','note':'No confirmed upcoming fixture in covered schedule'})
 
-@app.get('/api/analyze')
 def analyze():
-    league=request.args.get('league','')
-    home=request.args.get('home_id','')
-    away=request.args.get('away_id','')
+    data=request.get_json(silent=True) or {}
+    league=str(data.get('league',''))
+    home=str(data.get('home_id',''))
+    away=str(data.get('away_id',''))
     if league not in LEAGUES or not home.isdigit() or not away.isdigit() or home==away:
         return jsonify({'error':'provide valid league, home_id, away_id'}),400
     with ThreadPoolExecutor(max_workers=2) as pool:
@@ -222,18 +227,22 @@ def analyze():
         result.update({'status':'ok','model':'simple_poisson_baseline','prediction':probabilities(hs,as_)})
     return jsonify(result)
 
+@app.post('/api/analyze')
+@metered_analysis
+def analyze_endpoint():
+    return analyze()
+
 @app.get('/api/ticket')
 def ticket():
-    # Never fabricate odds. Input: league,home_id,away_id. One match at a time initially.
-    with app.test_request_context('/api/analyze',query_string=request.args):
-        response=analyze()
-    if isinstance(response,tuple): return response
-    data=response.get_json()
-    if data.get('status')!='ok': return jsonify({'status':'no_selection','analysis':data})
-    markets=data['prediction']['markets']
-    choices=[{'market':k,'estimated_probability':v} for k,v in markets.items() if k in ('over_1_5','over_2_5','btts','home_or_draw','away_or_draw')]
-    choices.sort(key=lambda c:c['estimated_probability'],reverse=True)
-    return jsonify({'status':'ok','suggestions':choices[:3],'analysis':data,'warning':'No real bookmaker odds; not a verified value bet. Probabilities are model estimates, not guarantees.'})
+    return jsonify({'error':'use_authenticated_analysis','message':'Connecte-toi et ouvre une fiche match pour lancer ton analyse.'}),410
+
+@app.get('/profile.js')
+def profile_script():
+    return send_from_directory('.', 'profile.js', mimetype='application/javascript')
+
+@app.get('/account-deletion')
+def account_deletion():
+    return send_from_directory('.', 'account-deletion.html')
 
 
 # V29: unified server-side fixture feed to avoid browser CORS failures.
@@ -327,6 +336,7 @@ def premium_cover_asset():
 # V36: independent analysis endpoint; statistics must be supplied, never invented.
 from engine import analyse as analyse_independent
 @app.post('/api/analyse-statistique')
+@metered_analysis
 def analyse_statistique():
     data = request.get_json(silent=True)
     if not isinstance(data, dict):

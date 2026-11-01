@@ -41,8 +41,8 @@ class BackendTests(unittest.TestCase):
             self.assertEqual(errors,[])
 
     def test_low_sample_never_generates_probabilities(self):
-        with patch.object(server,'history',return_value=([],[])):
-            data=self.client.get('/api/analyze?league=fra.1&home_id=1&away_id=2').json
+        with patch.object(server,'history',return_value=([],[])), server.app.test_request_context('/api/analyze',method='POST',json={'league':'fra.1','home_id':'1','away_id':'2'}):
+            data=server.analyze().get_json()
         self.assertEqual(data['status'],'insufficient_data')
         self.assertNotIn('prediction',data)
 
@@ -76,11 +76,11 @@ class BackendTests(unittest.TestCase):
         self.assertIn('updated_at',response.json)
 
     def test_input_validation_and_asset_routes(self):
-        self.assertEqual(self.client.get('/api/analyze?league=fra.1&home_id=1&away_id=1').status_code,400)
+        self.assertEqual(self.client.get('/api/analyze?league=fra.1&home_id=1&away_id=1').status_code,405)
         self.assertEqual(self.client.get('/api/fixtures?date=invalid').status_code,400)
-        self.assertEqual(self.client.post('/api/analyse-statistique',json=[]).status_code,400)
+        self.assertEqual(self.client.post('/api/analyse-statistique',json=[]).status_code,403)
         with self.client.get('/stade_premium.png') as response:
             self.assertEqual(response.status_code,200)
-        self.assertEqual(self.client.get('/api/health').json['version'],'46')
+        self.assertEqual(self.client.get('/api/health').json['version'],'47')
 
 if __name__=='__main__': unittest.main()
