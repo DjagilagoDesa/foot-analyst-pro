@@ -319,3 +319,36 @@ def analyse_statistique():
 def stade_premium_v37():
     return send_from_directory(".", "stade_premium.png", mimetype="image/png")
 
+
+# V40 additional transparent analysis API. Existing V39 routes remain intact.
+from intelligence import deep_analysis, build_ticket_profiles
+@app.get('/api/v40/deep-analysis')
+def v40_deep_analysis():
+    league=request.args.get('league','')
+    home=request.args.get('home_id','')
+    away=request.args.get('away_id','')
+    if league not in LEAGUES or not home.isdigit() or not away.isdigit() or home==away:
+        return jsonify({'error':'invalid_team_or_league'}),400
+    hm,he=history(league,home)
+    am,ae=history(league,away)
+    hs,as_=summary(hm,home),summary(am,away)
+    result=deep_analysis(hs,as_,hm[0]['home'] if hm and hm[0]['home_id']==home else home,am[0]['away'] if am and am[0]['away_id']==away else away)
+    result['source']='ESPN unofficial public results'
+    result['generated_at']=datetime.now(timezone.utc).isoformat()
+    result['source_errors']={'home':he,'away':ae}
+    return jsonify(result)
+
+@app.post('/api/v40/tickets')
+def v40_tickets():
+    payload=request.get_json(silent=True)
+    if not isinstance(payload,dict) or not isinstance(payload.get('analyses'),list) or len(payload['analyses'])>20:
+        return jsonify({'error':'analyses must be an array of up to 20 analysis objects'}),400
+    # Recompute on the server from validated summary data; never trust submitted probability figures.
+    analyses=[]
+    for item in payload['analyses']:
+        if not isinstance(item,dict): return jsonify({'error':'invalid_analysis'}),400
+        home,away=item.get('home'),item.get('away')
+        if not isinstance(home,dict) or not isinstance(away,dict): return jsonify({'error':'missing_summaries'}),400
+        result=deep_analysis(home,away,str(item.get('home_name','Home'))[:80],str(item.get('away_name','Away'))[:80])
+        analyses.append(result)
+    return jsonify({'status':'ok','profiles':build_ticket_profiles(analyses),'warning':'Illustrative estimates only, not guarantees or verified bookmaker value.'})
