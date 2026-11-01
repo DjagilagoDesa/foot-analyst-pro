@@ -213,6 +213,10 @@ def analyze():
         result.update({'status':'insufficient_data','message':'Fewer than five completed matches found per team; no probabilities or betting ticket generated.'})
     else:
         result.update({'status':'ok','model':'simple_poisson_baseline','prediction':probabilities(hs,as_)})
+        from report_v41 import report
+        home_name=next((m['home'] for m in hm if m['home_id']==home),None) or next((m['away'] for m in hm if m['away_id']==home),None) or 'Équipe domicile'
+        away_name=next((m['home'] for m in am if m['home_id']==away),None) or next((m['away'] for m in am if m['away_id']==away),None) or 'Équipe extérieur'
+        result['editorial_report']=report(home_name,away_name,hs,as_,result['prediction'],result['data_quality'])
     return jsonify(result)
 
 @app.get('/api/ticket')
