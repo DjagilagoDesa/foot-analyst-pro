@@ -11,9 +11,25 @@ function longDailySelections(results){
  }
  return selected;
 }
+function mixedDailySelections(results){
+ const groups=[['home_or_draw','away_or_draw'],['over_1_5','over_2_5','under_1_5','under_2_5'],['btts','btts_no']];
+ const used=new Set(),teams=new Set(),selected=[];
+ for(const keys of groups){
+  const options=[];
+  for(const r of results){
+   const markets=ticketMarkets(r.analysis.prediction?.markets||{});
+   if(used.has(String(r.match.id))||teams.has(String(r.match.home.id))||teams.has(String(r.match.away.id)))continue;
+   for(const market of keys){const probability=markets[market];if(Number.isFinite(probability)&&probability>=50&&probability<100)options.push({...r,choice:{market,probability}});}
+  }
+  options.sort((a,b)=>b.choice.probability-a.choice.probability);
+  if(!options.length)return [];
+  const r=options[0];selected.push(r);used.add(String(r.match.id));teams.add(String(r.match.home.id));teams.add(String(r.match.away.id));
+ }
+ return selected;
+}
 (()=>{
  const get=id=>document.getElementById(id),esc=escapeHtml;
- const labels={home:'Victoire domicile',away:'Victoire extérieur',home_or_draw:'Double chance 1X',away_or_draw:'Double chance X2',over_1_5:'Plus de 1,5 but',over_2_5:'Plus de 2,5 buts',btts:'Les deux équipes marquent'};
+ const labels={home:'Victoire domicile',away:'Victoire extérieur',home_or_draw:'Double chance 1X',away_or_draw:'Double chance X2',over_1_5:'Plus de 1,5 but',over_2_5:'Plus de 2,5 buts',under_1_5:'Moins de 1,5 but',under_2_5:'Moins de 2,5 buts',btts_no:'Les deux équipes marquent : non',btts:'Les deux équipes marquent'};
  const message=(t,error=false)=>'<div class="message '+(error?'error':'')+'">'+esc(t)+'</div>';
  function renderLongTicket(results,locked){
   const selected=longDailySelections(results),title='Ticket 4 · Grand combiné · 5 à 8 matchs';
@@ -49,9 +65,10 @@ function longDailySelections(results){
    }
    notice.innerHTML=message(day+' · '+total+' rencontre(s) à venir retrouvée(s). Les 16 prochaines au maximum sont examinées dans l’ordre horaire jusqu’à obtenir 8 analyses. Ce n’est pas une sélection exhaustive des meilleurs paris.'+(feed.partial?' Couverture partielle.':''));
    if(locked&&results.length===0){renderLockedAnalysis(out);return;}
-   const profiles=[['prudent','Ticket 1 · Prudent',2],['balanced','Ticket 2 · Équilibré',3],['offensive','Ticket 3 · Offensif',3]];
+   const profiles=[['prudent','Ticket 1 · Prudent',2],['balanced','Ticket 2 · Équilibré',3],['offensive','Ticket 3 · Offensif',3],['long','Ticket 4 · Grand combiné',0],['mixed','Ticket 5 · Double chance & buts',3]];
    out.innerHTML=profiles.map(([profile,title,count])=>{
-    const choices=results.map(r=>({...r,choice:ticketSelection(r.analysis.prediction.markets,profile)})).filter(r=>r.choice).sort((a,b)=>b.choice.probability-a.choice.probability);
+    if(profile==='long')return renderLongTicket(results,locked);
+    const choices=(profile==='mixed'?mixedDailySelections(results):results.map(r=>({...r,choice:ticketSelection(r.analysis.prediction.markets,profile)})).filter(r=>r.choice).sort((a,b)=>b.choice.probability-a.choice.probability));
     const selected=[],teams=new Set();
     for(const r of choices){if(teams.has(String(r.match.home.id))||teams.has(String(r.match.away.id)))continue;selected.push(r);teams.add(String(r.match.home.id));teams.add(String(r.match.away.id));if(selected.length===count)break;}
     if(selected.length<count)return '<div class="panel"><h2>'+title+'</h2>'+message('Pas assez de matchs distincts disposant de données suffisantes pour ce profil. Aucun ticket artificiellement complété.')+'</div>';
@@ -59,12 +76,13 @@ function longDailySelections(results){
     const joint=selected.reduce((p,r)=>p*r.choice.probability/100,1);
     return '<div class="panel premium"><h2>'+title+'</h2>'+selected.map((r,i)=>'<div class="message"><strong>'+esc((i+1)+'. '+r.match.home.name+' – '+r.match.away.name)+'</strong><p class="gold">'+esc(labels[r.choice.market])+'</p><p>Probabilité du modèle : '+esc(r.choice.probability)+' %</p><details><summary>Lire l’analyse détaillée</summary>'+renderAnalysisReport(r.analysis)+'</details></div>').join('')+
      message('Probabilité combinée sous hypothèse d’indépendance : '+(joint*100).toFixed(2).replace('.',',')+' %. Cote équitable théorique : '+(1/joint).toFixed(2).replace('.',',')+' — ce n’est pas une cote bookmaker.')+'</div>';
-   }).join('')+renderLongTicket(results,locked)+skipped.map(t=>message(t)).join('')+'<p class="fine">Les quatre tickets peuvent partager des matchs et des sélections : ce ne sont pas quatre tickets indépendants. Aucun gain garanti. Les profils utilisent les probabilités du modèle, sans connaître les cotes réelles ni vérifier les compositions.</p>';
+   }).join('')+skipped.map(t=>message(t)).join('')+'<p class="fine">Les cinq tickets peuvent partager des matchs et des sélections : ce ne sont pas cinq tickets indépendants. Aucun gain garanti. Les profils utilisent les probabilités du modèle, sans connaître les cotes réelles ni vérifier les compositions.</p>';
    const missed=await window.Tracking.record(toTrack);
    if(missed)notice.innerHTML+=message(missed+' sélection(s) non enregistrée(s) dans le suivi : rencontre non vérifiable, déjà commencée ou ancienne analyse.');
   }catch(e){out.innerHTML=message('Tickets non finalisés : '+e.message,true);if(e.code==='login_required')window.Accounts.needsLogin(out);}
   finally{busy=false;get('generateDailyTickets').disabled=false;await window.Accounts.afterAnalysis();}
  };
 })();
+
 
 

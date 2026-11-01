@@ -1,7 +1,7 @@
 /* Each ticket selection is recorded server-side before kickoff. */
 (()=>{
  const get=id=>document.getElementById(id),esc=escapeHtml;
- const market={home:'Victoire domicile',away:'Victoire extérieur',draw:'Match nul',home_or_draw:'Double chance 1X',away_or_draw:'Double chance X2',over_1_5:'Plus de 1,5 but',over_2_5:'Plus de 2,5 buts',btts:'Les deux marquent'};
+ const market={home:'Victoire domicile',away:'Victoire extérieur',draw:'Match nul',home_or_draw:'Double chance 1X',away_or_draw:'Double chance X2',over_1_5:'Plus de 1,5 but',over_2_5:'Plus de 2,5 buts',under_1_5:'Moins de 1,5 but',under_2_5:'Moins de 2,5 buts',btts_no:'Les deux équipes marquent : non',btts:'Les deux marquent'};
  window.Tracking={record:async picks=>{
   let missed=0;
   for(const pick of picks){
@@ -18,3 +18,4 @@
  }};
  get('refreshTracking').onclick=window.Tracking.load;
 })();
+

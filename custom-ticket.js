@@ -1,9 +1,17 @@
 /* Personal ticket builder: reuses authenticated, metered match analyses. */
+function ticketMarkets(markets){
+ const values={...markets};
+ for(const [under,over] of [['under_1_5','over_1_5'],['under_2_5','over_2_5'],['btts_no','btts']]){
+  if(!Number.isFinite(values[under])&&Number.isFinite(values[over]))values[under]=Math.round((100-values[over])*10)/10;
+ }
+ return values;
+}
 function ticketSelection(markets, profile){
- const allowed=['home','away','home_or_draw','away_or_draw','over_1_5','over_2_5','btts'];
+ markets=ticketMarkets(markets);
+ const allowed=(profile==='mixed'?[]:['home','away']).concat(['home_or_draw','away_or_draw','over_1_5','over_2_5','under_1_5','under_2_5','btts','btts_no']);
  const options=allowed.filter(k=>Number.isFinite(markets[k])&&markets[k]>0&&markets[k]<100).map(k=>({market:k,probability:markets[k]}));
  if(!options.length)return null;
- const bands={prudent:[75,100],balanced:[60,80],offensive:[45,65]};
+ const bands={prudent:[75,100],balanced:[60,80],offensive:[45,65],mixed:[55,85]};
  const [min,max]=bands[profile]||bands.balanced;
  const pool=options.filter(x=>x.probability>=min&&x.probability<=max);
  return (pool.length?pool:options).sort((a,b)=>b.probability-a.probability||allowed.indexOf(a.market)-allowed.indexOf(b.market))[0];
@@ -11,7 +19,7 @@ function ticketSelection(markets, profile){
 (()=>{
  const el=id=>document.getElementById(id),esc=escapeHtml;
  let chosen=[],fixtures=[],busy=false,loadToken=0;
- const labels={home:'Victoire domicile',away:'Victoire extérieur',home_or_draw:'Double chance 1X',away_or_draw:'Double chance X2',over_1_5:'Plus de 1,5 but',over_2_5:'Plus de 2,5 buts',btts:'Les deux équipes marquent'};
+ const labels={home:'Victoire domicile',away:'Victoire extérieur',home_or_draw:'Double chance 1X',away_or_draw:'Double chance X2',over_1_5:'Plus de 1,5 but',over_2_5:'Plus de 2,5 buts',under_1_5:'Moins de 1,5 but',under_2_5:'Moins de 2,5 buts',btts_no:'Les deux équipes marquent : non',btts:'Les deux équipes marquent'};
  const key=m=>String(m.id),name=m=>m.home.name+' – '+m.away.name;
  const upcoming=m=>m.state==='pre'&&!m.completed&&new Date(m.date).getTime()>Date.now()&&!/POSTPONED|CANCELED|CANCELLED|ABANDONED|SUSPENDED/.test(m.status_name||'');
  const message=(s,error=false)=>'<div class="message '+(error?'error':'')+'">'+esc(s)+'</div>';
@@ -65,7 +73,7 @@ function ticketSelection(markets, profile){
    if(untracked)el('customNotice').innerHTML=message(untracked+' sélection(s) non enregistrée(s) dans le suivi : rencontre non vérifiable, déjà commencée ou ancienne analyse.');
    let joint=results.reduce((v,r)=>v*r.probability/100,1);
    const repeated=new Set(),teams=new Set();for(const r of results){for(const id of [r.match.home.id,r.match.away.id]){if(teams.has(String(id)))repeated.add(String(id));teams.add(String(id));}}
-   const profileName={prudent:'Prudent',balanced:'Équilibré',offensive:'Offensif'}[profile];
+   const profileName={prudent:'Prudent',balanced:'Équilibré',offensive:'Offensif',mixed:'Double chance & buts'}[profile];
    target.innerHTML='<div class="panel premium"><h2>Ton ticket personnalisé · '+esc(profileName)+'</h2>'+results.map((r,i)=>'<div class="panel"><h3>'+esc((i+1)+'. '+name(r.match))+'</h3><p class="gold"><strong>'+esc(labels[r.market])+'</strong></p><p>Probabilité du modèle : <strong>'+esc(r.probability)+' %</strong></p><p class="fine">Sélection dans la plage du profil choisi lorsqu’elle est disponible ; sinon, choix du marché avec la probabilité la plus élevée. Ce tri n’établit pas la rentabilité d’un pari.</p><details><summary>Pourquoi ce choix ? Voir l’analyse du match</summary>'+renderAnalysisReport(r.analysis)+'</details></div>').join('')+
     (repeated.size?message('Plusieurs rencontres concernent la même équipe : leur dépendance empêche de présenter une probabilité combinée crédible. Les sélections sont affichées séparément.'):message('Estimation combinée sous hypothèse d’indépendance : '+(joint*100).toFixed(2).replace('.',',')+' %. Cote équitable théorique : '+(1/joint).toFixed(2).replace('.',',')+'. Ce n’est pas une cote bookmaker.'))+
     '<p class="fine">Une sélection par match. Les matchs peuvent rester dépendants ; le produit des probabilités est une approximation non calibrée. Ajouter des matchs augmente le risque d’échec. Aucune garantie de gain, aucun pari placé par l’application.</p></div>';
@@ -76,4 +84,5 @@ function ticketSelection(markets, profile){
  openMatch=function(m,from){originalOpen(m,from);const button=document.createElement('button');button.type='button';button.className='day';button.textContent='＋ AJOUTER À MON TICKET';button.style.cssText='width:100%;max-width:none;margin:12px 0';button.onclick=()=>{show('dailyTickets');add(m);};el('detailContent').prepend(button);};
  draw();
 })();
+
 
