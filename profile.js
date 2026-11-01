@@ -101,12 +101,20 @@
       targets.forEach(el=>{el.innerHTML=html;el.querySelectorAll('[data-history]').forEach(b=>b.onclick=()=>{
         const a=data.analyses[Number(b.dataset.history)],r=a.result;const probs=r.prediction?.markets||r.probabilities||{};
         const labels={home:'Victoire domicile',home_win:'Victoire domicile',draw:'Nul',away:'Victoire extérieur',away_win:'Victoire extérieur',over_1_5:'Plus de 1,5 but',over_2_5:'Plus de 2,5 buts',btts:'Les deux marquent',both_score:'Les deux marquent',home_or_draw:'Double chance 1X',away_or_draw:'Double chance X2'};
-        el.innerHTML='<button class="day" id="historyBack">← Historique</button><h3>'+esc(a.label)+'</h3><p class="fine">Analyse enregistrée le '+date(a.created_at)+'. Estimations non garanties.</p><div class="analysis">'+Object.entries(probs).filter(([k])=>labels[k]).map(([k,v])=>'<div class="stat"><span>'+labels[k]+'</span><b>'+esc(v)+' %</b></div>').join('')+'</div>';
+        el.innerHTML=renderAnalysisReport(r)+'<button class="day" id="historyBack">← Historique</button><h3>'+esc(a.label)+'</h3><p class="fine">Analyse enregistrée le '+date(a.created_at)+'. Estimations non garanties.</p><div class="analysis">'+Object.entries(probs).filter(([k])=>labels[k]).map(([k,v])=>'<div class="stat"><span>'+labels[k]+'</span><b>'+esc(v)+' %</b></div>').join('')+'</div>';
         el.querySelector('#historyBack').onclick=loadHistory;
       });});
     }catch(e){targets.forEach(el=>el.innerHTML=message(e.message,true));}
   }
+  async function loadBilling(){
+    try{
+      await refresh(false);const u=state.user;
+      id('billingAccount').textContent=u?(u.premium_active?'Premium actif jusqu’au '+date(u.premium_until):u.nickname+' · '+u.trial_remaining+' analyse(s) offerte(s) restante(s)'):'Connecte-toi ou crée ton compte pour utiliser tes 3 analyses offertes.';
+    }catch{id('billingAccount').textContent='Impossible de charger ton compte. Réessaie depuis Profil.';}
+    id('billingProfile').onclick=()=>show('info');
+    id('billingManage').onclick=()=>{window.location.href='https://play.google.com/store/account/subscriptions';};
+  }
   async function load(){try{await refresh(false);draw();}catch(e){id('profileContent').innerHTML=message('Ton profil est momentanément indisponible. '+e.message,true);}}
-  window.Accounts={request,refresh,loadHistory,render:load,afterAnalysis:async()=>{try{await refresh(false);}catch{}},needsLogin:el=>{const b=document.createElement('button');b.className='btn';b.textContent='OUVRIR MON PROFIL';b.onclick=()=>show('info');el.appendChild(b);}};
+  window.Accounts={request,refresh,loadHistory,loadBilling,render:load,afterAnalysis:async()=>{try{await refresh(false);}catch{}},needsLogin:el=>{const b=document.createElement('button');b.className='btn';b.textContent='OUVRIR MON PROFIL';b.onclick=()=>show('info');el.appendChild(b);}};
   refresh(false).catch(()=>{});
 })();

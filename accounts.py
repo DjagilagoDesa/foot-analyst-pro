@@ -396,7 +396,11 @@ def metered_analysis(func):
         key=digest(request.path+':'+json.dumps(data,sort_keys=True,ensure_ascii=False))
         label=str(data.get('label') or (str(data.get('home','Domicile'))+' – '+str(data.get('away','Extérieur'))))
         analysis_id,cached=reserve_analysis(user,key,label)
-        if cached is not None: return jsonify(cached)
+        if cached is not None:
+            from analysis_report import report
+            if cached.get('prediction') and not cached.get('report'):
+                cached['report']=report(cached)
+            return jsonify(cached)
         try:
             response=current_app.make_response(func(*args,**kwargs))
             result=response.get_json(silent=True)

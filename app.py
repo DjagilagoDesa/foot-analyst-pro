@@ -7,6 +7,7 @@ from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
 from accounts import init_app as init_accounts, metered_analysis
+from analysis_report import report as build_report
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
@@ -122,7 +123,7 @@ def frontend_icon():
     return send_from_directory('.', 'icon.svg')
 
 @app.get('/api/health')
-def healthcheck(): return jsonify({'status':'ok','version':'47','sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
+def healthcheck(): return jsonify({'status':'ok','version':'48','sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
 
 @app.get('/api/leagues')
 def leagues(): return jsonify({'leagues':LEAGUES})
@@ -225,6 +226,13 @@ def analyze():
         result.update({'status':'insufficient_data','message':'Fewer than five completed matches found per team; no probabilities or betting ticket generated.'})
     else:
         result.update({'status':'ok','model':'simple_poisson_baseline','prediction':probabilities(hs,as_)})
+    def team_name(matches,team):
+        for match in matches:
+            if match['home_id']==team:return match['home']
+            if match['away_id']==team:return match['away']
+        return 'Domicile' if team==home else 'Extérieur'
+    result['home_name']=team_name(hm,home);result['away_name']=team_name(am,away)
+    if result.get('status')=='ok':result['report']=build_report(result)
     return jsonify(result)
 
 @app.post('/api/analyze')
@@ -235,6 +243,10 @@ def analyze_endpoint():
 @app.get('/api/ticket')
 def ticket():
     return jsonify({'error':'use_authenticated_analysis','message':'Connecte-toi et ouvre une fiche match pour lancer ton analyse.'}),410
+
+@app.get('/api/billing/catalog')
+def billing_catalog():
+    return jsonify({'product_id':'foot_analyst_pro_premium_monthly','price_eur':'29.90','period':'month','trial_analyses':3,'purchase_available':False,'provider':'google_play','reason':'play_billing_setup_required'})
 
 @app.get('/profile.js')
 def profile_script():
