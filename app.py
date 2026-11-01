@@ -423,11 +423,36 @@ def stade_premium_v37():
     return send_from_directory(".", "stade_premium.png", mimetype="image/png")
 
 
+from football_assistant import answer as assistant_answer
+
+@app.post('/api/assistant')
+@metered_analysis
+def football_assistant_endpoint():
+    data=request.get_json(silent=True)
+    if not isinstance(data,dict):return jsonify(error='invalid_json',message='Demande non valide.'),400
+    # Only account-owned, already authorized football reports are sent as context.
+    from accounts import current_user, database
+    user=current_user(csrf=True)
+    import json
+    with database() as db:
+        rows=db.execute("SELECT result FROM account_analyses WHERE user_id=? AND status='complete' ORDER BY created_at DESC LIMIT 3",(user['id'],)).fetchall()
+    reports=[]
+    for row in rows:
+        result=json.loads(row['result'])
+        if result.get('report'):reports.append({'home':result.get('home_name'),'away':result.get('away_name'),'generated_at':result.get('generated_at'),'report':result['report']})
+    output,status=assistant_answer(data,{'recent_football_reports':reports})
+    return jsonify(output),status
+
+@app.get('/football-assistant.js')
+def assistant_script():
+    return send_from_directory('.', 'football-assistant.js', mimetype='application/javascript')
+
 from tracking import init_app as init_tracking
 init_tracking(app,fetch,ESPN,LEAGUES)
 
 if __name__=='__main__':
     app.run(host='0.0.0.0',port=int(os.environ.get('PORT','10000')))
+
 
 
 

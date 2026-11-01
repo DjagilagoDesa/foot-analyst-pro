@@ -94,7 +94,7 @@
     if(id(feedback))id(feedback).innerHTML=message('Traitement en cours…');
     try{await action();}catch(e){if(id(feedback))id(feedback).innerHTML=message(e.message,true);}finally{busy=false;buttons.forEach(b=>b.disabled=false);}
   }
-  function clearHistory(){for(const name of ['analysisResult','manualResult','customTicketResult','automaticTicketsResult','automaticTicketsNotice','trackingResult'])if(id(name))id(name).textContent='';if(id('analysisHistory'))id('analysisHistory').innerHTML=message('Connecte-toi pour retrouver ton historique.');}
+  function clearHistory(){window.FootballAssistant?.clear();for(const name of ['analysisResult','manualResult','customTicketResult','automaticTicketsResult','automaticTicketsNotice','trackingResult'])if(id(name))id(name).textContent='';if(id('analysisHistory'))id('analysisHistory').innerHTML=message('Connecte-toi pour retrouver ton historique.');}
   async function loadHistory(){
     const targets=['profileHistory','analysisHistory'].map(id).filter(Boolean);
     try{
@@ -105,7 +105,7 @@
       targets.forEach(el=>{el.innerHTML=html;el.querySelectorAll('[data-history]').forEach(b=>b.onclick=()=>{
         const a=data.analyses[Number(b.dataset.history)],r=a.result;const probs=r.prediction?.markets||r.probabilities||{};
         const labels={home_or_draw_and_btts:"1X + les deux équipes marquent",home_or_draw_and_btts_no:"1X + les deux équipes marquent : non",home_or_draw_and_over_1_5:"1X + plus de 1,5 but",home_or_draw_and_over_2_5:"1X + plus de 2,5 buts",home_or_draw_and_under_1_5:"1X + moins de 1,5 but",home_or_draw_and_under_2_5:"1X + moins de 2,5 buts",away_or_draw_and_btts:"X2 + les deux équipes marquent",away_or_draw_and_btts_no:"X2 + les deux équipes marquent : non",away_or_draw_and_over_1_5:"X2 + plus de 1,5 but",away_or_draw_and_over_2_5:"X2 + plus de 2,5 buts",away_or_draw_and_under_1_5:"X2 + moins de 1,5 but",away_or_draw_and_under_2_5:"X2 + moins de 2,5 buts",home:'Victoire domicile',home_win:'Victoire domicile',draw:'Nul',away:'Victoire extérieur',away_win:'Victoire extérieur',over_1_5:'Plus de 1,5 but',over_2_5:'Plus de 2,5 buts',under_1_5:'Moins de 1,5 but',under_2_5:'Moins de 2,5 buts',btts_no:'Les deux équipes marquent : non',btts:'Les deux marquent',both_score:'Les deux marquent',home_or_draw:'Double chance 1X',away_or_draw:'Double chance X2'};
-        el.innerHTML=renderAnalysisReport(r)+'<button class="day" id="historyBack">← Historique</button><h3>'+esc(a.label)+'</h3><p class="fine">Analyse enregistrée le '+date(a.created_at)+'. Estimations non garanties.</p><div class="analysis">'+Object.entries(probs).filter(([k])=>labels[k]).map(([k,v])=>'<div class="stat"><span>'+labels[k]+'</span><b>'+esc(v)+' %</b></div>').join('')+'</div>';
+        el.innerHTML=(r.assistant_reply?'<div class="message assistant-text">'+esc(r.assistant_reply)+'</div>':'')+renderAnalysisReport(r)+'<button class="day" id="historyBack">← Historique</button><h3>'+esc(a.label)+'</h3><p class="fine">Analyse enregistrée le '+date(a.created_at)+'. Estimations non garanties.</p><div class="analysis">'+Object.entries(probs).filter(([k])=>labels[k]).map(([k,v])=>'<div class="stat"><span>'+labels[k]+'</span><b>'+esc(v)+' %</b></div>').join('')+'</div>';
         el.querySelector('#historyBack').onclick=loadHistory;
       });});
     }catch(e){targets.forEach(el=>el.innerHTML=message(e.message,true));}
@@ -122,6 +122,7 @@
   window.Accounts={request,refresh,loadHistory,loadBilling,render:load,afterAnalysis:async()=>{try{await refresh(false);}catch{}},needsLogin:el=>{const b=document.createElement('button');b.className='btn';b.textContent='OUVRIR MON PROFIL';b.onclick=()=>show('info');el.appendChild(b);}};
   refresh(false).catch(()=>{});
 })();
+
 
 
 

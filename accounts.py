@@ -132,7 +132,7 @@ def init_app(app):
 
     @app.after_request
     def private_headers(response):
-        if request.path.startswith(('/api/account','/api/tracking')) or request.path in ('/api/analyze', '/api/ticket', '/api/analyse-statistique'):
+        if request.path.startswith(('/api/account','/api/tracking')) or request.path in ('/api/analyze', '/api/ticket', '/api/analyse-statistique', '/api/assistant'):
             response.headers['Cache-Control'] = 'no-store'
             response.headers['Vary'] = 'Cookie'
         response.headers['X-Content-Type-Options'] = 'nosniff'
@@ -469,6 +469,7 @@ def metered_analysis(func):
             finish_analysis(user['id'],analysis_id)
             raise
     return wrapper
+
 
 
 
