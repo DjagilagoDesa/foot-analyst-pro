@@ -395,7 +395,22 @@ def metered_analysis(func):
         # Include fixture id for automatic analyses; identical manual inputs reuse a result.
         key=digest(request.path+':'+json.dumps(data,sort_keys=True,ensure_ascii=False))
         label=str(data.get('label') or (str(data.get('home','Domicile'))+' – '+str(data.get('away','Extérieur'))))
-        analysis_id,cached=reserve_analysis(user,key,label)
+        try:
+            analysis_id,cached=reserve_analysis(user,key,label)
+        except AccountError as error:
+            if error.kind != 'trial_exhausted':
+                raise
+            # Compute privately, but never expose premium results in HTML, JSON or history.
+            response=current_app.make_response(func(*args,**kwargs))
+            result=response.get_json(silent=True)
+            if (response.status_code != 200 or not isinstance(result,dict)
+                    or 'error' in result or result.get('status','ok') != 'ok'):
+                return response
+            return jsonify(status='locked', analysis_generated=True,
+                           message='Tes 3 analyses offertes sont utilisées. Passe à Premium pour lire cette analyse.',
+                           offer={'price_eur':'29.90','period':'month','page':'subscription'},
+                           preview_sections=['Jugement du match','Arguments des deux équipes',
+                                             'Surprises possibles','Confrontations passées','Probabilités'])
         if cached is not None:
             from analysis_report import report
             if cached.get('prediction') and not cached.get('report'):
@@ -411,3 +426,4 @@ def metered_analysis(func):
             finish_analysis(user['id'],analysis_id)
             raise
     return wrapper
+

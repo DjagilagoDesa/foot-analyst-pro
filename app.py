@@ -145,7 +145,7 @@ def frontend_icon():
     return send_from_directory('.', 'icon.svg')
 
 @app.get('/api/health')
-def healthcheck(): return jsonify({'status':'ok','version':'51','sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
+def healthcheck(): return jsonify({'status':'ok','version':'52','sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
 
 @app.get('/api/leagues')
 def leagues(): return jsonify({'leagues':LEAGUES})
