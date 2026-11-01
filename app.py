@@ -145,7 +145,7 @@ def frontend_icon():
     return send_from_directory('.', 'icon.svg')
 
 @app.get('/api/health')
-def healthcheck(): return jsonify({'status':'ok','version':'52','sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
+def healthcheck(): return jsonify({'status':'ok','version':'53','sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
 
 @app.get('/api/leagues')
 def leagues(): return jsonify({'leagues':LEAGUES})
@@ -275,6 +275,10 @@ def ticket():
 def billing_catalog():
     return jsonify({'product_id':'foot_analyst_pro_premium_monthly','price_eur':'29.90','period':'month','trial_analyses':3,'purchase_available':False,'provider':'google_play','reason':'play_billing_setup_required'})
 
+@app.get('/custom-ticket.js')
+def custom_ticket_script():
+    return send_from_directory('.', 'custom-ticket.js', mimetype='application/javascript')
+
 @app.get('/profile.js')
 def profile_script():
     return send_from_directory('.', 'profile.js', mimetype='application/javascript')
@@ -403,5 +407,6 @@ def stade_premium_v37():
 
 if __name__=='__main__':
     app.run(host='0.0.0.0',port=int(os.environ.get('PORT','10000')))
+
 
 
