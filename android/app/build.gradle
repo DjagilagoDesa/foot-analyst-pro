@@ -1,6 +1,7 @@
 plugins { id 'com.android.application' }
 def signingNames = ['ANDROID_KEYSTORE_PATH', 'ANDROID_KEYSTORE_PASSWORD', 'ANDROID_KEY_ALIAS', 'ANDROID_KEY_PASSWORD']
 def signingReady = signingNames.every { System.getenv(it) }
+def configuredVersionCode = Integer.parseInt(project.findProperty('releaseVersionCode')?.toString() ?: '2')
 if (project.findProperty('requireReleaseSigning') == 'true' && !signingReady) {
     throw new GradleException('Release signing is required. Configure the four Android signing secrets outside this repository.')
 }
@@ -11,7 +12,7 @@ android {
         applicationId 'fr.footanalystpro.app'
         minSdk 26
         targetSdk 36
-        versionCode (project.findProperty('releaseVersionCode') ?: '2').toInteger()
+        versionCode = configuredVersionCode
         versionName '1.0.0'
     }
     signingConfigs {
