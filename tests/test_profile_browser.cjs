@@ -1,5 +1,8 @@
 const {chromium}=require('playwright');
 const fs=require('fs');
+const {randomUUID}=require('node:crypto');
+const testEmail='mobile-'+randomUUID()+'@example.com';
+const testPassword=randomUUID()+randomUUID();
 fs.mkdirSync('artifacts',{recursive:true});
 (async()=>{
  const browser=await chromium.launch({headless:true});
@@ -9,9 +12,9 @@ fs.mkdirSync('artifacts',{recursive:true});
  await page.locator('nav [data-page="info"]').click();
  await page.locator('[data-auth-tab="register"]').click();
  await page.locator('#authForm [name="nickname"]').fill('Jordan Test');
- await page.locator('#authForm [name="email"]').fill('mobile@example.com');
- await page.locator('#authForm [name="password"]').fill('Mobile-test-password-2026!');
- await page.locator('#authForm [name="password_confirm"]').fill('Mobile-test-password-2026!');
+ await page.locator('#authForm [name="email"]').fill(testEmail);
+ await page.locator('#authForm [name="password"]').fill(testPassword);
+ await page.locator('#authForm [name="password_confirm"]').fill(testPassword);
  await page.locator('#authForm [name="accept_privacy"]').check();
  await page.locator('#authForm button[type="submit"], #authForm > button.btn').click();
  await page.locator('#recoveryCode').waitFor();
@@ -22,17 +25,18 @@ fs.mkdirSync('artifacts',{recursive:true});
  await page.getByRole('heading',{name:'Jordan Pro',exact:true}).waitFor();
  await page.locator('nav [data-page="tickets"]').click();
  const data={home:'Paris',away:'Lyon',home_scored_avg:'2',home_conceded_avg:'1',away_scored_avg:'1.5',away_conceded_avg:'1.2',sample_matches_per_team:'10'};
- for(const [key,value] of Object.entries(data))await page.locator('#manualAnalysis [name="'+key+'"]').fill(value);
- await page.locator('#manualAnalysis button').click();
- await page.locator('#manualResult h3').waitFor();
+ // The manual form was replaced by the ticket builder. Exercise the metered
+ // analysis endpoint through the signed-in browser, then verify quota/history UI.
+ const analysis=await page.evaluate(data=>window.Accounts.request('/api/analyse-statistique',data),data);
+ if(analysis.error || analysis.status==='locked')throw Error('Metered analysis failed: '+JSON.stringify(analysis));
  await page.locator('nav [data-page="info"]').click();
  await page.waitForFunction(()=>document.querySelector('.profile-count')?.textContent.includes('2'));
  await page.locator('#logoutAccount').click();
  await page.locator('#authForm [name="email"]').waitFor();
  // The previous registration tab may remain selected after logout; select login explicitly.
  await page.locator('[data-auth-tab="login"]').click();
- await page.locator('#authForm [name="email"]').fill('mobile@example.com');
- await page.locator('#authForm [name="password"]').fill('Mobile-test-password-2026!');
+ await page.locator('#authForm [name="email"]').fill(testEmail);
+ await page.locator('#authForm [name="password"]').fill(testPassword);
  await page.locator('#authForm > button.btn').click();
  await page.locator('#profileHistory [data-history="0"]').waitFor();
  await page.locator('#profileHistory [data-history="0"]').click();
