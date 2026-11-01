@@ -77,6 +77,28 @@ def history(league,team_id,limit=10):
     matches=sorted(collected.values(),key=lambda m:m.get('date') or '',reverse=True)
     return matches[:limit],errors
 
+def head_to_head(league, home_id, away_id, limit=10):
+    """Search five season labels in the selected ESPN competition only."""
+    now = datetime.now(timezone.utc)
+    found = {}; failures = []
+    seasons = list(range(now.year, now.year - 5, -1))
+    def load(season):
+        return fetch(f'{ESPN}/{league}/teams/{home_id}/schedule', {'season':season}, ttl=3600)
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        jobs = {pool.submit(load, season):season for season in seasons}
+        for job in as_completed(jobs):
+            try:
+                for match in parse_events(job.result(), home_id):
+                    if {match['home_id'],match['away_id']} == {str(home_id),str(away_id)}:
+                        found[match['id']] = match
+            except (requests.RequestException, ValueError, KeyError, TypeError):
+                failures.append(jobs[job])
+    matches = sorted(found.values(), key=lambda m:m.get('date') or '', reverse=True)[:limit]
+    return {'matches':matches, 'seasons_checked':seasons, 'failed_seasons':sorted(failures),
+            'status':'unavailable' if len(failures)==len(seasons) else 'partial' if failures else 'ok',
+            'competition':league, 'source':'ESPN unofficial', 'limit':limit}
+
+
 def summary(matches,team_id):
     goals_for=[]; goals_against=[]; wins=draws=losses=0
     for m in matches:
@@ -123,7 +145,7 @@ def frontend_icon():
     return send_from_directory('.', 'icon.svg')
 
 @app.get('/api/health')
-def healthcheck(): return jsonify({'status':'ok','version':'49','sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
+def healthcheck(): return jsonify({'status':'ok','version':'50','sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
 
 @app.get('/api/leagues')
 def leagues(): return jsonify({'leagues':LEAGUES})
@@ -215,11 +237,13 @@ def analyze():
     away=str(data.get('away_id',''))
     if league not in LEAGUES or not home.isdigit() or not away.isdigit() or home==away:
         return jsonify({'error':'provide valid league, home_id, away_id'}),400
-    with ThreadPoolExecutor(max_workers=2) as pool:
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        head_job=pool.submit(head_to_head,league,home,away)
         hf=pool.submit(history,league,home)
         af=pool.submit(history,league,away)
         hm,he=hf.result()
         am,ae=af.result()
+        confrontations=head_job.result()
     hs,as_=summary(hm,home),summary(am,away)
     result={'league':league,'home_id':home,'away_id':away,'home':hs,'away':as_,'source':'ESPN unofficial API','data_quality':{'home_games':len(hm),'away_games':len(am),'source_errors':{'home':he,'away':ae}},'generated_at':datetime.now(timezone.utc).isoformat(),'disclaimer':'Statistical estimates are not certainties. Odds, injuries, lineups and xG are not included.'}
     if len(hm)<10 or len(am)<10:
@@ -232,6 +256,7 @@ def analyze():
             if match['away_id']==team:return match['away']
         return 'Domicile' if team==home else 'Extérieur'
     result['home_name']=team_name(hm,home);result['away_name']=team_name(am,away)
+    result['head_to_head']=confrontations
     if result.get('status')=='ok':result['report']=build_report(result, histories={'home':hm,'away':am})
     return jsonify(result)
 
@@ -363,3 +388,4 @@ def stade_premium_v37():
 
 if __name__=='__main__':
     app.run(host='0.0.0.0',port=int(os.environ.get('PORT','10000')))
+

@@ -1,7 +1,7 @@
 """Match-specific editorial reasoning from observed results, without invented news."""
 from datetime import datetime
 
-REPORT_VERSION = 3
+REPORT_VERSION = 4
 
 def number(value):
     return f'{float(value):.2f}'.rstrip('0').rstrip('.').replace('.', ',')
@@ -170,14 +170,58 @@ def report(data, names=None, histories=None):
     add(f'{home} : ses arguments et ses limites', team_section(home,away,h,a,hr,'home',ph))
     add(f'{away} : comment il peut faire basculer le match', team_section(away,home,a,h,ar,'away',pa))
 
-    encounters={}
-    for row in hr:
-        if row['opponent_id']==str(data.get('away_id')):encounters[row['match_id'] or row['date']]=row
-    if encounters:
-        details=[]
-        for row in sorted(encounters.values(),key=lambda r:r['date'],reverse=True)[:3]:
-            details.append(f'{row["date"][:10]} : {home} {row["gf"]}–{row["ga"]} {away}')
-        add('Confrontations réellement retrouvées', '; '.join(details)+'. Ces rencontres sont celles présentes dans l’échantillon récent, pas un historique exhaustif. Elles ne suffisent pas à établir une supériorité durable.')
+    h2h = data.get('head_to_head')
+    if h2h is not None:
+        past = observations(h2h.get('matches'),data.get('home_id'))
+        years = h2h.get('seasons_checked') or []
+        scope = (f"Recherche dans la compétition {h2h.get('competition',data.get('league',''))}, "
+                 + (f"sur les saisons {min(years)} à {max(years)}. " if years else "sur les saisons disponibles. "))
+        if past:
+            stats = record(past)
+            text = (scope + f"Sur {stats['n']} confrontation(s) retrouvée(s), {home} compte {stats['wins']} victoire(s), "
+                    f"{stats['draws']} nul(s) et {stats['losses']} défaite(s) face à {away}. "
+                    f"Buts moyens : {number(stats['gf'])} pour {home}, {number(stats['ga'])} pour {away}. ")
+            text += 'Résultats, du plus récent au plus ancien : ' + '; '.join(
+                f"{r['date'][:10]} : {home} {r['gf']}–{r['ga']} {away} ({'chez '+home if r['venue']=='home' else 'chez '+away})"
+                for r in past) + '. '
+            if stats['wins'] > stats['losses']:
+                dominant = home
+            elif stats['losses'] > stats['wins']:
+                dominant = away
+            else:
+                dominant = None
+            if dominant:
+                text += f"Le bilan de ces confrontations favorise {dominant}. "
+                if gap >= 8:
+                    text += ("Il va dans le sens de la préférence du modèle, sans constituer une preuve indépendante. " if dominant==leader else
+                             "Il contredit la préférence actuelle du modèle : c’est un point à examiner dans le scénario de surprise, pas une raison suffisante pour renverser le favori. ")
+            else:
+                text += "Ce bilan ne départage pas les équipes par le nombre de victoires. "
+            try:
+                generated = datetime.fromisoformat(data['generated_at'].replace('Z','+00:00'))
+                latest = datetime.fromisoformat(past[0]['date'].replace('Z','+00:00'))
+                if (generated-latest).days > 730:
+                    text += "Même la confrontation la plus récente date de plus de deux ans : sa pertinence actuelle est faible. "
+            except (KeyError, ValueError, TypeError):
+                pass
+            if stats['n'] < 3:
+                text += "Moins de trois confrontations : échantillon trop court pour dégager une tendance robuste. "
+            text += ("Ces résultats contextualisent le jugement et les surprises possibles ; ils ne modifient pas mécaniquement les pourcentages calculés sur les dix derniers matchs. "
+                     "Certains de ces matchs peuvent déjà figurer dans ces dix résultats et ne constituent donc pas un second signal indépendant. "
+                     "Les effectifs et les entraîneurs ont pu changer depuis.")
+        else:
+            text = scope + ("La source n’a pas répondu : confrontations indisponibles. " if h2h.get('status')=='unavailable' else
+                            "Aucune confrontation terminée retrouvée dans cette couverture ; cela ne signifie pas que les équipes ne se sont jamais affrontées. ")
+        if h2h.get('status')=='partial':
+            text += " Certaines saisons sont indisponibles : bilan partiel."
+        text += " La recherche est limitée à cette compétition et à dix confrontations ; les autres coupes et championnats ne sont pas couverts ici."
+        add('Confrontations passées : bilan et incidence sur le jugement',text)
+    else:
+        encounters = [r for r in hr if r['opponent_id']==str(data.get('away_id'))]
+        if encounters:
+            add('Confrontations présentes dans la forme récente', '; '.join(
+                f"{r['date'][:10]} : {home} {r['gf']}–{r['ga']} {away}" for r in encounters)
+                + '. Cette ancienne analyse ne contient pas de recherche historique distincte.')
 
     total=goals['home']+goals['away']
     if p.get('btts',0)>=60:
@@ -223,3 +267,4 @@ def report(data, names=None, histories=None):
     return dict(version=REPORT_VERSION,verdict=verdict,sections=sections,
                 method='Lecture conditionnelle des résultats disponibles et modèle Poisson indépendant',
                 source=data.get('source'),generated_at=data.get('generated_at'))
+
