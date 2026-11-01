@@ -2,7 +2,7 @@
 (() => {
   const id = value => document.getElementById(value);
   const esc = escapeHtml;
-  let state = {available: null, user: null}, csrf = '', tab = 'login', recovery = '', busy = false;
+  let state = {available: null, user: null}, csrf = '', tab = 'login', recovery = '', busy = false, authGeneration = 0;
   const date = seconds => new Date(seconds * 1000).toLocaleDateString('fr-FR');
   const message = (text, error=false) => '<div class="message '+(error?'error':'')+'" role="status">'+esc(text)+'</div>';
   const field = (name,label,type='text',extra='') => '<label class="profile-field">'+label+'<input class="day" name="'+name+'" type="'+type+'" required '+extra+'></label>';
@@ -15,8 +15,8 @@
       const response = await fetch(path, {...options, credentials:'same-origin',headers,signal:ctl.signal});
       let data;try{data=await response.json();}catch{throw new Error('Le service est momentanément indisponible. Réessaie dans un instant.');}
       if (!response.ok) { const e=new Error(data.message||'Le service est momentanément indisponible.'); e.code=data.error;e.status=response.status;throw e; }
-      if (data.csrf_token) csrf=data.csrf_token;
-      if (data.user) state.user=data.user;
+      if (/\/api\/account\/(register|login|password|recover|logout|delete)$/.test(path)) authGeneration++;
+      if (path!=='/api/account') {if(data.csrf_token)csrf=data.csrf_token;if(data.user)state.user=data.user;}
       if (data.recovery_code) recovery=data.recovery_code;
       return data;
     } catch(e) {
@@ -25,8 +25,9 @@
     } finally {clearTimeout(timeout);}
   }
   async function refresh(render=true) {
-    state = await raw('/api/account');
-    if (!state.user) csrf='';
+    const generation=authGeneration;const data=await raw('/api/account');
+    if(generation!==authGeneration)return state;
+    state=data;csrf=data.csrf_token||'';
     if(render && page==='info') draw();
     return state;
   }
@@ -94,7 +95,8 @@
     const targets=['profileHistory','analysisHistory'].map(id).filter(Boolean);
     try{
       if(!state.user){targets.forEach(el=>el.innerHTML=message('Connecte-toi depuis Profil pour retrouver tes analyses.'));return;}
-      const data=await raw('/api/account/history');
+      const owner=state.user.id;const data=await raw('/api/account/history');
+      if(!state.user||state.user.id!==owner)return;
       const html=data.analyses.length?data.analyses.map((a,i)=>'<button class="match" data-history="'+i+'"><span class="names"><strong>'+esc(a.label)+'</strong><small>'+date(a.created_at)+'</small></span><span class="gold">Voir ›</span></button>').join(''):message('Ton historique est vide. Choisis un match pour commencer.');
       targets.forEach(el=>{el.innerHTML=html;el.querySelectorAll('[data-history]').forEach(b=>b.onclick=()=>{
         const a=data.analyses[Number(b.dataset.history)],r=a.result;const probs=r.prediction?.markets||r.probabilities||{};
