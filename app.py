@@ -213,6 +213,10 @@ def analyze():
         result.update({'status':'insufficient_data','message':'Fewer than five completed matches found per team; no probabilities or betting ticket generated.'})
     else:
         result.update({'status':'ok','model':'simple_poisson_baseline','prediction':probabilities(hs,as_)})
+        from report_v41 import report
+        home_name=next((m['home'] for m in hm if m['home_id']==home),None) or next((m['away'] for m in hm if m['away_id']==home),None) or 'Équipe domicile'
+        away_name=next((m['home'] for m in am if m['home_id']==away),None) or next((m['away'] for m in am if m['away_id']==away),None) or 'Équipe extérieur'
+        result['editorial_report']=report(home_name,away_name,hs,as_,result['prediction'],result['data_quality'])
     return jsonify(result)
 
 @app.get('/api/ticket')
@@ -319,3 +323,101 @@ def analyse_statistique():
 def stade_premium_v37():
     return send_from_directory(".", "stade_premium.png", mimetype="image/png")
 
+
+# V40 additional transparent analysis API. Existing V39 routes remain intact.
+from intelligence import deep_analysis, build_ticket_profiles
+@app.get('/api/v40/deep-analysis')
+def v40_deep_analysis():
+    league=request.args.get('league','')
+    home=request.args.get('home_id','')
+    away=request.args.get('away_id','')
+    if league not in LEAGUES or not home.isdigit() or not away.isdigit() or home==away:
+        return jsonify({'error':'invalid_team_or_league'}),400
+    hm,he=history(league,home)
+    am,ae=history(league,away)
+    hs,as_=summary(hm,home),summary(am,away)
+    result=deep_analysis(hs,as_,hm[0]['home'] if hm and hm[0]['home_id']==home else home,am[0]['away'] if am and am[0]['away_id']==away else away)
+    result['source']='ESPN unofficial public results'
+    result['generated_at']=datetime.now(timezone.utc).isoformat()
+    result['source_errors']={'home':he,'away':ae}
+    return jsonify(result)
+
+@app.post('/api/v40/tickets')
+def v40_tickets():
+    payload=request.get_json(silent=True)
+    if not isinstance(payload,dict) or not isinstance(payload.get('analyses'),list) or len(payload['analyses'])>20:
+        return jsonify({'error':'analyses must be an array of up to 20 analysis objects'}),400
+    # Recompute on the server from validated summary data; never trust submitted probability figures.
+    analyses=[]
+    for item in payload['analyses']:
+        if not isinstance(item,dict): return jsonify({'error':'invalid_analysis'}),400
+        home,away=item.get('home'),item.get('away')
+        if not isinstance(home,dict) or not isinstance(away,dict): return jsonify({'error':'missing_summaries'}),400
+        result=deep_analysis(home,away,str(item.get('home_name','Home'))[:80],str(item.get('away_name','Away'))[:80])
+        analyses.append(result)
+    return jsonify({'status':'ok','profiles':build_ticket_profiles(analyses),'warning':'Illustrative estimates only, not guarantees or verified bookmaker value.'})
+
+
+# V42: daily, on-demand ticket candidates from confirmed upcoming fixtures.
+# Generated at request time; not a scheduler and not historical accuracy tracking.
+from zoneinfo import ZoneInfo
+from daily_v42 import choose_tickets
+
+@app.get('/api/v42/daily-tickets')
+def daily_tickets():
+    local_day=datetime.now(ZoneInfo('Europe/Paris')).date().isoformat()
+    day=request.args.get('date',local_day)
+    if day!=local_day:
+        return jsonify({'error':'only_current_paris_date_supported','today':local_day}),400
+    # Fetch the same fixture data as the calendar, without HTTP recursion.
+    def load_one(lg):
+        data=fetch(f'{ESPN}/{lg}/scoreboard',{'dates':day.replace('-',''),'limit':200},ttl=300)
+        return [f for e in data.get('events') or [] if (f:=_fixture(e,lg)) and f['state']=='pre']
+    fixtures=[];failed=[]
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        futures={pool.submit(load_one,lg):lg for lg in LEAGUES}
+        for future in as_completed(futures):
+            try:fixtures.extend(future.result())
+            except (requests.RequestException,ValueError,KeyError):failed.append(futures[future])
+    now=datetime.now(timezone.utc)
+    fixtures=[f for f in fixtures if f['home']['id'].isdigit() and f['away']['id'].isdigit()
+              and f['home']['id']!=f['away']['id'] and f['date']
+              and datetime.fromisoformat(f['date'].replace('Z','+00:00'))>now]
+    fixtures.sort(key=lambda f:(f['date'],f['id']))
+    # Cap upstream requests and processing time. Mark partial coverage explicitly.
+    limit=18; considered=fixtures[:limit]
+    def analyze_fixture(f):
+        hm,he=history(f['league'],f['home']['id'])
+        am,ae=history(f['league'],f['away']['id'])
+        hs,as_=summary(hm,f['home']['id']),summary(am,f['away']['id'])
+        if hs['matches']<5 or as_['matches']<5:return None
+        return f,probabilities(hs,as_)['markets'],{'home_games':len(hm),'away_games':len(am)}
+    valid=[]
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        futures=[pool.submit(analyze_fixture,f) for f in considered]
+        for future in as_completed(futures):
+            try:
+                value=future.result()
+                if value:valid.append(value)
+            except (requests.RequestException,ValueError,KeyError,TypeError,OverflowError):pass
+    tickets=choose_tickets(valid,day)
+    from tracking_v43 import record
+    try: record(tickets)
+    except (OSError, __import__("sqlite3").Error): pass
+    return jsonify({'status':'ok','date':day,'generated_at':now.isoformat(),
+      'tickets':tickets,'fixtures_considered':len(considered),'fixtures_eligible':len(valid),
+      'partial_coverage':bool(failed) or len(fixtures)>limit,'failed_leagues':failed,
+      'method':'Poisson baseline on historical goals; no bookmaker odds; no verified betting edge',
+      'accuracy_tracking':{'status':'not_available','message':'Aucun taux de réussite vérifié : il faut enregistrer les prédictions avant les matchs, puis comparer aux résultats définitifs sur une base persistante.'},
+      'warning':'Aucun ticket ne garantit un gain. Les cotes affichées sont des cotes équitables théoriques, et non des cotes disponibles chez un bookmaker.'})
+
+
+# V43: measured outcomes only, never fabricated success rates.
+@app.get('/api/v43/performance')
+def performance_v43():
+    from tracking_v43 import settle,metrics
+    try:
+        settle(fetch,ESPN)
+        return jsonify(metrics())
+    except (OSError,__import__('sqlite3').Error) as exc:
+        return jsonify({'status':'storage_unavailable','error':type(exc).__name__}),503
