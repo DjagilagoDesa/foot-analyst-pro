@@ -1,7 +1,7 @@
 """Match-specific editorial reasoning from observed results, without invented news."""
 from datetime import datetime
 
-REPORT_VERSION = 2
+REPORT_VERSION = 3
 
 def number(value):
     return f'{float(value):.2f}'.rstrip('0').rstrip('.').replace('.', ',')
@@ -37,6 +37,51 @@ def record(rows):
                 clean=sum(r['ga']==0 for r in rows),
                 blanks=sum(r['gf']==0 for r in rows),
                 points=sum(3 if r['outcome']=='V' else 1 if r['outcome']=='N' else 0 for r in rows))
+
+
+def surprise_reading(home, away, h, a, p, hr, ar):
+    """Explain upset evidence; labels are editorial, never extra probabilities."""
+    ph, pa, pn = p['home'], p['away'], p['draw']
+    if abs(ph-pa) < 8:
+        return (f'Pas d’outsider clairement établi entre {home} et {away} : les victoires sont estimées à {number(ph)} % et {number(pa)} %. '
+                f'Une victoire de l’un ou de l’autre ne constitue donc pas une surprise statistique nette. Le nul vaut {number(pn)} %. '
+                'Les favoris dont il est question ici sont ceux du modèle, pas ceux des bookmakers.')
+    favorite, outsider, fav, under, fr, ur, up = (home,away,h,a,hr,ar,pa) if ph>pa else (away,home,a,h,ar,hr,ph)
+    signals=[]; counters=[]
+    if fav['goals_against_avg'] >= 1.4 and under['goals_for_avg'] >= 1.2:
+        signals.append(f'{outsider} marque {number(under["goals_for_avg"])} but par match face à un favori qui en concède {number(fav["goals_against_avg"])}')
+    else:
+        counters.append(f'le croisement attaque de {outsider} ({number(under["goals_for_avg"])} but/match) / défense de {favorite} ({number(fav["goals_against_avg"])} encaissé) ne déclenche pas le signal de fragilité retenu')
+    if under['goals_against_avg'] <= 1:
+        signals.append(f'{outsider} encaisse au plus un but en moyenne ({number(under["goals_against_avg"])}), un appui à un scénario serré')
+    if under['goals_for_avg'] < 1:
+        counters.append(f'l’attaque de {outsider} reste sous un but par match ({number(under["goals_for_avg"])}), ce qui freine surtout la victoire sèche')
+    if fr and ur:
+        fs, us = record(fr[:10]), record(ur[:10])
+        if fs['losses']/fs['n'] >= .3:
+            signals.append(f'{favorite} a perdu {fs["losses"]} de ses {fs["n"]} derniers matchs disponibles')
+        else:
+            counters.append(f'{favorite} ne compte que {fs["losses"]} défaite(s) en {fs["n"]} sorties')
+        if us['points']/us['n'] >= 1.5:
+            signals.append(f'{outsider} a pris {us["points"]} points sur {us["n"]} matchs ({us["wins"]} victoires, {us["draws"]} nuls)')
+        if us['blanks']/us['n'] >= .4:
+            counters.append(f'{outsider} est resté sans marquer dans {us["blanks"]} de ses {us["n"]} sorties')
+    else:
+        counters.append('les résultats détaillés manquent pour vérifier les séries ; les moyennes seules ne permettent pas de les inventer')
+    # A transparent editorial triage, not a fitted or calibrated upset detector.
+    label = 'outsider à examiner' if up >= 20 and len(signals)>=2 else 'surprise peu étayée dans cet échantillon'
+    text=(f'{outsider} : {label}. Sa victoire reste estimée à {number(up)} %, le nul à {number(pn)} %. '
+          f'Le scénario « {favorite} ne gagne pas » vaut {number(up+pn)} % ; il inclut le nul et ne doit pas être confondu avec une victoire de l’outsider. ')
+    text+='Arguments favorables : '+('; '.join(signals) if signals else 'aucun des signaux statistiques retenus n’est déclenché')+'. '
+    text+='Arguments contraires : '+('; '.join(counters) if counters else f'le modèle conserve une préférence pour {favorite}, malgré ces signaux')+'. '
+    if pn >= up:
+        text+=f'Parmi les deux issues contraires au favori, le nul est la plus probable dans le modèle ({number(pn)} % contre {number(up)} %). '
+    else:
+        text+=f'Le modèle place la victoire de {outsider} devant le nul, mais à {number(up)} % elle reste minoritaire. '
+    text+=('La mention « à examiner » exige au moins 20 % de victoire et deux signaux favorables ; c’est un filtre éditorial non validé, pas une nouvelle probabilité. '
+           'Ces signaux viennent des mêmes résultats que le modèle : ils ne sont pas indépendants et n’augmentent pas les pourcentages. '
+           'Une surprise peut se produire même sans signal. Aucune comparaison aux cotes, aux absences ou aux compositions n’est disponible ici.')
+    return text
 
 
 def report(data, names=None, histories=None):
@@ -162,6 +207,7 @@ def report(data, names=None, histories=None):
                    'Le bilan défensif du favori rend cette voie plus étroite, sans la supprimer.')
         scenario+=f' La victoire de {outsider} est estimée à {number(min(ph,pa))} % et le nul à {number(pn)} %.'
     add('Le scénario qui ferait échouer ma lecture',scenario)
+    add('Surprise possible : outsider et nul', surprise_reading(home,away,h,a,p,hr,ar))
     add('Ma conclusion sur les marchés',
         f'La probabilité d’une victoire de {home} est de {number(ph)} %, celle de {away} de {number(pa)} %. '
         f'Les couvertures 1X ({number(p.get("home_or_draw",ph+pn))} %) et X2 ({number(p.get("away_or_draw",pa+pn))} %) couvrent deux issues, ce qui explique leur niveau plus élevé. '
