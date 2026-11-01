@@ -1,9 +1,10 @@
 name: Backend and calendar checks
 on:
+  workflow_dispatch:
   push:
-    branches: [live-scores-v46, profile-v47, analysis-premium-v48]
+    branches: [main, live-scores-v46, profile-v47, analysis-premium-v48]
   pull_request:
-    paths: ['app.py', 'accounts.py', 'profile.js', 'engine.py', 'index.html', 'tests/**', '.github/workflows/backend-checks.yml']
+    paths: ['app.py', 'accounts.py', 'profile.js', 'engine.py', 'analysis_report.py', 'custom-ticket.js', 'daily-tickets.js', 'Dockerfile', 'index.html', 'tests/**', '.github/workflows/backend-checks.yml']
 permissions:
   contents: read
 jobs:

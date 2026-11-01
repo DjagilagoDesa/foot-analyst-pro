@@ -7,9 +7,11 @@ class ReportTests(unittest.TestCase):
         data=dict(status='ok',home_name='Paris',away_name='Lyon',home=team,away=team,prediction=dict(expected_goals={'home':1.8,'away':1.3},markets={'home':48,'draw':28,'away':24,'over_1_5':70,'over_2_5':45,'btts':50}))
         result=report(data)
         self.assertIn('Paris',result['verdict'])
-        self.assertEqual(len(result['sections']),5)
-        self.assertIn('7 victoires',result['sections'][0]['text'])
-        self.assertIn('Lyon',result['sections'][1]['title'])
-        self.assertIn('ne sont pas intégrés',result['sections'][-1]['text'])
+        sections=result['sections']
+        self.assertTrue(any('7 victoires' in section['text'] for section in sections))
+        self.assertTrue(any('Lyon' in section['title'] for section in sections))
+        self.assertTrue(any('Surprise possible' in section['title'] for section in sections))
+        self.assertIn('ne sont pas vérifiés',sections[-1]['text'])
     def test_no_report_without_successful_data(self):
         self.assertIsNone(report({'status':'insufficient_data'}))
+

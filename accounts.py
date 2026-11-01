@@ -18,6 +18,7 @@ COOKIE = 'foot_session'
 SESSION_DAYS = 14
 DUMMY_HASH = generate_password_hash(secrets.token_urlsafe(24))
 SCHEMA = (
+    '''CREATE TABLE IF NOT EXISTS account_owner_access (slot TEXT PRIMARY KEY, user_id TEXT NOT NULL)''',
     '''CREATE TABLE IF NOT EXISTS account_users (
       id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, nickname TEXT NOT NULL,
       password_hash TEXT NOT NULL, recovery_hash TEXT NOT NULL,
@@ -450,5 +451,6 @@ def metered_analysis(func):
             finish_analysis(user['id'],analysis_id)
             raise
     return wrapper
+
 
 

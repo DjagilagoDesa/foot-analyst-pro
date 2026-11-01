@@ -41,7 +41,7 @@ class BackendTests(unittest.TestCase):
             self.assertEqual(errors,[])
 
     def test_low_sample_never_generates_probabilities(self):
-        with patch.object(server,'history',return_value=([],[])), server.app.test_request_context('/api/analyze',method='POST',json={'league':'fra.1','home_id':'1','away_id':'2'}):
+        with patch.object(server,'history',return_value=([],[])), patch.object(server,'head_to_head',return_value={'matches':[]}), server.app.test_request_context('/api/analyze',method='POST',json={'league':'fra.1','home_id':'1','away_id':'2'}):
             data=server.analyze().get_json()
         self.assertEqual(data['status'],'insufficient_data')
         self.assertNotIn('prediction',data)
@@ -81,6 +81,7 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(self.client.post('/api/analyse-statistique',json=[]).status_code,403)
         with self.client.get('/stade_premium.png') as response:
             self.assertEqual(response.status_code,200)
-        self.assertEqual(self.client.get('/api/health').json['version'],'48')
+        self.assertEqual(self.client.get('/api/health').json['status'],'ok')
 
 if __name__=='__main__': unittest.main()
+

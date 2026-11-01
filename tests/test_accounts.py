@@ -68,7 +68,11 @@ class AccountTests(unittest.TestCase):
             response=self.post('/api/analyse-statistique',self.manual(name))
             self.assertEqual(response.status_code,200,response.json)
         self.assertEqual(self.client.get('/api/account').json['user']['trial_remaining'],0)
-        self.assertEqual(self.post('/api/analyse-statistique',self.manual('E')).status_code,402)
+        locked=self.post('/api/analyse-statistique',self.manual('E'))
+        self.assertEqual(locked.status_code,200)
+        self.assertEqual(locked.json['status'],'locked')
+        self.assertNotIn('probabilities',locked.json)
+        self.assertNotIn('report',locked.json)
         self.assertEqual(self.post('/api/analyse-statistique',self.manual('A')).status_code,200)
         self.assertEqual(len(self.client.get('/api/account/history').json['analyses']),3)
         self.assertEqual(server.app.test_client().get('/api/account/history').status_code,401)
@@ -82,7 +86,7 @@ class AccountTests(unittest.TestCase):
         self.register()
         invalid=self.manual();invalid['home_scored_avg']=-1
         self.assertEqual(self.post('/api/analyse-statistique',invalid).status_code,400)
-        with patch.object(server,'history',return_value=([],[])):
+        with patch.object(server,'history',return_value=([],[])), patch.object(server,'head_to_head',return_value={'matches':[]}):
             r=self.post('/api/analyze',dict(league='fra.1',home_id='1',away_id='2',event_id='123'))
         self.assertEqual(r.json['status'],'insufficient_data')
         self.assertEqual(self.client.get('/api/account').json['user']['trial_remaining'],3)
@@ -137,3 +141,4 @@ class AccountTests(unittest.TestCase):
             self.assertEqual(db.execute('SELECT trial_used FROM account_users').fetchone()['trial_used'],3)
 
 if __name__=='__main__':unittest.main()
+
