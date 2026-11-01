@@ -1,4 +1,9 @@
 plugins { id 'com.android.application' }
+def signingNames = ['ANDROID_KEYSTORE_PATH', 'ANDROID_KEYSTORE_PASSWORD', 'ANDROID_KEY_ALIAS', 'ANDROID_KEY_PASSWORD']
+def signingReady = signingNames.every { System.getenv(it) }
+if (project.findProperty('requireReleaseSigning') == 'true' && !signingReady) {
+    throw new GradleException('Release signing is required. Configure the four Android signing secrets outside this repository.')
+}
 android {
     namespace 'fr.footanalystpro.app'
     compileSdk 36
@@ -6,8 +11,27 @@ android {
         applicationId 'fr.footanalystpro.app'
         minSdk 26
         targetSdk 36
-        versionCode 1
-        versionName '0.45.0'
+        versionCode (project.findProperty('releaseVersionCode') ?: '2').toInteger()
+        versionName '1.0.0'
     }
-    buildTypes { release { minifyEnabled true; shrinkResources true; proguardFiles getDefaultProguardFile('proguard-android-optimize.txt') } }
+    signingConfigs {
+        release {
+            if (signingReady) {
+                storeFile file(System.getenv('ANDROID_KEYSTORE_PATH'))
+                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            debuggable false
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (signingReady) signingConfig signingConfigs.release
+        }
+    }
 }
+

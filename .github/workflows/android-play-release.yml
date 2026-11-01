@@ -1,0 +1,82 @@
+name: Signed Android bundle for Google Play
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: 'Unused versionCode greater than every existing upload in Play Console'
+        required: true
+        default: '2'
+      confirmed_package:
+        description: 'Confirm the exact Play Console applicationId: fr.footanalystpro.app'
+        required: true
+permissions:
+  contents: read
+jobs:
+  build-signed-bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      VERSION_CODE: ${{ inputs.version_code }}
+      CONFIRMED_PACKAGE: ${{ inputs.confirmed_package }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate release inputs and signing configuration
+        run: |
+          python - <<'PY'
+          import os, base64
+          from pathlib import Path
+          names = ('ANDROID_KEYSTORE_BASE64','ANDROID_KEYSTORE_PASSWORD','ANDROID_KEY_ALIAS','ANDROID_KEY_PASSWORD')
+          if any(not os.environ.get(n) for n in names):
+              raise SystemExit('Android signing secrets are missing. No signed bundle has been created.')
+          if os.environ['CONFIRMED_PACKAGE'] != 'fr.footanalystpro.app':
+              raise SystemExit('Package confirmation does not match this Android project.')
+          code = os.environ['VERSION_CODE']
+          if not code.isdigit() or not 2 <= int(code) <= 2100000000:
+              raise SystemExit('Choose a valid unused versionCode, at least 2.')
+          path = Path(os.environ['RUNNER_TEMP']) / 'foot-upload.jks'
+          path.write_bytes(base64.b64decode(os.environ['ANDROID_KEYSTORE_BASE64'], validate=True))
+          path.chmod(0o600)
+          with open(os.environ['GITHUB_ENV'], 'a') as stream:
+              stream.write('ANDROID_KEYSTORE_PATH='+str(path)+'\n')
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - run: gradle --no-daemon -p android -PrequireReleaseSigning=true -PreleaseVersionCode="$VERSION_CODE" :app:bundleRelease :app:lintRelease
+      - name: Verify bundle signature
+        run: |
+          python - <<'PY'
+          import subprocess, zipfile
+          path='android/app/build/outputs/bundle/release/app-release.aab'
+          with zipfile.ZipFile(path) as archive:
+              if not any(n.startswith('META-INF/') and n.endswith(('.RSA','.DSA','.EC')) for n in archive.namelist()):
+                  raise SystemExit('Unsigned bundle: refusing to produce a Play release artifact.')
+          result=subprocess.run(['jarsigner','-J-Duser.language=en','-verify',path],capture_output=True,text=True,check=True)
+          if 'jar verified.' not in result.stdout:
+              raise SystemExit('Bundle signature verification failed.')
+          print('Signed bundle verified. Upload to Play Console remains a separate step.')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FOOT-ANALYST-PRO-1.0.0-PLAY-SIGNED
+          path: |
+            android/app/build/outputs/bundle/release/*.aab
+            android/app/build/outputs/mapping/release/mapping.txt
+            android/app/build/reports/lint-results-release.html
+          if-no-files-found: error
+      - name: Remove temporary upload key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/foot-upload.jks"

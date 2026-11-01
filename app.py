@@ -434,6 +434,9 @@ def ticket_builder_script():
 from tracking import init_app as init_tracking
 init_tracking(app,fetch,ESPN,LEAGUES)
 
+from publication import init_app as init_publication
+init_publication(app)
+
 # One shared daily board across workers and users; results persist in PostgreSQL.
 import sys
 from daily_opinion import init_app as init_daily_opinion

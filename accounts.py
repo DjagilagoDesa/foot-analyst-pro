@@ -114,7 +114,8 @@ def initialize_owner_access(app):
             db.execute("CREATE TABLE IF NOT EXISTS account_owner_access (slot TEXT PRIMARY KEY, user_id TEXT NOT NULL)")
             existing=db.execute("SELECT user_id FROM account_owner_access WHERE slot='owner'").fetchone()
             if existing:return
-            row=db.execute("SELECT id FROM account_users WHERE lower(email)=?",('jordannogueira47@gmail.com',)).fetchone()
+            owner_email = os.environ.get('OWNER_ACCOUNT_EMAIL', '').strip().lower()
+            row = db.execute("SELECT id FROM account_users WHERE lower(email)=?", (owner_email,)).fetchone() if owner_email else None
             db.execute("INSERT INTO account_owner_access(slot,user_id) VALUES('owner',?) ON CONFLICT(slot) DO NOTHING",(row['id'] if row else 'unassigned',))
 
 
@@ -360,6 +361,7 @@ def delete_account():
     if data.get('confirmation') != 'SUPPRIMER' or not check_password_hash(user['password_hash'],str(data.get('password') or '')[:128]):
         raise AccountError('Confirme avec ton mot de passe et le mot SUPPRIMER.',400)
     with database() as db:
+        db.execute("UPDATE account_owner_access SET user_id='unassigned' WHERE user_id=?", (user['id'],))
         db.execute('DELETE FROM account_users WHERE id=?',(user['id'],))
     response = jsonify(ok=True)
     response.delete_cookie(COOKIE, path='/', secure=current_app.config['ACCOUNT_SECURE_COOKIE'], httponly=True, samesite='Lax')
@@ -380,7 +382,9 @@ def export_data():
     user = current_user()
     with database() as db:
         rows=db.execute("SELECT label,created_at,result FROM account_analyses WHERE user_id=? AND status='complete' ORDER BY created_at",(user['id'],)).fetchall()
-    response=jsonify(profile=public_user(user),analyses=[dict(label=r['label'],created_at=r['created_at'],result=json.loads(r['result'])) for r in rows])
+    with database() as db:
+        selections=[dict(r) for r in db.execute('SELECT event_id,league,market,probability,label,home_id,away_id,starts_at,created_at,status,home_score,away_score,settled_at FROM account_predictions WHERE user_id=? ORDER BY created_at',(user['id'],)).fetchall()]
+    response=jsonify(profile=public_user(user),analyses=[dict(label=r['label'],created_at=r['created_at'],result=json.loads(r['result'])) for r in rows],selections=selections)
     response.headers['Content-Disposition']='attachment; filename=foot-analyst-pro-mes-donnees.json'
     return response
 

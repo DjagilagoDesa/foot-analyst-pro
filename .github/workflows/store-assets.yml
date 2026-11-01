@@ -1,0 +1,31 @@
+name: Google Play store assets
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['store-assets/**', 'tools/capture_store_screenshots.cjs', '.github/workflows/store-assets.yml']
+permissions:
+  contents: read
+jobs:
+  prepare-assets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install screenshot tools
+        run: |
+          npm --prefix "$RUNNER_TEMP/store-browser" install playwright@1.56.1
+          "$RUNNER_TEMP/store-browser/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Capture current public app
+        env:
+          NODE_PATH: ${{ runner.temp }}/store-browser/node_modules
+        run: node tools/capture_store_screenshots.cjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FOOT-ANALYST-PRO-PLAY-STORE-ASSETS
+          path: |
+            store-assets/icon.png
+            store-assets/feature-graphic.png
+            store-assets/screenshots/
+            store-assets/listing-fr.md
+          if-no-files-found: error
