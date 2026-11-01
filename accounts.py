@@ -90,10 +90,33 @@ def init_schema(app):
                 db.execute(sql)
 
 
+def initialize_owner_access(app):
+    # Pin the pre-existing account once. A missing account is recorded as missing;
+    # later signups or recreation after deletion never acquire owner privileges.
+    with app.app_context():
+        if not configured():return
+        with database() as db:
+            for sql in SCHEMA:db.execute(sql)
+            db.execute("CREATE TABLE IF NOT EXISTS account_owner_access (slot TEXT PRIMARY KEY, user_id TEXT NOT NULL)")
+            existing=db.execute("SELECT user_id FROM account_owner_access WHERE slot='owner'").fetchone()
+            if existing:return
+            row=db.execute("SELECT id FROM account_users WHERE lower(email)=?",('jordannogueira47@gmail.com',)).fetchone()
+            db.execute("INSERT INTO account_owner_access(slot,user_id) VALUES('owner',?) ON CONFLICT(slot) DO NOTHING",(row['id'] if row else 'unassigned',))
+
+
+def owner_access(user_id, db=None):
+    if db is None:
+        with database() as connection:
+            return owner_access(user_id,connection)
+    row=db.execute("SELECT user_id FROM account_owner_access WHERE slot='owner'").fetchone()
+    return bool(row and row['user_id']!='unassigned' and row['user_id']==user_id)
+
+
 def init_app(app):
     app.config.setdefault('ACCOUNT_DATABASE_URL', os.environ.get('DATABASE_URL', ''))
     app.config.setdefault('ACCOUNT_SECURE_COOKIE', True)
     app.config.setdefault('ACCOUNT_PUBLIC_ORIGIN', os.environ.get('PUBLIC_ORIGIN', 'https://foot-analyst-pro.onrender.com'))
+    initialize_owner_access(app)
     app.register_blueprint(bp)
     app.register_error_handler(AccountError, lambda e: (jsonify(error=e.kind, message=e.message), e.code))
 
@@ -165,9 +188,10 @@ def recovery_code():
 
 
 def public_user(row):
+    owner=owner_access(row['id'])
     return dict(id=row['id'], email=row['email'], nickname=row['nickname'], created_at=row['created_at'],
                 trial_used=row['trial_used'], trial_remaining=max(0, 3-row['trial_used']),
-                premium_active=row['premium_until'] > int(time.time()), premium_until=row['premium_until'])
+                premium_active=owner or row['premium_until'] > int(time.time()), premium_until=row['premium_until'], complimentary_premium=owner)
 
 
 def current_user(required=True, csrf=False):
@@ -363,7 +387,7 @@ def reserve_analysis(user, key, label):
         fresh=db.execute('SELECT * FROM account_users WHERE id=?',(user['id'],)).fetchone()
         if not fresh:
             raise AccountError('Reconnecte-toi pour continuer.',401,'login_required')
-        charged=int(fresh['premium_until']<=now)
+        charged=int(fresh['premium_until']<=now and not owner_access(user['id'],db))
         if charged:
             row=db.execute('UPDATE account_users SET trial_used=trial_used+1 WHERE id=? AND trial_used<3 RETURNING id',(user['id'],)).fetchone()
             if not row: raise AccountError('Tes 3 analyses offertes sont utilisées. L’abonnement Premium sera disponible prochainement.',402,'trial_exhausted')
@@ -426,4 +450,5 @@ def metered_analysis(func):
             finish_analysis(user['id'],analysis_id)
             raise
     return wrapper
+
 
