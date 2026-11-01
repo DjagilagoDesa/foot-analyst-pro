@@ -28,7 +28,10 @@ function ticketSelection(markets, profile){
   el('customCount').textContent=chosen.length+' match(s) sélectionné(s) · 10 maximum';
   el('customChosen').innerHTML=chosen.length?chosen.map((m,i)=>'<div class="panel ticket-picked"><strong>'+esc(name(m))+'</strong><p class="fine">'+esc(dateText(m.date))+' · '+esc(m.league)+'</p><button type="button" class="day" data-remove="'+i+'" '+(busy?'disabled':'')+'>RETIRER</button></div>').join(''):message('Ajoute au moins deux matchs pour construire ton combiné.');
   el('customChosen').querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{if(busy)return;chosen.splice(Number(b.dataset.remove),1);el('customTicketResult').innerHTML='';draw();drawFixtures();});
-  el('customGenerate').disabled=busy||chosen.length<2;
+  const button=el('customGenerate');
+  button.disabled=busy;
+  button.textContent=busy?'ANALYSE EN COURS…':chosen.length<2?'AJOUTER '+(2-chosen.length)+' MATCH'+(chosen.length===0?'S':'')+' POUR CRÉER MON TICKET':'ANALYSER MES '+chosen.length+' MATCHS ET CRÉER LE TICKET';
+  button.setAttribute('aria-describedby','customCount');
   el('customProfile').disabled=busy;
  }
  function add(m){
@@ -53,7 +56,13 @@ function ticketSelection(markets, profile){
  el('customLoad').onclick=load;el('customDate').onchange=load;el('customFilter').oninput=drawFixtures;
  el('customProfile').onchange=()=>{el('customTicketResult').innerHTML='';};
  el('customGenerate').onclick=async()=>{
-  if(busy||chosen.length<2)return;
+  if(busy)return;
+  if(chosen.length<2){
+   el('customNotice').innerHTML=message('Ajoute encore '+(2-chosen.length)+' match'+(chosen.length===0?'s':'')+' avec le bouton ＋, puis lance la création du ticket.');
+   el('customNotice').scrollIntoView({behavior:'smooth',block:'center'});
+   if(!fixtures.length)await load();
+   return;
+  }
   busy=true;draw();drawFixtures();el('customNotice').innerHTML='';
   const target=el('customTicketResult'),batch=chosen.slice(),profile=el('customProfile').value,results=[],failures=[];
   try{
@@ -86,6 +95,7 @@ function ticketSelection(markets, profile){
  openMatch=function(m,from){originalOpen(m,from);const button=document.createElement('button');button.type='button';button.className='day';button.textContent='＋ AJOUTER À MON TICKET';button.style.cssText='width:100%;max-width:none;margin:12px 0';button.onclick=()=>{show('dailyTickets');add(m);};el('detailContent').prepend(button);};
  draw();
 })();
+
 
 
 
