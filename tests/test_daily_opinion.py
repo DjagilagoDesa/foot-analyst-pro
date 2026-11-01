@@ -166,3 +166,37 @@ class PersistenceTests(unittest.TestCase):
         self.assertEqual(performance['won'], 2)
         self.assertEqual(performance['lost'], 1)
         self.assertEqual(performance['success_pct'], 66.7)
+
+    def test_official_rate_never_reads_personal_predictions_or_analyses(self):
+        self.refresh()
+        before = self.service.performance(DAY)
+        from accounts import init_schema
+        from uuid import uuid4
+        init_schema(self.app)
+        uid = uuid4().hex
+        with database() as db:
+            db.execute('''INSERT INTO account_users(id,email,nickname,password_hash,recovery_hash,created_at)
+                VALUES(?,?,?,?,?,?)''', (uid, uid+'@example.invalid', 'Test', uuid4().hex, uuid4().hex, 0))
+            for n in range(10):
+                db.execute('''INSERT INTO account_predictions(user_id,event_id,league,market,probability,label,home_id,away_id,starts_at,created_at,status)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?)''', (uid, str(n), 'fra.1', 'home', 80, 'Ticket personnel', '1', '2', 0, 0, 'won'))
+            db.execute('''INSERT INTO account_analyses(id,user_id,request_key,label,status,charged,created_at,result)
+                VALUES(?,?,?,?,?,?,?,?)''', (uuid4().hex, uid, uuid4().hex, 'Analyse personnelle', 'complete', 0, 0, '{}'))
+        after = self.service.performance(DAY)
+        self.assertEqual(after, before)
+        self.assertEqual(after['scope'], 'daily_opinion_only')
+        self.assertIsNone(after['success_pct'])
+
+    def test_official_rate_accumulates_all_published_days(self):
+        self.refresh()
+        board, _ = self.service.read(DAY)
+        previous = copy.deepcopy(board)
+        previous['picks'] = [previous['picks'][0]]
+        previous['picks'][0]['status'] = 'won'
+        with database() as db:
+            db.execute('INSERT INTO daily_opinion_boards(day,payload) VALUES(?,?)', ('2026-01-01', json.dumps(previous)))
+        performance = self.service.performance(DAY)
+        self.assertEqual(performance['won'], 1)
+        self.assertEqual(performance['pending'], 6)
+        self.assertEqual(performance['success_pct'], 100)
+        self.assertEqual(performance['period'], 'since_first_publication')

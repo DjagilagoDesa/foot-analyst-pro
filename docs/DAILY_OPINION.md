@@ -1,4 +1,4 @@
-# Mon avis du jour
+# Avis du jour
 
 Une sélection commune à tous les utilisateurs est publiée sur l’accueil et dans Tickets du jour : trois choix prudents, deux choix plus difficiles et une surprise. Ce sont six rencontres et douze équipes distinctes ; les places restent vides si les données ou les probabilités sont insuffisantes.
 
@@ -10,6 +10,8 @@ La date est celle de Paris, y compris lors des changements d’heure. Le serveur
 
 Les tableaux sont stockés dans PostgreSQL, avec un verrou temporaire partagé entre workers. Les sélections publiées, leur heure et leurs probabilités restent figées. Les places manquantes peuvent être complétées uniquement avant le coup d’envoi ; aucune rencontre déjà commencée n’est ajoutée. Les résultats sont vérifiés ensuite : gagné, perdu ou annulé/non réglable. Les totaux après prolongation ou tirs au but sont exclus des marchés à 90 minutes. Les sept derniers tableaux sont revérifiés pour les résultats en attente. Les erreurs de source conservent les choix existants et l’interface signale un retard.
 
-Un bilan commun sur les trente derniers jours compte les choix gagnés, perdus, en attente et annulés. Le pourcentage exclut les attentes et annulations ; il ne reconstitue aucun ancien pari.
+Le taux officiel de l’application, cumulé depuis la première publication, compte les choix gagnés, perdus, en attente et annulés. Le pourcentage exclut les attentes et annulations ; il ne reconstitue aucun ancien pari.
+
+Seuls les choix de Avis du jour entrent dans ce taux officiel. Les analyses et tickets personnels en sont exclus et leur espace affiche uniquement un historique de résultats, sans autre pourcentage de réussite.
 
 Ce tableau public ne consomme aucun essai personnel et ne crée pas de données dans l’historique privé. Les analyses individuelles et le suivi personnel existants conservent leur fonctionnement.

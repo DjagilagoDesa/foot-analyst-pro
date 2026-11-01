@@ -142,15 +142,17 @@ class DailyOpinion:
         return (json.loads(row['payload']), row['checked_at']) if row else ({}, 0)
 
     def performance(self, day):
-        start = (datetime.fromisoformat(day) - timedelta(days=29)).date().isoformat()
+        # Official app rate: only persisted editorial picks, since the first publication.
+        # Personal account_predictions and account_analyses never enter this query.
         with database() as db:
-            rows = db.execute('SELECT payload FROM daily_opinion_boards WHERE day>=? AND day<=?', (start, day)).fetchall()
+            rows = db.execute('SELECT payload FROM daily_opinion_boards WHERE day<=?', (day,)).fetchall()
         counts = {k: 0 for k in ('won', 'lost', 'pending', 'void')}
         for row in rows:
             for pick in json.loads(row['payload']).get('picks', []):
                 counts[pick['status']] += 1
         settled = counts['won'] + counts['lost']
-        return dict(**counts, success_pct=round(100 * counts['won'] / settled, 1) if settled else None, days=30)
+        return dict(**counts, success_pct=round(100 * counts['won'] / settled, 1) if settled else None,
+                    scope='daily_opinion_only', period='since_first_publication')
 
     def refresh(self, now=None):
         now = now or datetime.now(timezone.utc)

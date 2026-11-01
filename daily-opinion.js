@@ -10,7 +10,9 @@
   lastDay=board.day;lastBoard=board;
   const date=new Date(board.day+'T12:00:00+01:00').toLocaleDateString('fr-FR',{timeZone:'Europe/Paris',day:'numeric',month:'long'});
   const count=(board.groups||[]).reduce((n,g)=>n+g.picks.length,0);
-  let html='<div class="row"><strong class="gold">Mon avis du '+esc(date)+'</strong><span class="fine">'+count+' / 6 choix</span></div>';
+  let html='<div class="row"><strong class="gold">Avis du '+esc(date)+'</strong><span class="fine">'+count+' / 6 choix</span></div>';
+  const p=board.performance;
+  if(p)html+='<div class="opinion-performance"><h3>Taux officiel de l’application</h3><div class="analysis"><div class="stat"><span>Réussite</span><b>'+(p.success_pct===null?'—':esc(p.success_pct)+' %')+'</b></div><div class="stat"><span>Gagnés</span><b>'+esc(p.won)+'</b></div><div class="stat"><span>Perdus</span><b>'+esc(p.lost)+'</b></div><div class="stat"><span>En attente</span><b>'+esc(p.pending)+'</b></div></div>'+message('Uniquement les choix quotidiens : 3 prudents, 2 plus difficiles et 1 surprise, cumulés depuis le début. Tes tickets et analyses personnels ne comptent pas.')+message('Calcul : gagnés ÷ (gagnés + perdus) × 100. Les matchs en attente et les '+p.void+' choix annulés sont exclus.')+(p.success_pct===null?message('Le taux apparaîtra après les premiers résultats vérifiés.'):'')+'</div>';
   if(board.status==='preparing')html+=message('Je prépare mes choix du jour. Cette page se met à jour automatiquement.');
   else if(count<6)html+=message('Sélection partielle : pas assez de rencontres à venir avec les données et probabilités requises. Je ne force aucun choix pour remplir les cases.');
   if(board.stale&&board.status!=='preparing')html+=message('Actualisation en retard : les choix restent ceux publiés à l’heure indiquée.');
@@ -20,8 +22,6 @@
   }).join('')+(!group.picks.length?message('Aucun choix admissible pour le moment.'):'')+'</div>').join('');
   html+=message('Prudent ne signifie pas certain. Les 6 choix sont des sélections individuelles, pas un combiné garanti.');
   if(board.checked_at)html+=message('Dernière vérification : '+new Date(board.checked_at).toLocaleTimeString('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'})+' · actualisation automatique.');
-  const p=board.performance;
-  if(p)html+=message('Bilan des choix quotidiens sur 30 jours : '+p.won+' gagnés · '+p.lost+' perdus · '+p.pending+' en attente · '+p.void+' annulés.'+(p.success_pct===null?' Le taux apparaîtra après les premiers résultats.':' Réussite : '+p.success_pct+' % (hors attentes et annulations).'));
   if(board.source_errors||board.result_source_errors)html+=message('Certaines sources sont indisponibles : sélection ou résultats potentiellement incomplets.');
   html+='<details><summary>Méthode et actualisation</summary>'+message(board.method)+message(board.scope)+message(board.update_note)+'</details>';
   for(const id of targets){
