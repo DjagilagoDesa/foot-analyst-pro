@@ -1,0 +1,45 @@
+const {chromium}=require('playwright');
+const fs=require('fs');
+fs.mkdirSync('artifacts',{recursive:true});
+(async()=>{
+ const browser=await chromium.launch({headless:true});
+ const page=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:1});
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ for(let i=0;i<60;i++){try{await page.goto('http://127.0.0.1:19047/');break;}catch(e){if(i===59)throw e;await new Promise(r=>setTimeout(r,500));}}
+ await page.locator('nav [data-page="info"]').click();
+ await page.locator('[data-auth-tab="register"]').click();
+ await page.locator('#authForm [name="nickname"]').fill('Jordan Test');
+ await page.locator('#authForm [name="email"]').fill('mobile@example.com');
+ await page.locator('#authForm [name="password"]').fill('Mobile-test-password-2026!');
+ await page.locator('#authForm [name="password_confirm"]').fill('Mobile-test-password-2026!');
+ await page.locator('#authForm [name="accept_privacy"]').check();
+ await page.locator('#authForm button[type="submit"], #authForm > button.btn').click();
+ await page.locator('#recoveryCode').waitFor();
+ await page.screenshot({path:'artifacts/profile-mobile.png',fullPage:true});
+ if(!await page.locator('.profile-count').innerText().then(s=>s.includes('3')))throw Error('Missing trial count');
+ await page.locator('#nicknameForm [name="nickname"]').fill('Jordan Pro');
+ await page.locator('#nicknameForm .btn').click();
+ await page.getByRole('heading',{name:'Jordan Pro',exact:true}).waitFor();
+ await page.locator('nav [data-page="tickets"]').click();
+ const data={home:'Paris',away:'Lyon',home_scored_avg:'2',home_conceded_avg:'1',away_scored_avg:'1.5',away_conceded_avg:'1.2',sample_matches_per_team:'10'};
+ for(const [key,value] of Object.entries(data))await page.locator('#manualAnalysis [name="'+key+'"]').fill(value);
+ await page.locator('#manualAnalysis button').click();
+ await page.locator('#manualResult h3').waitFor();
+ await page.locator('nav [data-page="info"]').click();
+ await page.waitForFunction(()=>document.querySelector('.profile-count')?.textContent.includes('2'));
+ await page.locator('#logoutAccount').click();
+ await page.locator('#authForm [name="email"]').waitFor();
+ // The previous registration tab may remain selected after logout; select login explicitly.
+ await page.locator('[data-auth-tab="login"]').click();
+ await page.locator('#authForm [name="email"]').fill('mobile@example.com');
+ await page.locator('#authForm [name="password"]').fill('Mobile-test-password-2026!');
+ await page.locator('#authForm > button.btn').click();
+ await page.locator('#profileHistory [data-history="0"]').waitFor();
+ await page.locator('#profileHistory [data-history="0"]').click();
+ await page.locator('#profileHistory .analysis').waitFor();
+ const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth);
+ if(overflow)throw Error('Horizontal overflow');
+ if(errors.length)throw Error(errors.join('; '));
+ console.log('Mobile browser: registration, recovery code, profile edit, analysis, quota, logout/login and private history OK');
+ await browser.close();
+})().catch(e=>{console.error(e);process.exit(1)});
