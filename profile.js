@@ -94,7 +94,7 @@
     if(id(feedback))id(feedback).innerHTML=message('Traitement en cours…');
     try{await action();}catch(e){if(id(feedback))id(feedback).innerHTML=message(e.message,true);}finally{busy=false;buttons.forEach(b=>b.disabled=false);}
   }
-  function clearHistory(){window.FootballAssistant?.clear();for(const name of ['analysisResult','manualResult','customTicketResult','automaticTicketsResult','automaticTicketsNotice','trackingResult'])if(id(name))id(name).textContent='';if(id('analysisHistory'))id('analysisHistory').innerHTML=message('Connecte-toi pour retrouver ton historique.');}
+  function clearHistory(){window.TicketBuilder?.clear();for(const name of ['analysisResult','manualResult','customTicketResult','automaticTicketsResult','automaticTicketsNotice','trackingResult'])if(id(name))id(name).textContent='';if(id('analysisHistory'))id('analysisHistory').innerHTML=message('Connecte-toi pour retrouver ton historique.');}
   async function loadHistory(){
     const targets=['profileHistory','analysisHistory'].map(id).filter(Boolean);
     try{
@@ -122,6 +122,7 @@
   window.Accounts={request,refresh,loadHistory,loadBilling,render:load,afterAnalysis:async()=>{try{await refresh(false);}catch{}},needsLogin:el=>{const b=document.createElement('button');b.className='btn';b.textContent='OUVRIR MON PROFIL';b.onclick=()=>show('info');el.appendChild(b);}};
   refresh(false).catch(()=>{});
 })();
+
 
 
 

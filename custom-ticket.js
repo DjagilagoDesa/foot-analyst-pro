@@ -81,10 +81,12 @@ function ticketSelection(markets, profile){
   }catch(e){target.innerHTML=message('Ticket non finalisé : '+e.message,true)+message('Les analyses déjà terminées restent accessibles dans ton historique.');if(e.code==='login_required')window.Accounts.needsLogin(target);}
   finally{busy=false;draw();drawFixtures();await window.Accounts.afterAnalysis();}
  };
+ window.PersonalTicket={getMatches:()=>chosen.slice()};
  const originalOpen=openMatch;
  openMatch=function(m,from){originalOpen(m,from);const button=document.createElement('button');button.type='button';button.className='day';button.textContent='＋ AJOUTER À MON TICKET';button.style.cssText='width:100%;max-width:none;margin:12px 0';button.onclick=()=>{show('dailyTickets');add(m);};el('detailContent').prepend(button);};
  draw();
 })();
+
 
 
 
