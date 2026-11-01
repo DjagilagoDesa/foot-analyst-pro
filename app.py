@@ -60,7 +60,7 @@ def parse_events(data, team_id=None):
         except (ValueError,TypeError,StopIteration): continue
     return out
 
-def history(league,team_id,limit=12):
+def history(league,team_id,limit=10):
     # ESPN team schedule: completed fixtures across current and previous seasons.
     now=datetime.now(timezone.utc)
     collected={}
@@ -123,7 +123,7 @@ def frontend_icon():
     return send_from_directory('.', 'icon.svg')
 
 @app.get('/api/health')
-def healthcheck(): return jsonify({'status':'ok','version':'48','sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
+def healthcheck(): return jsonify({'status':'ok','version':'49','sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
 
 @app.get('/api/leagues')
 def leagues(): return jsonify({'leagues':LEAGUES})
@@ -222,8 +222,8 @@ def analyze():
         am,ae=af.result()
     hs,as_=summary(hm,home),summary(am,away)
     result={'league':league,'home_id':home,'away_id':away,'home':hs,'away':as_,'source':'ESPN unofficial API','data_quality':{'home_games':len(hm),'away_games':len(am),'source_errors':{'home':he,'away':ae}},'generated_at':datetime.now(timezone.utc).isoformat(),'disclaimer':'Statistical estimates are not certainties. Odds, injuries, lineups and xG are not included.'}
-    if len(hm)<5 or len(am)<5:
-        result.update({'status':'insufficient_data','message':'Fewer than five completed matches found per team; no probabilities or betting ticket generated.'})
+    if len(hm)<10 or len(am)<10:
+        result.update({'status':'insufficient_data','message':'Dix matchs terminés sont nécessaires pour chaque équipe. Les données disponibles ne permettent pas encore cette analyse sur 10 matchs.'})
     else:
         result.update({'status':'ok','model':'simple_poisson_baseline','prediction':probabilities(hs,as_)})
     def team_name(matches,team):
@@ -232,7 +232,7 @@ def analyze():
             if match['away_id']==team:return match['away']
         return 'Domicile' if team==home else 'Extérieur'
     result['home_name']=team_name(hm,home);result['away_name']=team_name(am,away)
-    if result.get('status')=='ok':result['report']=build_report(result)
+    if result.get('status')=='ok':result['report']=build_report(result, histories={'home':hm,'away':am})
     return jsonify(result)
 
 @app.post('/api/analyze')
