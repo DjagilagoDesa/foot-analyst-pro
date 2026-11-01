@@ -1,0 +1,31 @@
+name: Refresh daily opinion
+on:
+  schedule:
+    - cron: '7,37 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: daily-opinion-refresh
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Wake the app and check today's board
+        shell: bash
+        run: |
+          curl --fail --silent --show-error --retry 1 --retry-delay 10 --max-time 100 \
+            https://foot-analyst-pro.onrender.com/api/daily-opinion > board.json
+          python - <<'PY'
+          import json
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          with open('board.json') as stream:
+              board = json.load(stream)
+          expected = datetime.now(ZoneInfo('Europe/Paris')).date().isoformat()
+          if board.get('day') != expected:
+              raise SystemExit('Daily opinion returned an outdated date')
+          print('Daily opinion:', board['day'], board['status'])
+          PY

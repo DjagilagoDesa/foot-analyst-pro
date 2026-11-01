@@ -434,8 +434,14 @@ def ticket_builder_script():
 from tracking import init_app as init_tracking
 init_tracking(app,fetch,ESPN,LEAGUES)
 
+# One shared daily board across workers and users; results persist in PostgreSQL.
+import sys
+from daily_opinion import init_app as init_daily_opinion
+init_daily_opinion(app, sys.modules[__name__])
+
 if __name__=='__main__':
     app.run(host='0.0.0.0',port=int(os.environ.get('PORT','10000')))
+
 
 
 

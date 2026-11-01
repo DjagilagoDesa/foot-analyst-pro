@@ -49,5 +49,7 @@ fs.mkdirSync('artifacts',{recursive:true});
  if(overflow)throw Error('Horizontal overflow');
  if(errors.length)throw Error(errors.join('; '));
  console.log('Mobile browser: registration, recovery code, profile edit, analysis, quota, logout/login and private history OK');
+ await require('./daily_opinion_mobile.cjs')(browser);
  await browser.close();
 })().catch(e=>{console.error(e);process.exit(1)});
+

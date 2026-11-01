@@ -17,7 +17,11 @@ bp = Blueprint('accounts', __name__)
 COOKIE = 'foot_session'
 SESSION_DAYS = 14
 DUMMY_HASH = generate_password_hash(secrets.token_urlsafe(24))
+DAILY_OPINION_SCHEMA = '''CREATE TABLE IF NOT EXISTS daily_opinion_boards (
+ day TEXT PRIMARY KEY, payload TEXT NOT NULL, checked_at BIGINT NOT NULL DEFAULT 0,
+ lease_until BIGINT NOT NULL DEFAULT 0, lease_token TEXT NOT NULL DEFAULT '')'''
 SCHEMA = (
+    DAILY_OPINION_SCHEMA,
 
 
     '''CREATE TABLE IF NOT EXISTS account_owner_access (slot TEXT PRIMARY KEY, user_id TEXT NOT NULL)''',
@@ -469,6 +473,7 @@ def metered_analysis(func):
             finish_analysis(user['id'],analysis_id)
             raise
     return wrapper
+
 
 
 

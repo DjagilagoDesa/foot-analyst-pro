@@ -1,0 +1,38 @@
+const assert=require('node:assert/strict');
+module.exports=async function(browser){
+ for(const width of [360,390]){
+  const page=await browser.newPage({viewport:{width,height:844}});
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  const day=new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Paris'});
+  const groups=[['prudent',3,'Mes 3 choix prudents',80],['challenge',2,'Mes 2 choix plus difficiles',65],['surprise',1,'Ma surprise du jour',35]];
+  let id=0;
+  const board={day,status:'ready',stale:false,checked_at:new Date().toISOString(),method:'Données de test',scope:'Périmètre de test',update_note:'Actualisation automatique',performance:{won:2,lost:1,pending:3,void:0,success_pct:66.7},groups:groups.map(([group,count,title,probability])=>({id:group,title,target:count,picks:Array.from({length:count},()=>{
+   const n=++id;
+   return {group,probability,market_label:'Double chance 1X',rationale:'Explication propre à la rencontre de test '+n,expected_goals:{home:2,away:1},published_at:new Date().toISOString(),status:'pending',home_score:null,away_score:null,
+    match:{id:String(n),league:'fra.1',date:new Date(Date.now()+3600000).toISOString(),state:'pre',completed:false,status_name:'STATUS_SCHEDULED',home:{id:String(n*2),name:'Paris Saint-Germain '+n,badge:''},away:{id:String(n*2+1),name:'Olympique de Marseille '+n,badge:''}}};
+  })}))};
+  await page.route('**/api/daily-opinion',r=>r.fulfill({contentType:'application/json',body:JSON.stringify(board)}));
+  await page.goto('http://127.0.0.1:19047/');
+  await page.locator('#homeDailyOpinion .opinion-pick').first().waitFor();
+  assert.equal(await page.locator('#homeDailyOpinion .opinion-pick').count(),6);
+  assert.equal(await page.locator('#homeDailyOpinion .opinion-group').count(),3);
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  await page.locator('#homeDailyOpinion .opinion-pick details summary').first().click();
+  await page.locator('#homeDailyOpinion [data-opinion-match]').first().click();
+  await page.locator('#detail:not(.hidden) #analyzeBtn').waitFor();
+  await page.locator('nav [data-page="dailyTickets"]').click();
+  await page.locator('#dailyOpinionResult .opinion-pick').first().waitFor();
+  assert.equal(await page.locator('#dailyOpinionResult .opinion-pick').count(),6);
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  await page.waitForFunction(()=>!window.DailyOpinion.isLoading());
+  // A source failure must keep the current day's published choices with a stale notice.
+  await page.unroute('**/api/daily-opinion');
+  await page.route('**/api/daily-opinion',r=>r.fulfill({status:503,contentType:'application/json',body:'{}'}));
+  await page.evaluate(()=>window.DailyOpinion.load());
+  assert.equal(await page.locator('#dailyOpinionResult .opinion-pick').count(),6);
+  assert.match(await page.locator('#dailyOpinionResult').innerText(),/Actualisation en retard/);
+  assert.deepEqual(errors,[]);
+  console.log('Daily opinion mobile '+width+': 3/2/1, fixture navigation, no overflow, stale handling OK');
+  await page.close();
+ }
+};
