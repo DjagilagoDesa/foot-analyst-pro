@@ -99,6 +99,20 @@ class PersistenceTests(unittest.TestCase):
              patch.object(self.service, 'settle'), patch.object(self.service, 'settle_previous'):
             self.service.refresh(NOW)
 
+    def test_evaluation_endpoint_is_read_only_and_excludes_pending(self):
+        self.refresh()
+        board, checked = self.service.read(DAY)
+        board['picks'][0]['status'] = 'won'
+        with database() as db:
+            db.execute('UPDATE daily_opinion_boards SET payload=? WHERE day=?', (json.dumps(board), DAY))
+        before = self.service.read(DAY)
+        response = self.app.test_client().get('/api/daily-opinion/evaluation')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['overall']['count'], 1)
+        self.assertEqual(response.json['excluded']['pending'], 5)
+        self.assertEqual(response.headers['Cache-Control'], 'no-store')
+        self.assertEqual(self.service.read(DAY), before)
+
     def test_persistence_across_workers_and_no_quota_consumption(self):
         self.refresh()
         other = DailyOpinion(self.app, self.server)
