@@ -82,6 +82,7 @@ jobs:
         with:
           name: opponent-research-evidence
           path: |
+            opponent-archive.json
             opponent-archive.json.coverage.json
             opponent-benchmark-report.json
           retention-days: 30

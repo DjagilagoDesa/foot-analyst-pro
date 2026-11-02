@@ -1,5 +1,6 @@
 """Collect bounded ESPN scoreboard archives for offline tests, not production."""
 import argparse
+import hashlib
 import json
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -61,7 +62,9 @@ def main():
     parser.add_argument('--output',required=True)
     args=parser.parse_args()
     games,metadata=collect(args.leagues,args.start,args.end)
-    Path(args.output).write_text(json.dumps(games,ensure_ascii=False,indent=2)+'\n')
+    serialized=json.dumps(games,ensure_ascii=False,indent=2)+'\n'
+    metadata['dataset_sha256']=hashlib.sha256(serialized.encode()).hexdigest()
+    Path(args.output).write_text(serialized)
     Path(args.output+'.coverage.json').write_text(json.dumps(metadata,ensure_ascii=False,indent=2)+'\n')
     print(json.dumps(dict(fixtures=len(games),requests=metadata['requests'],failures=len(metadata['errors']))))
     if not games: raise SystemExit('No usable real fixtures collected; no benchmark conclusion is possible.')

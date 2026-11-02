@@ -75,3 +75,25 @@ python tools/benchmark_opponents.py --input /tmp/archive.json \
 Le rapport porte toujours `experimental_only_no_automatic_promotion`. Les données
 synthétiques des tests automatisés prouvent le fonctionnement du comparateur,
 pas l’efficacité sportive du modèle.
+
+## Premier résultat mesuré le 2 novembre 2026
+
+Recherche GitHub 41541226615, code figé au commit
+`4eb5be6971abfb401348c04bbfcdf7323fc768a1`. Collecte : 760 rencontres, 728 requêtes,
+aucune erreur remontée. Cela ne garantit pas l’exhaustivité du fournisseur.
+
+Test final : 283 rencontres, Brier 1X2 de 0,606404 pour la référence et 0,606085 pour
+le candidat (écart −0,000319). Même nombre d’issues 1X2 correctement désignées,
+140 sur 283. Le Brier BTTS global se dégrade très légèrement.
+
+Ligue des champions : 36 rencontres seulement ; Brier 0,588081 contre 0,586246,
+19 issues 1X2 correctement désignées sur 36 dans les deux cas. Échantillon trop court
+pour valider une amélioration spécifique UCL. Ce taux 1X2 n’est **pas** le taux des
+sélections spéciales de l’application ou des avis du jour.
+
+Décision : conserver le candidat expérimental. Pas de gain démontré suffisant pour
+remplacer le moteur. Les 760 dates de disponibilité sont toutes des hypothèses
+rétrospectives à +24h ; aucune validation prospective réelle n’est revendiquée.
+Résumé durable : `research/opponent-benchmark-2026-11-02.json`. Les exécutions suivantes
+conservent aussi le jeu de données et son SHA-256 avec les rapports ; une réexécution
+identique est un contrôle de reproductibilité, pas un nouvel échantillon indépendant.

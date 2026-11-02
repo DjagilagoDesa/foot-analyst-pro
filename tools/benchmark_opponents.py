@@ -1,5 +1,6 @@
 """Run offline: python tools/benchmark_opponents.py --help"""
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -15,8 +16,10 @@ def main():
     parser.add_argument('--test-from',required=True,help='Timezone-aware ISO date, fixed before evaluation')
     parser.add_argument('--output',required=True)
     args=parser.parse_args()
-    with open(args.input) as f: records=json.load(f)
+    raw=Path(args.input).read_bytes()
+    records=json.loads(raw)
     report=run(records,args.validation_from,args.test_from,probabilities,summary)
+    report['dataset_sha256']=hashlib.sha256(raw).hexdigest()
     Path(args.output).write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
     print(json.dumps({k:report[k] for k in ('version','validation','test','skipped','decision')},ensure_ascii=False))
 
