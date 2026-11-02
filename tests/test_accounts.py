@@ -88,7 +88,7 @@ class AccountTests(unittest.TestCase):
         self.register()
         inputs = dict(league='uefa.champions',home_id='1',away_id='2',event_id='123')
         context = dict(version=1,fixture_verified=True,observed_at='2026-11-02T12:00:00Z',teams={})
-        with patch.object(server,'history',side_effect=lambda league,team,**kw:([game(i,i+2,home=team) for i in range(10)],[])), patch.object(server,'head_to_head',return_value={'matches':[]}), patch('champions_context.collect',return_value=context):
+        with patch.object(server,'history',side_effect=lambda league,team,**kw:([game(i,i+2,home=team) for i in range(10)],[])), patch.object(server,'head_to_head',return_value={'matches':[]}), patch('champions_context.collect',return_value=context), patch('match_availability.collect',return_value=context):
             initial=self.post('/api/analyze',inputs)
         self.assertEqual(initial.status_code,200,initial.json)
         prediction=initial.json['prediction']
@@ -97,12 +97,13 @@ class AccountTests(unittest.TestCase):
             saved=json.loads(row['result']);saved.pop('domestic_context')
             saved['report']['sections']=[s for s in saved['report']['sections'] if not s['title'].startswith('Forme nationale')]
             db.execute('UPDATE account_analyses SET result=? WHERE id=?',(json.dumps(saved),row['id']))
-        with patch('champions_context.collect',return_value=context):
+        with patch('champions_context.collect',return_value=context), patch('match_availability.collect',return_value=context):
             enriched=self.post('/api/analyze',inputs)
         self.assertEqual(enriched.json['prediction'],prediction)
         self.assertEqual(enriched.json['domestic_context'],context)
         self.assertEqual(self.client.get('/api/account').json['user']['trial_remaining'],2)
         self.assertEqual(sum(s['title'].startswith('Forme nationale') for s in enriched.json['report']['sections']),1)
+        self.assertEqual(sum(s['title'].startswith('Compositions et disponibilités') for s in enriched.json['report']['sections']),1)
 
     def test_failed_and_insufficient_analyses_are_refunded(self):
         self.register()

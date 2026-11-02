@@ -172,7 +172,7 @@ def frontend_icon():
     return send_from_directory('.', 'icon.svg')
 
 @app.get('/api/health')
-def healthcheck(): return jsonify({'status':'ok','version':'54','champions_context_version':1,'sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
+def healthcheck(): return jsonify({'status':'ok','version':'54','champions_context_version':1,'personnel_context_version':1,'sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
 
 @app.get('/api/leagues')
 def leagues(): return jsonify({'leagues':LEAGUES})
@@ -297,6 +297,8 @@ def analyze():
         from champions_context import collect
         import sys
         result['domestic_context'] = collect(sys.modules[__name__], home, away, result['event_id'])
+        from match_availability import collect as collect_personnel
+        result['personnel_context'] = collect_personnel(sys.modules[__name__], league, home, away, result['event_id'])
     if result.get('status')=='ok':result['report']=build_report(result, histories={'home':hm,'away':am})
     return jsonify(result)
 
