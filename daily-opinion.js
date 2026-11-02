@@ -1,10 +1,10 @@
 /* Shared daily choices: automatic refresh, no personal analyses consumed. */
 (()=>{
- const targets=['homeDailyOpinion','dailyOpinionResult'];
+ const targets=['homeDailyOpinion'];
  const esc=escapeHtml;
  let busy=false,lastDay='',lastBoard=null;
  const day=()=>new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Paris'});
- const visible=()=>!document.hidden&&['home','dailyTickets'].some(id=>!document.getElementById(id).classList.contains('hidden'));
+ const visible=()=>!document.hidden&&!document.getElementById('home').classList.contains('hidden');
  const message=s=>'<p class="fine">'+esc(s)+'</p>';
  function render(board){
   lastDay=board.day;lastBoard=board;
@@ -12,7 +12,7 @@
   const count=(board.groups||[]).reduce((n,g)=>n+g.picks.length,0);
   let html='<div class="row"><strong class="gold">Avis du '+esc(date)+'</strong><span class="fine">'+count+' / 6 choix</span></div>';
   const p=board.performance;
-  if(p)html+='<div class="opinion-performance"><h3>Taux officiel de l’application</h3><div class="analysis"><div class="stat"><span>Réussite</span><b>'+(p.success_pct===null?'—':esc(p.success_pct)+' %')+'</b></div><div class="stat"><span>Gagnés</span><b>'+esc(p.won)+'</b></div><div class="stat"><span>Perdus</span><b>'+esc(p.lost)+'</b></div><div class="stat"><span>En attente</span><b>'+esc(p.pending)+'</b></div></div>'+message('Uniquement les choix quotidiens : 3 prudents, 2 plus difficiles et 1 surprise, cumulés depuis le début. Tes tickets et analyses personnels ne comptent pas.')+message('Calcul : gagnés ÷ (gagnés + perdus) × 100. Les matchs en attente et les '+p.void+' choix annulés sont exclus.')+(p.success_pct===null?message('Le taux apparaîtra après les premiers résultats vérifiés.'):'')+'</div>';
+  if(p)html+='<div class="opinion-performance"><h3>Taux officiel de l’application</h3><div class="analysis"><div class="stat"><span>Réussite</span><b>'+(p.success_pct===null?'—':esc(p.success_pct)+' %')+'</b></div><div class="stat"><span>Gagnés</span><b>'+esc(p.won)+'</b></div><div class="stat"><span>Perdus</span><b>'+esc(p.lost)+'</b></div><div class="stat"><span>En attente</span><b>'+esc(p.pending)+'</b></div></div>'+(p.success_pct===null?message('Le taux apparaîtra après les premiers résultats vérifiés.'):'')+'</div>';
   if(board.status==='preparing')html+=message('Je prépare mes choix du jour. Cette page se met à jour automatiquement.');
   else if(count<6)html+=message('Sélection partielle : pas assez de rencontres à venir avec les données et probabilités requises. Je ne force aucun choix pour remplir les cases.');
   if(board.stale&&board.status!=='preparing')html+=message('Actualisation en retard : les choix restent ceux publiés à l’heure indiquée.');

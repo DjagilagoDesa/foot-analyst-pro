@@ -42,4 +42,18 @@ class Tracking(unittest.TestCase):
   self.post();d=self.client.get('/api/tracking/performance').json;self.assertEqual(d['pending'],1);self.assertIsNone(d['success_pct'])
  def test_markets(self):
   self.assertTrue(tracking.resolve('home_or_draw',0,0));self.assertFalse(tracking.resolve('over_2_5',1,1));self.assertTrue(tracking.resolve('over_1_5',1,1))
+ def test_personal_and_editorial_rates_are_independent(self):
+  from daily_opinion import DailyOpinion
+  self.post()
+  with self.app.app_context(),accounts.database() as db:
+   db.execute("UPDATE account_predictions SET status='won' WHERE user_id='u'")
+   db.execute('''INSERT INTO account_predictions(user_id,event_id,league,market,probability,label,home_id,away_id,starts_at,created_at,status)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?)''',('other','456','fra.1','home',70,'Other account','1','2',0,0,'lost'))
+   db.execute(accounts.DAILY_OPINION_SCHEMA)
+   db.execute('INSERT INTO daily_opinion_boards(day,payload) VALUES(?,?)',('2026-01-01',json.dumps({'picks':[{'status':'lost'}]})))
+  personal=self.client.get('/api/tracking/performance').json
+  with self.app.app_context():editorial=DailyOpinion(self.app,None).performance('2026-01-01')
+  self.assertEqual(personal['scope'],'personal_selections_only')
+  self.assertEqual((personal['won'],personal['lost'],personal['success_pct']),(1,0,100))
+  self.assertEqual((editorial['won'],editorial['lost'],editorial['success_pct']),(0,1,0))
 if __name__=='__main__':unittest.main()
