@@ -127,11 +127,39 @@ def owner_access(user_id, db=None):
     return bool(row and row['user_id']!='unassigned' and row['user_id']==user_id)
 
 
+def initialize_review_access(app):
+    """Grant an existing review account once, pinned to its immutable user ID.
+
+    The operator sets PLAY_REVIEW_ACCOUNT_EMAIL for this one-time grant.
+    No account is created, and deleting/recreating it never repeats the grant.
+    """
+    email = os.environ.get('PLAY_REVIEW_ACCOUNT_EMAIL', '').strip().lower()
+    if not email:
+        return
+    with app.app_context():
+        if not configured():
+            return
+        with database() as db:
+            existing = db.execute("SELECT user_id FROM account_owner_access WHERE slot='play-review'").fetchone()
+            if existing:
+                return
+            user = db.execute('SELECT id FROM account_users WHERE lower(email)=?', (email,)).fetchone()
+            if not user:
+                app.logger.warning('Play review account must exist before access can be granted.')
+                return
+            pinned = db.execute("INSERT INTO account_owner_access(slot,user_id) VALUES('play-review',?) ON CONFLICT(slot) DO NOTHING RETURNING user_id", (user['id'],)).fetchone()
+            if pinned:
+                # Reusable review access through 2100, without owner privileges.
+                db.execute('UPDATE account_users SET premium_until=? WHERE id=? AND premium_until<?', (4102444800, user['id'], 4102444800))
+                app.logger.info('Play review Premium access initialized.')
+
+
 def init_app(app):
     app.config.setdefault('ACCOUNT_DATABASE_URL', os.environ.get('DATABASE_URL', ''))
     app.config.setdefault('ACCOUNT_SECURE_COOKIE', True)
     app.config.setdefault('ACCOUNT_PUBLIC_ORIGIN', os.environ.get('PUBLIC_ORIGIN', 'https://foot-analyst-pro.onrender.com'))
     initialize_owner_access(app)
+    initialize_review_access(app)
     app.register_blueprint(bp)
     app.register_error_handler(AccountError, lambda e: (jsonify(error=e.kind, message=e.message), e.code))
 
@@ -477,6 +505,7 @@ def metered_analysis(func):
             finish_analysis(user['id'],analysis_id)
             raise
     return wrapper
+
 
 
 
