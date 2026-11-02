@@ -112,8 +112,9 @@ def init_app(app, fetch, base, leagues):
         won,lost=counts.get('won',0),counts.get('lost',0)
         return jsonify(won=won,lost=lost,pending=counts.get('pending',0),void=counts.get('void',0),
                        success_pct=round(100*won/(won+lost),1) if won+lost else None,
+                       scope='personal_selections_only',
                        total=sum(counts.values()),recent=recent,source_errors=errors,
-                       note='Sélections enregistrées avant le coup d’envoi. Réussite = justes / (justes + fausses). En attente et annulées exclues du pourcentage. Chaque marché est compté une fois par match et par compte ; les sélections peuvent être corrélées. Les anciens paris non enregistrés ne sont pas reconstitués.')
+                       note='Sélections personnelles enregistrées avant le coup d’envoi. Réussite = gagnés / (gagnés + perdus). En attente et annulées exclues du pourcentage. Chaque marché est compté une fois par match et par compte ; les sélections peuvent être corrélées. Les anciens paris non enregistrés ne sont pas reconstitués.')
     app.register_blueprint(bp)
 
 
