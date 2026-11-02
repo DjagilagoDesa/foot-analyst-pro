@@ -34,7 +34,7 @@ def fetch(url, params=None, ttl=900):
         CACHE[key] = (time.time(), data)
     return data
 
-def parse_events(data, team_id=None):
+def parse_events(data, team_id=None, regulation_only=False):
     out=[]
     for e in data.get('events') or []:
         comp=(e.get('competitions') or [{}])[0]
@@ -42,6 +42,14 @@ def parse_events(data, team_id=None):
         if len(teams)!=2: continue
         state=(comp.get('status') or e.get('status') or {}).get('type') or {}
         if not state.get('completed'): continue
+        if regulation_only:
+            status = comp.get('status') or e.get('status') or {}
+            name = str(state.get('name', '')).upper()
+            try:
+                if int(status.get('period') or 0) > 2: continue
+            except (TypeError, ValueError):
+                continue
+            if any(x in name for x in ('EXTRA_TIME', 'PENALT', 'FINAL_AET', 'AFTER_EXTRA', 'CANCEL', 'ABANDON')): continue
         try:
             if datetime.fromisoformat(e['date'].replace('Z','+00:00')) > datetime.now(timezone.utc): continue
         except (KeyError, ValueError, TypeError): continue
@@ -60,6 +68,15 @@ def parse_events(data, team_id=None):
         except (ValueError,TypeError,StopIteration): continue
     return out
 
+def champions_recent(match, now):
+    """Bound European evidence; do not let old campaigns silently fill the sample."""
+    try:
+        played = datetime.fromisoformat(match['date'].replace('Z', '+00:00'))
+        return played.tzinfo is not None and 0 <= (now-played).total_seconds() <= 540*86400
+    except (KeyError, ValueError, TypeError, AttributeError):
+        return False
+
+
 def history(league,team_id,limit=10):
     # ESPN team schedule: completed fixtures across current and previous seasons.
     now=datetime.now(timezone.utc)
@@ -70,7 +87,8 @@ def history(league,team_id,limit=10):
               for season in (now.year,now.year-1,now.year-2)}
         for job in as_completed(jobs):
             try:
-                for match in parse_events(job.result(),team_id):
+                for match in parse_events(job.result(),team_id,regulation_only=league=='uefa.champions'):
+                    if league == 'uefa.champions' and not champions_recent(match, now): continue
                     if match['id']: collected[match['id']]=match
             except (requests.RequestException,ValueError) as exc:
                 errors.append(f'{jobs[job]}: {type(exc).__name__}')
@@ -269,6 +287,12 @@ def analyze():
     result['home_name']=team_name(hm,home);result['away_name']=team_name(am,away)
     result['event_id']=str(data.get('event_id',''))
     result['head_to_head']=confrontations
+    if league == 'uefa.champions':
+        result['competition_profile'] = {'name':'Ligue des champions', 'history_days':540,
+            'regulation_only':True, 'opponent_strength_adjusted':False,
+            'model_version':'poisson-ucl-540d-v1'}
+        if result.get('status') == 'insufficient_data':
+            result['message'] = 'Ligue des champions : dix résultats européens exploitables par équipe sur les 540 derniers jours sont nécessaires. Les scores avec prolongations ou tirs au but sont exclus.'
     if result.get('status')=='ok':result['report']=build_report(result, histories={'home':hm,'away':am})
     return jsonify(result)
 

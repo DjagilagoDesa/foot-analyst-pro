@@ -28,6 +28,18 @@ class ReportTests(unittest.TestCase):
         self.assertTrue(any('Lyon' in section['title'] for section in sections))
         self.assertTrue(any('Surprise possible' in section['title'] for section in sections))
         self.assertIn('ne sont pas vérifiés',sections[-1]['text'])
+    def test_champions_report_distinguishes_match_and_qualification(self):
+        team = dict(wins=6, draws=2, losses=2, matches=10, goals_for_avg=1.6, goals_against_avg=1.1)
+        data = dict(status='ok', league='uefa.champions', home_name='Paris', away_name='Madrid',
+                    home=team, away=team, prediction=dict(expected_goals={'home':1.7,'away':1.3},
+                    markets={'home':45,'away':30,'draw':25}))
+        result = report(data)
+        section = next(s for s in result['sections'] if s['title'].startswith('Ligue des champions'))
+        self.assertIn('pas la qualification', section['text'])
+        self.assertIn('force n’est pas corrigée', section['text'])
+        self.assertIn('Paris : détail du parcours européen indisponible', section['text'])
+        self.assertEqual(data['prediction']['markets']['home'], 45)
+
     def test_no_report_without_successful_data(self):
         self.assertIsNone(report({'status':'insufficient_data'}))
 
