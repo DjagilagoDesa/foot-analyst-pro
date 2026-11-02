@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 from flask import jsonify
 from accounts import database, configured, DAILY_OPINION_SCHEMA
 from tracking import fixture_info, score, resolve
+from evaluation import evaluate, MODEL_VERSION
 
 PARIS = ZoneInfo('Europe/Paris')
 INTERVAL = 900
@@ -124,7 +125,7 @@ def choose(results, existing, now, day):
             rationale += ' ' + judgement(r, choice['market'])
             picks.append(dict(group=group, match=m, **choice, market_label=LABELS[choice['market']],
                               rationale=rationale, expected_goals=r['prediction']['expected_goals'],
-                              published_at=now.isoformat(), status='pending', home_score=None, away_score=None))
+                              model_version=MODEL_VERSION, published_at=now.isoformat(), status='pending', home_score=None, away_score=None))
             used_events.add(m['id'])
             used_teams.update(ids)
             missing -= 1
@@ -328,6 +329,18 @@ def init_app(app, server):
             method='Modèle statistique Poisson, 10 matchs terminés par équipe. Pas de cotes bookmaker, compositions ou absences vérifiées. Probabilités non calibrées.',
             scope=f'Compétitions couvertes : {len(server.LEAGUES)}. Au maximum {LIMIT} rencontres étudiées, réparties sur la journée. Ce n’est pas une sélection exhaustive du football mondial.',
             update_note='Nouvelle journée à minuit, heure de Paris. Vérification environ toutes les 15 minutes lorsque le serveur est actif ; reprise à son réveil. Les choix publiés restent figés, les places manquantes peuvent être complétées avant le coup d’envoi.')
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+
+    @app.get('/api/daily-opinion/evaluation')
+    def editorial_evaluation():
+        if not configured():
+            return jsonify(status='unavailable'), 503
+        with database() as db:
+            db.execute(SCHEMA)
+            rows = db.execute('SELECT payload FROM daily_opinion_boards WHERE day<=? ORDER BY day', (today(),)).fetchall()
+        picks = [pick for row in rows for pick in json.loads(row['payload']).get('picks', [])]
+        response = jsonify(evaluate(picks))
         response.headers['Cache-Control'] = 'no-store'
         return response
 
