@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, live-scores-v46, profile-v47, analysis-premium-v48]
   pull_request:
-    paths: ['app.py', 'accounts.py', 'profile.js', 'engine.py', 'analysis_report.py', 'daily_opinion.py', 'custom-ticket.js', 'daily-tickets.js', 'Dockerfile', 'index.html', 'tests/**', '.github/workflows/backend-checks.yml']
+    paths: ['opponent_benchmark.py', 'tools/benchmark_opponents.py', 'tools/collect_opponent_archive.py', 'docs/opponent-research.md', 'app.py', 'accounts.py', 'profile.js', 'engine.py', 'analysis_report.py', 'daily_opinion.py', 'custom-ticket.js', 'daily-tickets.js', 'Dockerfile', 'index.html', 'tests/**', '.github/workflows/backend-checks.yml']
 permissions:
   contents: read
 jobs:
@@ -52,3 +52,37 @@ jobs:
           name: profile-mobile-preview
           path: artifacts/profile-mobile.png
           if-no-files-found: ignore
+
+  opponent-research:
+    if: github.event_name == 'pull_request' && github.head_ref == 'opponent-strength-benchmark'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - name: Collect retrospective archive with explicit coverage audit
+        id: archive
+        continue-on-error: true
+        run: >-
+          python tools/collect_opponent_archive.py
+          --leagues eng.1 esp.1 ita.1 ger.1 fra.1 por.1 ned.1 uefa.champions
+          --start 2025-09-01 --end 2025-11-30
+          --output opponent-archive.json
+      - name: Compare frozen models on validation and held-out November fixtures
+        if: steps.archive.outcome == 'success'
+        run: >-
+          python tools/benchmark_opponents.py --input opponent-archive.json
+          --validation-from 2025-10-01T00:00:00Z --test-from 2025-11-01T00:00:00Z
+          --output opponent-benchmark-report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: opponent-research-evidence
+          path: |
+            opponent-archive.json
+            opponent-archive.json.coverage.json
+            opponent-benchmark-report.json
+          retention-days: 30
