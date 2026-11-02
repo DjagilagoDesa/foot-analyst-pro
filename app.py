@@ -77,7 +77,7 @@ def champions_recent(match, now):
         return False
 
 
-def history(league,team_id,limit=10):
+def history(league,team_id,limit=10,regulation_only=None):
     # ESPN team schedule: completed fixtures across current and previous seasons.
     now=datetime.now(timezone.utc)
     collected={}
@@ -87,7 +87,7 @@ def history(league,team_id,limit=10):
               for season in (now.year,now.year-1,now.year-2)}
         for job in as_completed(jobs):
             try:
-                for match in parse_events(job.result(),team_id,regulation_only=league=='uefa.champions'):
+                for match in parse_events(job.result(),team_id,regulation_only=(league=='uefa.champions' if regulation_only is None else regulation_only)):
                     if league == 'uefa.champions' and not champions_recent(match, now): continue
                     if match['id']: collected[match['id']]=match
             except (requests.RequestException,ValueError) as exc:
@@ -172,7 +172,7 @@ def frontend_icon():
     return send_from_directory('.', 'icon.svg')
 
 @app.get('/api/health')
-def healthcheck(): return jsonify({'status':'ok','version':'54','sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
+def healthcheck(): return jsonify({'status':'ok','version':'54','champions_context_version':1,'sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
 
 @app.get('/api/leagues')
 def leagues(): return jsonify({'leagues':LEAGUES})
@@ -293,6 +293,10 @@ def analyze():
             'model_version':'poisson-ucl-540d-v1'}
         if result.get('status') == 'insufficient_data':
             result['message'] = 'Ligue des champions : dix résultats européens exploitables par équipe sur les 540 derniers jours sont nécessaires. Les scores avec prolongations ou tirs au but sont exclus.'
+    if league == 'uefa.champions' and result.get('status') == 'ok':
+        from champions_context import collect
+        import sys
+        result['domestic_context'] = collect(sys.modules[__name__], home, away, result['event_id'])
     if result.get('status')=='ok':result['report']=build_report(result, histories={'home':hm,'away':am})
     return jsonify(result)
 
