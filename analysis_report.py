@@ -1,7 +1,7 @@
 """Match-specific editorial reasoning from observed results, without invented news."""
 from datetime import datetime
 
-REPORT_VERSION = 6
+REPORT_VERSION = 7
 
 def number(value):
     return f'{float(value):.2f}'.rstrip('0').rstrip('.').replace('.', ',')
@@ -84,6 +84,45 @@ def surprise_reading(home, away, h, a, p, hr, ar):
     return text
 
 
+def domestic_section(data):
+    context = data.get('domestic_context')
+    if not context:
+        return None
+    lines = [f"Contexte consulté le {context.get('observed_at', '')[:16].replace('T', ' ')} UTC."]
+    for side in ('home', 'away'):
+        name = data.get(side+'_name', side)
+        team_id = str(data.get(side+'_id'))
+        item = context.get('teams', {}).get(team_id, {})
+        rows = observations(item.get('games'), team_id)
+        if not rows:
+            lines.append(f'{name} : forme nationale indisponible dans la couverture consultée.')
+        else:
+            stats = record(rows)
+            sequence = ' – '.join(row['outcome'] for row in rows)
+            lines.append(f"{name} ({item.get('league')}) : {sequence}, du plus récent au plus ancien (V = victoire, N = nul, D = défaite). "
+                         f"{stats['n']} match(s) du {rows[-1]['date'][:10]} au {rows[0]['date'][:10]}, "
+                         f"{stats['points']} point(s) sur {3*stats['n']}, {sum(r['gf'] for r in rows)} but(s) marqué(s), "
+                         f"{sum(r['ga'] for r in rows)} encaissé(s).")
+            for venue, label in (('home', 'domicile'), ('away', 'extérieur')):
+                split = record([r for r in rows if r['venue'] == venue])
+                lines.append(f"Dans ces résultats à {label} : {split['n']} match(s), {split['wins']} victoire(s), "
+                             f"{split['draws']} nul(s), {split['losses']} défaite(s).")
+        last = item.get('last_observed_match')
+        if item.get('rest_hours') is not None and last:
+            lines.append(f"{name} : {number(item['rest_hours'])} heures entre le dernier coup d’envoi observé "
+                         f"({last['date'][:10]}, {last.get('home')} – {last.get('away')}) et ce match européen.")
+        else:
+            lines.append(f'{name} : temps de repos non calculable avec les données vérifiées.')
+        if item.get('status') != 'ok':
+            lines.append(f'{name} : couverture partielle ou indisponible, aucune série complétée artificiellement.')
+    lines.append(context.get('note', ''))
+    if context.get('failed_leagues'):
+        lines.append('Certains championnats n’ont pas répondu à la recherche.')
+    lines.append('La forme nationale et le repos contextualisent le jugement ; ils ne modifient pas les probabilités européennes. '
+                 'Les forces des adversaires nationaux ne sont pas ajustées : ces bilans ne sont pas directement équivalents entre championnats.')
+    return dict(title='Forme nationale et repos avant la Ligue des champions', text=' '.join(lines))
+
+
 def report(data, names=None, histories=None):
     if data.get('status') != 'ok' or not data.get('prediction'):
         return None
@@ -108,9 +147,12 @@ def report(data, names=None, histories=None):
                          f"{split['draws']} nul(s), {split['losses']} défaite(s). "
                          f"Adversaires rencontrés : {', '.join(opponents)}.")
         lines.append('Ces parcours affrontent des adversaires différents : leur force n’est pas corrigée par le modèle. '
-                     'La forme en championnat national, le classement européen et le score cumulé d’une éventuelle double confrontation ne sont pas vérifiés. '
-                     'Les marchés concernent le résultat du match, pas la qualification. Aucun bonus de confiance européen n’est ajouté.')
+                     + ('Le classement européen et le score cumulé d’une éventuelle double confrontation ne sont pas vérifiés. ' if data.get('domestic_context') else 'La forme en championnat national, le classement européen et le score cumulé d’une éventuelle double confrontation ne sont pas vérifiés. ')
+                     + 'Les marchés concernent le résultat du match, pas la qualification. Aucun bonus de confiance européen n’est ajouté.')
         add('Ligue des champions : lecture du parcours européen', ' '.join(lines))
+    national = domestic_section(data)
+    if national:
+        sections.append(national)
     ph, pa, pn = p['home'], p['away'], p['draw']
     gap = abs(ph-pa)
     leader, outsider = (home, away) if ph>pa else (away,home)

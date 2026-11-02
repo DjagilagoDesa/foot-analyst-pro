@@ -482,6 +482,22 @@ def metered_analysis(func):
                            preview_sections=['Jugement du match','Arguments des deux équipes',
                                              'Surprises possibles','Confrontations passées','Probabilités'])
         if cached is not None:
+            if cached.get('league') == 'uefa.champions' and not cached.get('domestic_context'):
+                import app as server
+                from champions_context import collect
+                from analysis_report import domestic_section, REPORT_VERSION
+                context = collect(server, cached.get('home_id'), cached.get('away_id'), cached.get('event_id', ''))
+                # Enrich a still-upcoming cached fixture without using another free analysis.
+                # Archived match reports keep their original pre-match context.
+                if context['fixture_verified']:
+                    cached['domestic_context'] = context
+                    if cached.get('report'):
+                        for section in cached['report']['sections']:
+                            section['text'] = section['text'].replace('La forme en championnat national, le classement européen et le score cumulé', 'Le classement européen et le score cumulé')
+                        cached['report']['sections'].append(domestic_section(cached))
+                        cached['report']['version'] = REPORT_VERSION
+                    with database() as db:
+                        db.execute("UPDATE account_analyses SET result=? WHERE user_id=? AND request_key=? AND status='complete'", (json.dumps(cached,ensure_ascii=False),user['id'],key))
             if (cached.get('prediction') and cached.get('home') and cached.get('away')
                     and 'home_or_draw_and_btts' not in cached['prediction'].get('markets',{})):
                 from app import probabilities
