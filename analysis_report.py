@@ -1,7 +1,7 @@
 """Match-specific editorial reasoning from observed results, without invented news."""
 from datetime import datetime
 
-REPORT_VERSION = 7
+REPORT_VERSION = 8
 
 def number(value):
     return f'{float(value):.2f}'.rstrip('0').rstrip('.').replace('.', ',')
@@ -150,6 +150,10 @@ def report(data, names=None, histories=None):
                      + ('Le classement européen et le score cumulé d’une éventuelle double confrontation ne sont pas vérifiés. ' if data.get('domestic_context') else 'La forme en championnat national, le classement européen et le score cumulé d’une éventuelle double confrontation ne sont pas vérifiés. ')
                      + 'Les marchés concernent le résultat du match, pas la qualification. Aucun bonus de confiance européen n’est ajouté.')
         add('Ligue des champions : lecture du parcours européen', ' '.join(lines))
+    from match_availability import section as personnel_section
+    personnel = personnel_section(data)
+    if personnel:
+        sections.append(personnel)
     national = domestic_section(data)
     if national:
         sections.append(national)

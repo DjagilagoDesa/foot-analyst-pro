@@ -482,6 +482,12 @@ def metered_analysis(func):
                            preview_sections=['Jugement du match','Arguments des deux équipes',
                                              'Surprises possibles','Confrontations passées','Probabilités'])
         if cached is not None:
+            if cached.get('league') == 'uefa.champions':
+                import app as server
+                from match_availability import refresh_cached
+                if refresh_cached(server, cached):
+                    with database() as db:
+                        db.execute("UPDATE account_analyses SET result=? WHERE user_id=? AND request_key=? AND status='complete'", (json.dumps(cached,ensure_ascii=False),user['id'],key))
             if cached.get('league') == 'uefa.champions' and not cached.get('domestic_context'):
                 import app as server
                 from champions_context import collect
