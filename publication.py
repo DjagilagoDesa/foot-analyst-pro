@@ -6,8 +6,14 @@ bp = Blueprint('publication', __name__)
 FIELDS = ('PUBLIC_PUBLISHER_NAME', 'PUBLIC_SUPPORT_EMAIL', 'PUBLIC_BACKUP_RETENTION_DAYS', 'PUBLIC_LOG_RETENTION_DAYS')
 
 
+PUBLIC_DEFAULTS = {
+    'PUBLIC_PUBLISHER_NAME': 'Nogueira Jordan',
+    'PUBLIC_SUPPORT_EMAIL': 'Foot.analyst.pro@gmail.com',
+}
+
+
 def settings():
-    return {key: str(current_app.config.get(key, os.environ.get(key, ''))).strip() for key in FIELDS}
+    return {key: str(current_app.config.get(key, os.environ.get(key, PUBLIC_DEFAULTS.get(key, '')))).strip() for key in FIELDS}
 
 
 def missing_fields(values):
