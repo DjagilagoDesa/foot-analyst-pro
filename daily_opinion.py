@@ -70,7 +70,9 @@ def upcoming(match, now, day):
 
 
 def candidates_for(result, group):
-    markets = result['prediction']['markets']
+    markets = {key: value for key, value in result['prediction']['markets'].items()
+               if isinstance(value, (int, float)) and not isinstance(value, bool)
+               and math.isfinite(value) and 0 <= value <= 100}
     if group == 'surprise':
         # Oppose the favourite in the 1X2 model; never relabel a favourite as a surprise.
         keys = [k for k, opposite in [('home', 'away'), ('away', 'home')]
@@ -168,6 +170,8 @@ class DailyOpinion:
             return
         board = json.loads(row['payload'])
         try:
+            # Results must progress even when today's fixture feed is unavailable.
+            self.settle_previous(day)
             matches, failures = self.fixtures(day)
             if not matches and failures:
                 raise RuntimeError('sports_sources_unavailable')
@@ -200,11 +204,17 @@ class DailyOpinion:
                 db.execute('''UPDATE daily_opinion_boards SET payload=?,checked_at=?,lease_until=0,lease_token=''
                     WHERE day=? AND lease_token=?''',
                     (json.dumps(updated, ensure_ascii=False), int(publication.timestamp()), day, token))
-            self.settle_previous(day)
         except Exception:
+            # Keep published choices and their original freshness timestamp, but
+            # still settle today's known events independently of the fixture feed.
+            if board.get('picks'):
+                settled = copy.deepcopy(board)
+                self.settle(settled)
+                if settled['picks'] != board['picks']:
+                    board = settled
             with database() as db:
-                db.execute("UPDATE daily_opinion_boards SET lease_until=?,lease_token='' WHERE day=? AND lease_token=?",
-                           (epoch + 60, day, token))
+                db.execute("UPDATE daily_opinion_boards SET payload=?,lease_until=?,lease_token='' WHERE day=? AND lease_token=?",
+                           (json.dumps(board, ensure_ascii=False), epoch + 60, day, token))
             raise
 
     def fixtures(self, day):
@@ -263,14 +273,16 @@ class DailyOpinion:
 
     def settle_previous(self, day):
         with database() as db:
-            rows = db.execute('SELECT day,payload FROM daily_opinion_boards WHERE day<? ORDER BY day DESC LIMIT 7', (day,)).fetchall()
+            rows = db.execute('SELECT day,payload FROM daily_opinion_boards WHERE day<? ORDER BY day', (day,)).fetchall()
         for row in rows:
             board = json.loads(row['payload'])
             if not any(p['status'] == 'pending' for p in board.get('picks', [])):
                 continue
             self.settle(board)
             with database() as db:
-                db.execute('UPDATE daily_opinion_boards SET payload=? WHERE day=?', (json.dumps(board, ensure_ascii=False), row['day']))
+                # A slower worker must never overwrite results saved by another.
+                db.execute('UPDATE daily_opinion_boards SET payload=? WHERE day=? AND payload=?',
+                           (json.dumps(board, ensure_ascii=False), row['day'], row['payload']))
 
     def start(self):
         if self.app.testing or not configured():

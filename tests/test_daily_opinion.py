@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 
 from flask import Flask
 from accounts import database
-from daily_opinion import DailyOpinion, choose, init_app, today, upcoming
+from daily_opinion import DailyOpinion, candidates_for, choose, init_app, today, upcoming
 
 
 NOW = datetime(2026, 11, 1, 9, tzinfo=timezone.utc)
@@ -33,6 +33,12 @@ def results():
 
 
 class SelectionTests(unittest.TestCase):
+    def test_invalid_source_probabilities_do_not_crash_or_become_picks(self):
+        for value in (None, '65', float('nan'), float('inf'), True, -5, 101):
+            candidate = result(1, {'home': value, 'away': 35, 'over_2_5': 80})
+            self.assertEqual(candidates_for(candidate, 'prudent'), [{'market': 'over_2_5', 'probability': 80}])
+            self.assertEqual(candidates_for(candidate, 'surprise'), [])
+
     def test_six_unique_games_and_teams_in_three_bands(self):
         picks = choose(results(), [], NOW, DAY)
         self.assertEqual([sum(p['group'] == g for p in picks) for g in ('prudent', 'challenge', 'surprise')], [3, 2, 1])
@@ -166,6 +172,56 @@ class PersistenceTests(unittest.TestCase):
         self.assertEqual(performance['won'], 2)
         self.assertEqual(performance['lost'], 1)
         self.assertEqual(performance['success_pct'], 66.7)
+
+    def test_old_pending_board_is_settled_beyond_seven_days(self):
+        pick = choose([result(1)], [], NOW, DAY)[0]
+        old_day = '2026-01-01'
+        with database() as db:
+            db.execute('INSERT INTO daily_opinion_boards(day,payload) VALUES(?,?)',
+                       (old_day, json.dumps({'picks': [pick]})))
+            for n in range(1, 10):
+                db.execute('INSERT INTO daily_opinion_boards(day,payload) VALUES(?,?)',
+                           (f'2026-02-{n:02}', '{"picks": []}'))
+        def settle(board):
+            board['picks'][0]['status'] = 'won'
+        with patch.object(self.service, 'settle', side_effect=settle):
+            self.service.settle_previous(DAY)
+        self.assertEqual(self.service.read(old_day)[0]['picks'][0]['status'], 'won')
+        self.assertEqual(self.service.performance(DAY)['success_pct'], 100)
+
+    def test_fixture_outage_still_settles_current_and_previous_choices(self):
+        self.refresh()
+        original, checked = self.service.read(DAY)
+        def settle(board):
+            board['picks'][0]['status'] = 'won'
+        with patch.object(self.service, 'fixtures', side_effect=RuntimeError('offline')), \
+             patch.object(self.service, 'settle_previous') as previous, \
+             patch.object(self.service, 'settle', side_effect=settle):
+            with self.assertRaises(RuntimeError):
+                self.service.refresh(NOW + timedelta(hours=1))
+        previous.assert_called_once_with(DAY)
+        board, after_checked = self.service.read(DAY)
+        self.assertEqual(after_checked, checked)
+        self.assertEqual(board['picks'][0]['status'], 'won')
+        self.assertEqual(board['picks'][0]['probability'], original['picks'][0]['probability'])
+        self.assertEqual(board['picks'][0]['published_at'], original['picks'][0]['published_at'])
+
+    def test_slow_worker_cannot_overwrite_another_workers_result(self):
+        pick = choose([result(1)], [], NOW, DAY)[0]
+        old_day = '2026-01-01'
+        with database() as db:
+            db.execute('INSERT INTO daily_opinion_boards(day,payload) VALUES(?,?)',
+                       (old_day, json.dumps({'picks': [pick]})))
+        def settle(board):
+            newer = copy.deepcopy(board)
+            newer['picks'][0]['status'] = 'won'
+            with database() as db:
+                db.execute('UPDATE daily_opinion_boards SET payload=? WHERE day=?',
+                           (json.dumps(newer), old_day))
+            board['picks'][0]['status'] = 'lost'
+        with patch.object(self.service, 'settle', side_effect=settle):
+            self.service.settle_previous(DAY)
+        self.assertEqual(self.service.read(old_day)[0]['picks'][0]['status'], 'won')
 
     def test_official_rate_never_reads_personal_predictions_or_analyses(self):
         self.refresh()

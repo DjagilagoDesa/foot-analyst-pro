@@ -1,7 +1,7 @@
 """Match-specific editorial reasoning from observed results, without invented news."""
 from datetime import datetime
 
-REPORT_VERSION = 4
+REPORT_VERSION = 5
 
 def number(value):
     return f'{float(value):.2f}'.rstrip('0').rstrip('.').replace('.', ',')
@@ -124,6 +124,24 @@ def report(data, names=None, histories=None):
         reading += ('Les deux indicateurs favorisent donc le même camp ; c’est un appui statistique cohérent à confronter à sa forme immédiate.' if stronger==tighter else
                     'L’attaque et la défense désignent des forces différentes : le match oppose deux profils, plutôt qu’une supériorité uniforme.')
     add('Ce qui distingue cette rencontre', reading)
+
+    if hr or ar:
+        form = []
+        for name, rows in ((home, hr), (away, ar)):
+            recent = rows[:5]
+            if not recent:
+                form.append(f'{name} : résultats détaillés indisponibles pour comparer la forme sur cinq matchs.')
+                continue
+            stats = record(recent)
+            sequence = ' – '.join(row['outcome'] for row in recent)
+            form.append(
+                f'{name} : {sequence} (du plus récent au plus ancien ; V = victoire, N = nul, D = défaite). '
+                f'Sur {stats["n"]} match(s) disponible(s), {stats["points"]} point(s) sur {3 * stats["n"]}, '
+                f'{sum(row["gf"] for row in recent)} but(s) marqué(s) et {sum(row["ga"] for row in recent)} encaissé(s). '
+                f'Période observée : {recent[-1]["date"][:10]} au {recent[0]["date"][:10]}.')
+        form.append('Cette forme décrit les matchs retrouvés dans la compétition étudiée, pas nécessairement les cinq derniers matchs toutes compétitions. '
+                    'Elle ne modifie pas les probabilités du modèle et ne renseigne pas les absences ou les compositions actuelles.')
+        add('Forme sur les cinq derniers résultats disponibles', ' '.join(form))
 
     def team_section(name, other, own, opp, rows, venue, probability):
         text = (f'Sur les {own["matches"]} rencontres étudiées, {name} compte {own["wins"]} victoires, {own["draws"]} nuls et {own["losses"]} défaites. ')
