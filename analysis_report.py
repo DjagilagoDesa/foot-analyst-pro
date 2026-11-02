@@ -1,7 +1,7 @@
 """Match-specific editorial reasoning from observed results, without invented news."""
 from datetime import datetime
 
-REPORT_VERSION = 8
+REPORT_VERSION = 9
 
 def number(value):
     return f'{float(value):.2f}'.rstrip('0').rstrip('.').replace('.', ',')
@@ -23,7 +23,7 @@ def observations(matches, team_id):
                          opponent=match.get('away') if home else match.get('home'),
                          opponent_id=str(match.get('away_id') if home else match.get('home_id')),
                          outcome='V' if gf > ga else 'N' if gf == ga else 'D',
-                         match_id=str(match.get('id') or '')))
+                         match_id=str(match.get('id') or ''), competition=match.get('competition')))
     return sorted(rows, key=lambda r: r['date'], reverse=True)
 
 
@@ -118,7 +118,7 @@ def domestic_section(data):
     lines.append(context.get('note', ''))
     if context.get('failed_leagues'):
         lines.append('Certains championnats n’ont pas répondu à la recherche.')
-    lines.append('La forme nationale et le repos contextualisent le jugement ; ils ne modifient pas les probabilités européennes. '
+    lines.append(('Les résultats nationaux retenus dans la base de calcul participent aux moyennes du modèle ; le repos ne modifie pas les probabilités. ' if data.get('analysis_basis') else 'La forme nationale et le repos contextualisent le jugement ; ils ne modifient pas les probabilités européennes. ') +
                  'Les forces des adversaires nationaux ne sont pas ajustées : ces bilans ne sont pas directement équivalents entre championnats.')
     return dict(title='Forme nationale et repos avant la Ligue des champions', text=' '.join(lines))
 
@@ -134,9 +134,23 @@ def report(data, names=None, histories=None):
     sections = []
     def add(title, text):
         sections.append(dict(title=title, text=text))
+    basis = data.get('analysis_basis')
+    if basis:
+        details = []
+        for side, name in (('home',home),('away',away)):
+            item = basis[side]
+            competitions = ', '.join(f'{key} : {count}' for key,count in item['competitions'].items()) or 'aucune'
+            details.append(f"{name} : {item['sample']} match(s) utilisé(s), {competitions}, du {(item.get('oldest') or '')[:10]} au {(item.get('newest') or '')[:10]}.")
+        details.append('Recherche bornée aux compétitions couvertes et aux résultats exploitables des 540 derniers jours, jusqu’à 20 par équipe. '
+                       'Les historiques peuvent mélanger championnat et Europe : le niveau des adversaires n’est pas corrigé. '
+                       'Un petit échantillon rend les pourcentages particulièrement fragiles ; ils ne sont pas calibrés.')
+        if any(basis[side]['sample'] < 10 for side in ('home','away')):
+            details.append('ÉCHANTILLON LIMITÉ : moins de dix résultats pour au moins une équipe. Analyse exploratoire, forte incertitude.')
+        add('Base des calculs : recherche adaptée par équipe', ' '.join(details))
     if data.get('league') == 'uefa.champions':
         lines = []
         for name, rows, venue in ((home, hr, 'home'), (away, ar, 'away')):
+            rows = [r for r in rows if r.get('competition') in (None,'uefa.champions','uefa.europa')]
             if not rows:
                 lines.append(f'{name} : détail du parcours européen indisponible.')
                 continue
@@ -201,7 +215,7 @@ def report(data, names=None, histories=None):
                 f'Sur {stats["n"]} match(s) disponible(s), {stats["points"]} point(s) sur {3 * stats["n"]}, '
                 f'{sum(row["gf"] for row in recent)} but(s) marqué(s) et {sum(row["ga"] for row in recent)} encaissé(s). '
                 f'Période observée : {recent[-1]["date"][:10]} au {recent[0]["date"][:10]}.')
-        form.append('Cette forme décrit les matchs retrouvés dans la compétition étudiée, pas nécessairement les cinq derniers matchs toutes compétitions. '
+        form.append('Cette forme décrit les matchs retrouvés dans les compétitions indiquées, pas nécessairement les cinq derniers matchs toutes compétitions. '
                     'Elle ne modifie pas les probabilités du modèle et ne renseigne pas les absences ou les compositions actuelles.')
         add('Forme sur les cinq derniers résultats disponibles', ' '.join(form))
 
@@ -286,8 +300,8 @@ def report(data, names=None, histories=None):
                 pass
             if stats['n'] < 3:
                 text += "Moins de trois confrontations : échantillon trop court pour dégager une tendance robuste. "
-            text += ("Ces résultats contextualisent le jugement et les surprises possibles ; ils ne modifient pas mécaniquement les pourcentages calculés sur les dix derniers matchs. "
-                     "Certains de ces matchs peuvent déjà figurer dans ces dix résultats et ne constituent donc pas un second signal indépendant. "
+            text += ("Ces résultats contextualisent le jugement et les surprises possibles ; ils ne modifient pas mécaniquement les pourcentages calculés sur l’échantillon indiqué. "
+                     "Certains de ces matchs peuvent déjà figurer dans ces résultats et ne constituent donc pas un second signal indépendant. "
                      "Les effectifs et les entraîneurs ont pu changer depuis.")
         else:
             text = scope + ("La source n’a pas répondu : confrontations indisponibles. " if h2h.get('status')=='unavailable' else

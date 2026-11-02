@@ -172,7 +172,7 @@ def frontend_icon():
     return send_from_directory('.', 'icon.svg')
 
 @app.get('/api/health')
-def healthcheck(): return jsonify({'status':'ok','version':'54','champions_context_version':1,'personnel_context_version':1,'sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
+def healthcheck(): return jsonify({'status':'ok','version':'54','champions_context_version':1,'personnel_context_version':1,'adaptive_analysis_version':1,'sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
 
 @app.get('/api/leagues')
 def leagues(): return jsonify({'leagues':LEAGUES})
@@ -266,19 +266,47 @@ def analyze():
     away=str(data.get('away_id',''))
     if league not in LEAGUES or not home.isdigit() or not away.isdigit() or home==away:
         return jsonify({'error':'provide valid league, home_id, away_id'}),400
-    with ThreadPoolExecutor(max_workers=3) as pool:
+    import sys
+    from adaptive_history import combine, MIN_SAMPLE, MODEL_VERSION
+    from champions_context import collect
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        context_job = pool.submit(collect,sys.modules[__name__],home,away,str(data.get('event_id',''))) if league=='uefa.champions' else None
         head_job=pool.submit(head_to_head,league,home,away)
-        hf=pool.submit(history,league,home)
-        af=pool.submit(history,league,away)
+        hf=pool.submit(history,league,home,limit=20,regulation_only=True)
+        af=pool.submit(history,league,away,limit=20,regulation_only=True)
         hm,he=hf.result()
         am,ae=af.result()
         confrontations=head_job.result()
+        context = context_job.result() if context_job else None
+    extra = {}
+    if league == 'uefa.champions':
+        # Expand to the other covered European competition when UCL history is short.
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            jobs = {team:pool.submit(history,'uefa.europa',team,limit=20,regulation_only=True)
+                    for team,games in ((home,hm),(away,am)) if len(games)<10}
+            for team,job in jobs.items():
+                try: extra[team] = job.result()
+                except (requests.RequestException,ValueError,TypeError): extra[team] = ([],['source_unavailable'])
+    def evidence(team, primary, errors):
+        batches = [(league,primary)]
+        if context:
+            national = context.get('teams',{}).get(team,{})
+            batches.append((national.get('league','unknown'),national.get('model_games',[])))
+            errors = list(errors) + list((national.get('source_errors') or {}).get('domestic',[]))
+        if team in extra:
+            batches.append(('uefa.europa',extra[team][0]))
+            errors = list(errors) + list(extra[team][1])
+        games, basis = combine(team,batches)
+        return games,basis,errors
+    hm,hbasis,he = evidence(home,hm,he)
+    am,abasis,ae = evidence(away,am,ae)
     hs,as_=summary(hm,home),summary(am,away)
     result={'league':league,'home_id':home,'away_id':away,'home':hs,'away':as_,'source':'ESPN unofficial API','data_quality':{'home_games':len(hm),'away_games':len(am),'source_errors':{'home':he,'away':ae}},'generated_at':datetime.now(timezone.utc).isoformat(),'disclaimer':'Statistical estimates are not certainties. Odds, injuries, lineups and xG are not included.'}
-    if len(hm)<10 or len(am)<10:
-        result.update({'status':'insufficient_data','message':'Dix matchs terminés sont nécessaires pour chaque équipe. Les données disponibles ne permettent pas encore cette analyse sur 10 matchs.'})
+    result['analysis_basis'] = {'home':hbasis,'away':abasis,'minimum_sample':MIN_SAMPLE,'maximum_sample':20,'window_days':540}
+    if len(hm)<MIN_SAMPLE or len(am)<MIN_SAMPLE:
+        result.update({'status':'insufficient_data','message':f"Recherche élargie terminée : {len(hm)} résultat(s) exploitable(s) à domicile et {len(am)} à l’extérieur. Au moins {MIN_SAMPLE} par équipe sont nécessaires pour chiffrer des marchés ; aucune donnée manquante n’est inventée."})
     else:
-        result.update({'status':'ok','model':'simple_poisson_baseline','prediction':probabilities(hs,as_)})
+        result.update({'status':'ok','model':MODEL_VERSION,'prediction':probabilities(hs,as_)})
     def team_name(matches,team):
         for match in matches:
             if match['home_id']==team:return match['home']
@@ -290,13 +318,10 @@ def analyze():
     if league == 'uefa.champions':
         result['competition_profile'] = {'name':'Ligue des champions', 'history_days':540,
             'regulation_only':True, 'opponent_strength_adjusted':False,
-            'model_version':'poisson-ucl-540d-v1'}
-        if result.get('status') == 'insufficient_data':
-            result['message'] = 'Ligue des champions : dix résultats européens exploitables par équipe sur les 540 derniers jours sont nécessaires. Les scores avec prolongations ou tirs au but sont exclus.'
+            'model_version':MODEL_VERSION}
+        result['competition_profile']['adaptive_history'] = True
     if league == 'uefa.champions' and result.get('status') == 'ok':
-        from champions_context import collect
-        import sys
-        result['domestic_context'] = collect(sys.modules[__name__], home, away, result['event_id'])
+        result['domestic_context'] = context
         from match_availability import collect as collect_personnel
         result['personnel_context'] = collect_personnel(sys.modules[__name__], league, home, away, result['event_id'])
     if result.get('status')=='ok':result['report']=build_report(result, histories={'home':hm,'away':am})

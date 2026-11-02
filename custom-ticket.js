@@ -71,12 +71,14 @@ function ticketSelection(markets, profile){
    for(let i=0;i<batch.length;i++){
     const m=batch[i];target.innerHTML=message('Analyse '+(i+1)+' / '+batch.length+' : '+name(m)+'…');
     if(!upcoming(m)){failures.push(name(m)+' : le match a commencé ou n’est plus confirmé.');continue;}
+    try{
     const d=await window.Accounts.request('/api/analyze',{league:m.league,home_id:m.home.id,away_id:m.away.id,event_id:m.id,label:name(m)});
     if(d.status==='locked'){renderLockedAnalysis(target);el('customNotice').innerHTML=message('Premium est nécessaire pour poursuivre. Les analyses déjà obtenues restent dans ton historique.');return;}
     if(d.status!=='ok'){failures.push(name(m)+' : '+(d.message||'données insuffisantes'));continue;}
     const leg=ticketSelection(d.prediction?.markets||{},profile);
     if(!leg){failures.push(name(m)+' : aucune probabilité exploitable.');continue;}
     results.push({match:m,analysis:d,...leg});
+    }catch(error){if(error.code==='login_required')throw error;failures.push(name(m)+' : '+error.message);}
    }
    if(failures.length){target.innerHTML=message('Ticket incomplet : aucun combiné global n’est présenté, car tous tes matchs n’ont pas pu être analysés.',true)+failures.map(x=>message(x,true)).join('')+message(results.length+' analyse(s) disponible(s) dans ton historique. Retire ou remplace les rencontres signalées puis réessaie.');return;}
    const untracked=await window.Tracking.record(results.map(r=>({analysis:r.analysis,market:r.market})));
@@ -84,7 +86,8 @@ function ticketSelection(markets, profile){
    let joint=results.reduce((v,r)=>v*r.probability/100,1);
    const repeated=new Set(),teams=new Set();for(const r of results){for(const id of [r.match.home.id,r.match.away.id]){if(teams.has(String(id)))repeated.add(String(id));teams.add(String(id));}}
    const profileName={prudent:'Prudent',balanced:'Équilibré',offensive:'Offensif',mixed:'Double chance & buts'}[profile];
-   target.innerHTML='<div class="panel premium"><h2>Ton ticket personnalisé · '+esc(profileName)+'</h2>'+results.map((r,i)=>'<div class="panel"><h3>'+esc((i+1)+'. '+name(r.match))+'</h3><p class="gold"><strong>'+esc(labels[r.market])+'</strong></p><p>Probabilité du modèle : <strong>'+esc(r.probability)+' %</strong></p><p class="fine">Sélection dans la plage du profil choisi lorsqu’elle est disponible ; sinon, choix du marché avec la probabilité la plus élevée. Pour le profil Double chance & buts, les deux conditions doivent se réaliser sur le même match et leur probabilité est calculée ensemble. Ce tri n’établit pas la rentabilité d’un pari.</p><details><summary>Pourquoi ce choix ? Voir l’analyse du match</summary>'+renderAnalysisReport(r.analysis)+'</details></div>').join('')+
+   const limited=results.filter(r=>r.analysis.analysis_basis&&['home','away'].some(side=>r.analysis.analysis_basis[side].sample<10));
+   target.innerHTML=(limited.length?message('Échantillon limité pour '+limited.map(r=>name(r.match)).join(', ')+'. Les probabilités et le combiné sont particulièrement incertains ; consulte les bases de calcul dans les analyses.'):'' )+'<div class="panel premium"><h2>Ton ticket personnalisé · '+esc(profileName)+'</h2>'+results.map((r,i)=>'<div class="panel"><h3>'+esc((i+1)+'. '+name(r.match))+'</h3><p class="gold"><strong>'+esc(labels[r.market])+'</strong></p><p>Probabilité du modèle : <strong>'+esc(r.probability)+' %</strong></p><p class="fine">Sélection dans la plage du profil choisi lorsqu’elle est disponible ; sinon, choix du marché avec la probabilité la plus élevée. Pour le profil Double chance & buts, les deux conditions doivent se réaliser sur le même match et leur probabilité est calculée ensemble. Ce tri n’établit pas la rentabilité d’un pari.</p><details><summary>Pourquoi ce choix ? Voir l’analyse du match</summary>'+renderAnalysisReport(r.analysis)+'</details></div>').join('')+
     (repeated.size?message('Plusieurs rencontres concernent la même équipe : leur dépendance empêche de présenter une probabilité combinée crédible. Les sélections sont affichées séparément.'):message('Estimation combinée sous hypothèse d’indépendance : '+(joint*100).toFixed(2).replace('.',',')+' %. Cote équitable théorique : '+(1/joint).toFixed(2).replace('.',',')+'. Ce n’est pas une cote bookmaker.'))+
     '<p class="fine">Une sélection par match. Les matchs peuvent rester dépendants ; le produit des probabilités est une approximation non calibrée. Ajouter des matchs augmente le risque d’échec. Aucune garantie de gain, aucun pari placé par l’application.</p></div>';
   }catch(e){target.innerHTML=message('Ticket non finalisé : '+e.message,true)+message('Les analyses déjà terminées restent accessibles dans ton historique.');if(e.code==='login_required')window.Accounts.needsLogin(target);}
