@@ -1,7 +1,7 @@
 """Match-specific editorial reasoning from observed results, without invented news."""
 from datetime import datetime
 
-REPORT_VERSION = 5
+REPORT_VERSION = 6
 
 def number(value):
     return f'{float(value):.2f}'.rstrip('0').rstrip('.').replace('.', ',')
@@ -95,6 +95,22 @@ def report(data, names=None, histories=None):
     sections = []
     def add(title, text):
         sections.append(dict(title=title, text=text))
+    if data.get('league') == 'uefa.champions':
+        lines = []
+        for name, rows, venue in ((home, hr, 'home'), (away, ar, 'away')):
+            if not rows:
+                lines.append(f'{name} : détail du parcours européen indisponible.')
+                continue
+            split = record([r for r in rows if r['venue'] == venue])
+            opponents = list(dict.fromkeys(r['opponent'] for r in rows if r.get('opponent')))
+            lines.append(f"{name} : résultats européens du {rows[-1]['date'][:10]} au {rows[0]['date'][:10]}. "
+                         f"Sur le terrain considéré : {split['n']} match(s), {split['wins']} victoire(s), "
+                         f"{split['draws']} nul(s), {split['losses']} défaite(s). "
+                         f"Adversaires rencontrés : {', '.join(opponents)}.")
+        lines.append('Ces parcours affrontent des adversaires différents : leur force n’est pas corrigée par le modèle. '
+                     'La forme en championnat national, le classement européen et le score cumulé d’une éventuelle double confrontation ne sont pas vérifiés. '
+                     'Les marchés concernent le résultat du match, pas la qualification. Aucun bonus de confiance européen n’est ajouté.')
+        add('Ligue des champions : lecture du parcours européen', ' '.join(lines))
     ph, pa, pn = p['home'], p['away'], p['draw']
     gap = abs(ph-pa)
     leader, outsider = (home, away) if ph>pa else (away,home)

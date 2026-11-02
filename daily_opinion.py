@@ -125,7 +125,7 @@ def choose(results, existing, now, day):
             rationale += ' ' + judgement(r, choice['market'])
             picks.append(dict(group=group, match=m, **choice, market_label=LABELS[choice['market']],
                               rationale=rationale, expected_goals=r['prediction']['expected_goals'],
-                              model_version=MODEL_VERSION, published_at=now.isoformat(), status='pending', home_score=None, away_score=None))
+                              model_version='poisson-ucl-540d-v1' if m['league']=='uefa.champions' else MODEL_VERSION, published_at=now.isoformat(), status='pending', home_score=None, away_score=None))
             used_events.add(m['id'])
             used_teams.update(ids)
             missing -= 1
