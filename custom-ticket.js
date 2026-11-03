@@ -15,8 +15,8 @@ function ticketSelection(markets, profile, odds){
  const bands={prudent:[75,100],balanced:[60,80],offensive:[45,65],mixed:[55,85]};
  const [min,max]=bands[profile]||bands.balanced;
  const pool=options.filter(x=>x.probability>=min&&x.probability<=max);
- const choices=pool.length?pool:options;
- return (window.OddsTicket?.rank(choices,odds)||choices.sort((a,b)=>b.probability-a.probability||allowed.indexOf(a.market)-allowed.indexOf(b.market)))[0];
+ if(!pool.length)return null;
+ return (window.OddsTicket?.rank(pool,odds)||pool.sort((a,b)=>b.probability-a.probability||allowed.indexOf(a.market)-allowed.indexOf(b.market)))[0]||null;
 }
 /* Re-check the source calendar once per league/date before finalizing a ticket. */
 function ticketAssertFuture(results){
