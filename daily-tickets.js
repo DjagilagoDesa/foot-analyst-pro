@@ -32,7 +32,7 @@ function mixedDailySelections(results){
   simulations.push(selected);
   toTrack.push(...selected.map(r=>({analysis:r.analysis,market:r.choice.market})));
   const joint=selected.reduce((p,r)=>p*r.choice.probability/100,1);
-  return '<div class="panel premium"><h2>'+title+'</h2><p>'+selected.length+' matchs retenus · seuil de 75 % par sélection dans le modèle.</p>'+selected.map((r,i)=>'<div class="message"><strong>'+esc((i+1)+'. '+r.match.home.name+' – '+r.match.away.name)+'</strong><p class="gold">'+esc(labels[r.choice.market])+'</p><p>Probabilité modèle de ce choix : '+esc(r.choice.probability)+' %</p><details><summary>Voir les arguments et les surprises possibles</summary>'+renderAnalysisReport(r.analysis)+'</details></div>').join('')+message('Probabilité estimée que tout le combiné passe, sous hypothèse d’indépendance : '+(joint*100).toFixed(2).replace('.',',')+' %. Cote équitable théorique : '+(1/joint).toFixed(2).replace('.',',')+' ; ce n’est pas une cote bookmaker.')+message('Probabilités individuelles élevées ne signifie pas forte confiance dans le ticket complet. Le seuil de 75 % est un filtre, pas un taux de réussite vérifié. Les absences et compositions ne sont pas contrôlées et des dépendances peuvent subsister entre matchs.')+'</div>';
+  return '<div class="panel premium"><h2>'+title+'</h2><p>'+selected.length+' matchs retenus · seuil de 75 % par sélection dans le modèle.</p>'+selected.map((r,i)=>'<div class="message"><strong>'+esc((i+1)+'. '+r.match.home.name+' – '+r.match.away.name)+'</strong><p class="gold">'+esc(labels[r.choice.market])+'</p><p>Probabilité modèle de ce choix : '+esc(r.choice.probability)+' %</p><details><summary>Voir les arguments et les surprises possibles</summary>'+renderAnalysisReport(r.analysis)+'</details></div>').join('')+message('Estimation combinée : '+(joint*100).toFixed(2).replace('.',',')+' % · Cote théorique : '+(1/joint).toFixed(2).replace('.',',')+'.')+'</div>';
  }
  let toTrack=[],simulations=[];
  let busy=false;
@@ -60,10 +60,10 @@ function mixedDailySelections(results){
     d.market_odds=await window.OddsTicket?.load(m);
     results.push({match:m,analysis:d});
    }
-   notice.innerHTML=message(day+' · '+total+' rencontre(s) à venir retrouvée(s). Les 16 prochaines au maximum sont examinées dans l’ordre horaire jusqu’à obtenir 8 analyses. Ce n’est pas une sélection exhaustive des meilleurs paris.'+(feed.partial?' Couverture partielle.':''));
+   notice.innerHTML=feed.partial?message('Calendrier incomplet.'):'';
    if(locked&&results.length===0){renderLockedAnalysis(out);return;}
    const profiles=[['prudent','Ticket 1 · Prudent',2],['balanced','Ticket 2 · Équilibré',3],['offensive','Ticket 3 · Offensif',3],['long','Ticket 4 · Grand combiné',0],['mixed','Ticket 5 · Double chance + buts sur chaque match',3]];
-   out.innerHTML='<div class="message">Ticket 5 : chaque ligne combine une double chance avec une condition sur les buts du même match. Les probabilités sont calculées sur les scores qui remplissent les deux conditions, sans multiplier les probabilités séparées.</div>'+profiles.map(([profile,title,count])=>{
+   out.innerHTML=profiles.map(([profile,title,count])=>{
     if(profile==='long')return renderLongTicket(results,locked);
     const choices=(profile==='mixed'?mixedDailySelections(results):results.map(r=>({...r,choice:ticketSelection(r.analysis.prediction.markets,profile,r.analysis.market_odds)})).filter(r=>r.choice).sort((a,b)=>b.choice.probability-a.choice.probability));
     const selected=[],teams=new Set();
@@ -73,8 +73,8 @@ function mixedDailySelections(results){
   toTrack.push(...selected.map(r=>({analysis:r.analysis,market:r.choice.market})));
     const joint=selected.reduce((p,r)=>p*r.choice.probability/100,1);
     return '<div class="panel premium"><h2>'+title+'</h2>'+selected.map((r,i)=>'<div class="message"><strong>'+esc((i+1)+'. '+r.match.home.name+' – '+r.match.away.name)+'</strong><p class="gold">'+esc(labels[r.choice.market])+'</p><p>Probabilité du modèle : '+esc(r.choice.probability)+' %</p><details><summary>Lire l’analyse détaillée</summary>'+renderAnalysisReport(r.analysis)+'</details></div>').join('')+
-     message('Probabilité combinée sous hypothèse d’indépendance : '+(joint*100).toFixed(2).replace('.',',')+' %. Cote équitable théorique : '+(1/joint).toFixed(2).replace('.',',')+' — ce n’est pas une cote bookmaker.')+'</div>';
-   }).join('')+skipped.map(t=>message(t)).join('')+'<p class="fine">Les cinq tickets peuvent partager des matchs et des sélections : ce ne sont pas cinq tickets indépendants. Aucun gain garanti. Les profils utilisent les probabilités du modèle, avec comparaison aux cotes exactes disponibles. Sans cote, le tri reste fondé sur les probabilités. Les effectifs signalés restent consultables dans les analyses.</p>';
+     message('Estimation combinée : '+(joint*100).toFixed(2).replace('.',',')+' % · Cote théorique : '+(1/joint).toFixed(2).replace('.',',')+'.')+'</div>';
+   }).join('')+skipped.map(t=>message(t)).join('');
    out.querySelectorAll('.panel.premium').forEach(panel=>{
     const group=simulations.shift();if(group)window.OddsTicket?.mount(panel,group);
    });
