@@ -10,7 +10,7 @@ def decimal_price(value):
         american = float(value)
         if not math.isfinite(american) or abs(american) < 100:
             return None
-        return round(1 + (american / 100 if american > 0 else 100 / -american), 6)
+        return round(1 + (american / 100 if american > 0 else 100 / -american), 2)
     except (TypeError, ValueError, OverflowError):
         return None
 
@@ -35,6 +35,9 @@ def extract(event, observed_at, now=None):
             price = decimal_price((odds.get('moneyline', {}).get(side, {}).get('close') or {}).get('odds'))
             if price:
                 markets[side] = price
+        # A two-way moneyline can denote qualification, not the 90-minute 1X2.
+        if not all(side in markets for side in ('home','draw','away')):
+            markets.clear()
         for side, prefix in (('over', 'o'), ('under', 'u')):
             current = odds.get('total', {}).get(side, {}).get('close') or {}
             line = str(current.get('line', '')).lower()
