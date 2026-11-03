@@ -24,6 +24,7 @@ module.exports=async function(browser){
   assert.equal(await page.locator('#homeDailyOpinion .opinion-pick').count(),6);
   assert.equal(await page.locator('#homeDailyOpinion .opinion-group').count(),3);
   const cards=page.locator('#homeDailyOpinion .opinion-pick');
+  assert.doesNotMatch(await page.locator('#homeDailyOpinion').innerText(),/Sélection partielle|Prudent ne signifie|Dernière vérification|Méthode et actualisation/);
   const first=cards.nth(0).locator('.opinion-team-odds');
   assert.equal(await first.innerText(),'3,05');
   assert.equal(await first.getAttribute('data-odds-outcome'),'away');
