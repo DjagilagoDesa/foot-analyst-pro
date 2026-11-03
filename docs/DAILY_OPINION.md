@@ -53,8 +53,8 @@ ne sont pas révisés. Une archive incomplète ou indisponible reste absente.
 
 ## Présentation finale des cotes dans les avis
 
-Le pied d’un avis réglé affiche seulement le nom du vainqueur du match et sa cote
-victoire. La couleur dépend du résultat du pari éditorial : vert si ce pari est
+Le pied d’un avis réglé affiche uniquement le chiffre de la cote victoire du
+vainqueur du match, sans nom, titre, source ou autre texte. La couleur dépend du résultat du pari éditorial : vert si ce pari est
 gagné, rouge s’il est perdu, même quand la sélection portait sur les buts ou une
 double chance. L’équipe perdante n’est pas affichée. Aucun pied de cote n’est
 montré avant le résultat, sur un nul, un avis annulé ou sans cote disponible.
