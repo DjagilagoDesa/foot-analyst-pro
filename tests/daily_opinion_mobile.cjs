@@ -25,12 +25,12 @@ module.exports=async function(browser){
   assert.equal(await page.locator('#homeDailyOpinion .opinion-group').count(),3);
   const cards=page.locator('#homeDailyOpinion .opinion-pick');
   const first=cards.nth(0).locator('.opinion-team-odds');
-  assert.match(await first.innerText(),/Olympique de Marseille 1 · 3,05/);
+  assert.equal(await first.innerText(),'3,05');
   assert.equal(await first.getAttribute('data-odds-outcome'),'away');
   assert.match(await first.getAttribute('class'),/result-won/);
   assert.equal(await cards.nth(0).locator('[data-odds-outcome="home"]').count(),0);
   const lost=cards.nth(1).locator('.opinion-team-odds');
-  assert.match(await lost.innerText(),/Paris Saint-Germain 2 · 2,05/);
+  assert.equal(await lost.innerText(),'2,05');
   assert.match(await lost.getAttribute('class'),/result-lost/);
   for(const n of [2,3,4,5])assert.equal(await cards.nth(n).locator('.opinion-team-odds').count(),0);
   assert.equal(await first.locator('a').count(),0);
