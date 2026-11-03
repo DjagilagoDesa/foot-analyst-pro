@@ -132,7 +132,7 @@ async function ticketVerifyFixtures(results){
     (repeated.size?message('Plusieurs rencontres concernent la même équipe : leur dépendance empêche de présenter une probabilité combinée crédible. Les sélections sont affichées séparément.'):message('Estimation combinée : '+(joint*100).toFixed(2).replace('.',',')+' % · Cote théorique : '+(1/joint).toFixed(2).replace('.',',')+'.'))+
     '</div>';
    window.OddsTicket?.mount(target,results);
-  }catch(e){target.innerHTML=message('Ticket non finalisé : '+e.message,true)+message('Les analyses déjà terminées restent accessibles dans ton historique.');if(e.code==='login_required')window.Accounts.needsLogin(target);}
+  }catch(e){target.innerHTML=message(e.message.startsWith('Ticket non finalisé')?e.message:'Ticket non finalisé : '+e.message,true)+message('Les analyses déjà terminées restent accessibles dans ton historique.');if(e.code==='login_required')window.Accounts.needsLogin(target);}
   finally{busy=false;draw();drawFixtures();await window.Accounts.afterAnalysis();}
  };
  window.PersonalTicket={getMatches:()=>chosen.slice()};
