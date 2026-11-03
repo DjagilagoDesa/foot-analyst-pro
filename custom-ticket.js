@@ -122,7 +122,7 @@ async function ticketVerifyFixtures(results){
    target.innerHTML=message('Vérification des matchs…');
    await ticketVerifyFixtures(results);
    const untracked=await window.Tracking.record(results.map(r=>({analysis:r.analysis,market:r.market})));
-   ticketAssertFuture(results);
+   await ticketVerifyFixtures(results);
    if(untracked)el('customNotice').innerHTML=message(untracked+' sélection(s) non enregistrée(s) dans le suivi : rencontre non vérifiable, déjà commencée ou ancienne analyse.');
    let joint=results.reduce((v,r)=>v*r.probability/100,1);
    const repeated=new Set(),teams=new Set();for(const r of results){for(const id of [r.match.home.id,r.match.away.id]){if(teams.has(String(id)))repeated.add(String(id));teams.add(String(id));}}
