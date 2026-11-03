@@ -38,6 +38,7 @@ jobs:
       - run: node tests/test_calendar.js
       - run: node --check ticket-builder.js
       - run: node tests/test_ticket_builder.cjs
+      - run: node tests/test_ticket_validation.cjs
       - name: Install mobile browser test tools
         run: |
           npm --prefix "$RUNNER_TEMP/profile-browser" install playwright@1.56.1

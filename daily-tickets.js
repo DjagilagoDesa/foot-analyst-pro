@@ -62,8 +62,10 @@ function mixedDailySelections(results){
    }
    notice.innerHTML=feed.partial?message('Calendrier incomplet.'):'';
    if(locked&&results.length===0){renderLockedAnalysis(out);return;}
+   out.innerHTML=message('Vérification des matchs…');
+   await ticketVerifyFixtures(results);
    const profiles=[['prudent','Ticket 1 · Prudent',2],['balanced','Ticket 2 · Équilibré',3],['offensive','Ticket 3 · Offensif',3],['long','Ticket 4 · Grand combiné',0],['mixed','Ticket 5 · Double chance + buts sur chaque match',3]];
-   out.innerHTML=profiles.map(([profile,title,count])=>{
+   const ticketsHtml=profiles.map(([profile,title,count])=>{
     if(profile==='long')return renderLongTicket(results,locked);
     const choices=(profile==='mixed'?mixedDailySelections(results):results.map(r=>({...r,choice:ticketSelection(r.analysis.prediction.markets,profile,r.analysis.market_odds)})).filter(r=>r.choice).sort((a,b)=>b.choice.probability-a.choice.probability));
     const selected=[],teams=new Set();
@@ -75,10 +77,12 @@ function mixedDailySelections(results){
     return '<div class="panel premium"><h2>'+title+'</h2>'+selected.map((r,i)=>'<div class="message"><strong>'+esc((i+1)+'. '+r.match.home.name+' – '+r.match.away.name)+'</strong><p class="gold">'+esc(labels[r.choice.market])+'</p><p>Probabilité du modèle : '+esc(r.choice.probability)+' %</p><details><summary>Lire l’analyse détaillée</summary>'+renderAnalysisReport(r.analysis)+'</details></div>').join('')+
      message('Estimation combinée : '+(joint*100).toFixed(2).replace('.',',')+' % · Cote théorique : '+(1/joint).toFixed(2).replace('.',',')+'.')+'</div>';
    }).join('')+skipped.map(t=>message(t)).join('');
+   const missed=await window.Tracking.record(toTrack);
+   await ticketVerifyFixtures(results);
+   out.innerHTML=ticketsHtml;
    out.querySelectorAll('.panel.premium').forEach(panel=>{
     const group=simulations.shift();if(group)window.OddsTicket?.mount(panel,group);
    });
-   const missed=await window.Tracking.record(toTrack);
    if(missed)notice.innerHTML+=message(missed+' sélection(s) non enregistrée(s) dans le suivi : rencontre non vérifiable, déjà commencée ou ancienne analyse.');
   }catch(e){out.innerHTML=message('Tickets non finalisés : '+e.message,true);if(e.code==='login_required')window.Accounts.needsLogin(out);}
   finally{busy=false;get('generateDailyTickets').disabled=false;await window.Accounts.afterAnalysis();}
