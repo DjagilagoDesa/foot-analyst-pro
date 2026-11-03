@@ -78,7 +78,7 @@ function mixedDailySelections(results){
      message('Estimation combinée : '+(joint*100).toFixed(2).replace('.',',')+' % · Cote théorique : '+(1/joint).toFixed(2).replace('.',',')+'.')+'</div>';
    }).join('')+skipped.map(t=>message(t)).join('');
    const missed=await window.Tracking.record(toTrack);
-   ticketAssertFuture(results);
+   await ticketVerifyFixtures(results);
    out.innerHTML=ticketsHtml;
    out.querySelectorAll('.panel.premium').forEach(panel=>{
     const group=simulations.shift();if(group)window.OddsTicket?.mount(panel,group);
