@@ -18,6 +18,42 @@ function ticketSelection(markets, profile, odds){
  const choices=pool.length?pool:options;
  return (window.OddsTicket?.rank(choices,odds)||choices.sort((a,b)=>b.probability-a.probability||allowed.indexOf(a.market)-allowed.indexOf(b.market)))[0];
 }
+/* Re-check the source calendar once per league/date before finalizing a ticket. */
+function ticketAssertFuture(results){
+ const invalid=results.find(r=>{
+  const m=r.match;
+  return m.state!=='pre'||m.completed||!Number.isFinite(Date.parse(m.date))||Date.parse(m.date)<=Date.now()||/POSTPONED|CANCEL|ABANDON|SUSPEND/i.test(m.status_name||'');
+ });
+ if(invalid)throw Error('Ticket à actualiser : '+invalid.match.home.name+' – '+invalid.match.away.name+'.');
+}
+async function ticketVerifyFixtures(results){
+ if(!results.length)throw Error('Aucune rencontre à vérifier.');
+ ticketAssertFuture(results);
+ const groups=new Map();
+ for(const r of results){
+  const m=r.match;
+  if(typeof m.league!=='string'||!m.league||![m.id,m.home?.id,m.away?.id].every(id=>/^\d+$/.test(String(id))))throw Error('Rencontre non vérifiable.');
+  const key=m.league+'|'+new Date(m.date).toISOString().slice(0,10);
+  if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r);
+ }
+ try{
+  await Promise.all([...groups.entries()].map(async([key,rows])=>{
+   const [league,date]=key.split('|');
+   const feed=await api('/api/fixtures?league='+encodeURIComponent(league)+'&date='+encodeURIComponent(date),45000);
+   if(feed.partial||!Array.isArray(feed.events))throw Error('source_unavailable');
+   for(const r of rows){
+    const m=r.match;
+    const found=feed.events.filter(e=>e.league===m.league&&String(e.id)===String(m.id));
+    if(found.length!==1)throw Error('match_not_verified');
+    const current=found[0];
+    if(String(current.home?.id)!==String(m.home.id)||String(current.away?.id)!==String(m.away.id)||Date.parse(current.date)!==Date.parse(m.date))throw Error('fixture_changed');
+    ticketAssertFuture([{match:current}]);
+   }
+  }));
+ }catch{throw Error('Ticket non finalisé : une rencontre a changé ou ne peut pas être vérifiée. Réessaie.');}
+ // Source calls or a suspended phone tab can cross the kickoff boundary.
+ ticketAssertFuture(results);
+}
 (()=>{
  const el=id=>document.getElementById(id),esc=escapeHtml;
  let chosen=[],fixtures=[],busy=false,loadToken=0;
@@ -83,7 +119,10 @@ function ticketSelection(markets, profile, odds){
     }catch(error){if(error.code==='login_required')throw error;failures.push(name(m)+' : '+error.message);}
    }
    if(failures.length){target.innerHTML=message('Ticket incomplet : aucun combiné global n’est présenté, car tous tes matchs n’ont pas pu être analysés.',true)+failures.map(x=>message(x,true)).join('')+message(results.length+' analyse(s) disponible(s) dans ton historique. Retire ou remplace les rencontres signalées puis réessaie.');return;}
+   target.innerHTML=message('Vérification des matchs…');
+   await ticketVerifyFixtures(results);
    const untracked=await window.Tracking.record(results.map(r=>({analysis:r.analysis,market:r.market})));
+   ticketAssertFuture(results);
    if(untracked)el('customNotice').innerHTML=message(untracked+' sélection(s) non enregistrée(s) dans le suivi : rencontre non vérifiable, déjà commencée ou ancienne analyse.');
    let joint=results.reduce((v,r)=>v*r.probability/100,1);
    const repeated=new Set(),teams=new Set();for(const r of results){for(const id of [r.match.home.id,r.match.away.id]){if(teams.has(String(id)))repeated.add(String(id));teams.add(String(id));}}
