@@ -12,7 +12,7 @@ module.exports=async function(browser){
     match:{id:String(n),league:'fra.1',date:new Date(Date.now()+3600000).toISOString(),state:'pre',completed:false,status_name:'STATUS_SCHEDULED',home:{id:String(n*2),name:'Paris Saint-Germain '+n,badge:''},away:{id:String(n*2+1),name:'Olympique de Marseille '+n,badge:''}}};
   })}))};
   const picks=board.groups.flatMap(g=>g.picks);
-  for(const p of picks.slice(0,3))p.team_odds={bookmaker:'Example <book>',observed_at:new Date().toISOString(),markets:{home:2.05,draw:3.5,away:3.05}};
+  for(const p of picks.slice(0,5))p.team_odds={bookmaker:'Example <book>',observed_at:new Date().toISOString(),markets:{home:2.05,draw:3.5,away:3.05}};
   Object.assign(picks[0].team_odds,{kind:'historical_close',observed_at:null,retrieved_at:new Date().toISOString(),source_url:'https://www.espn.com/soccer/match/_/gameId/123'});
   Object.assign(picks[0],{status:'won',market_label:'Plus de 1,5 but',home_score:1,away_score:3});
   Object.assign(picks[1],{status:'lost',home_score:3,away_score:1});
@@ -24,15 +24,18 @@ module.exports=async function(browser){
   assert.equal(await page.locator('#homeDailyOpinion .opinion-pick').count(),6);
   assert.equal(await page.locator('#homeDailyOpinion .opinion-group').count(),3);
   const cards=page.locator('#homeDailyOpinion .opinion-pick');
-  assert.match(await cards.nth(0).locator('[data-odds-outcome="away"].result-won').innerText(),/3,05/);
-  assert.match(await cards.nth(0).locator('.opinion-team-odds').innerText(),/clôture récupérées/);
-  assert.equal(await cards.nth(0).locator('.opinion-team-odds a').getAttribute('href'),'https://www.espn.com/soccer/match/_/gameId/123');
-
-  assert.match(await cards.nth(0).locator('[data-odds-outcome="home"].result-lost').innerText(),/2,05/);
-  assert.match(await cards.nth(1).locator('[data-odds-outcome="home"].result-won').innerText(),/2,05/);
-  assert.match(await cards.nth(2).locator('[data-odds-outcome="draw"].result-won').innerText(),/3,50/);
-  assert.match(await cards.nth(3).locator('.opinion-team-odds').innerText(),/non enregistrées/);
-  assert.equal(await cards.nth(0).locator('.opinion-team-odds').evaluate(el=>getComputedStyle(el).textAlign),'right');
+  const first=cards.nth(0).locator('.opinion-team-odds');
+  assert.match(await first.innerText(),/Olympique de Marseille 1 · 3,05/);
+  assert.equal(await first.getAttribute('data-odds-outcome'),'away');
+  assert.match(await first.getAttribute('class'),/result-won/);
+  assert.equal(await cards.nth(0).locator('[data-odds-outcome="home"]').count(),0);
+  const lost=cards.nth(1).locator('.opinion-team-odds');
+  assert.match(await lost.innerText(),/Paris Saint-Germain 2 · 2,05/);
+  assert.match(await lost.getAttribute('class'),/result-lost/);
+  for(const n of [2,3,4,5])assert.equal(await cards.nth(n).locator('.opinion-team-odds').count(),0);
+  assert.equal(await first.locator('a').count(),0);
+  assert.doesNotMatch(await first.innerText(),/Source|clôture|avant-match|DraftKings|Gagné|Perdu/);
+  assert.equal(await first.evaluate(el=>getComputedStyle(el).textAlign),'right');
 
   assert.match(await page.locator('#homeDailyOpinion .opinion-performance').innerText(),/66.7 %/);
   assert.doesNotMatch(await page.locator('#homeDailyOpinion .opinion-performance').innerText(),/Uniquement les choix quotidiens|Calcul :/);
