@@ -45,7 +45,8 @@ module.exports=async browser=>{
  await calendar.locator('nav [data-page="calendar"]').click();
  await calendar.locator('#fixtures .team-odd').first().waitFor();
  const listing=await calendar.locator('#fixtures').innerText();
- if(!['2,05','3,05','4,20','Example book'].every(s=>listing.includes(s)))throw Error('Calendar does not show sourced 1X2 odds');
+ if(!['2,05','3,05'].every(s=>listing.includes(s)))throw Error('Calendar does not show team odds');
+ if(/Match nul|Example book|fra\.1/.test(listing))throw Error('Small metadata still appears beneath team names');
  for(const [side,price] of [['home','2,05'],['away','3,05']]){
   const group=calendar.locator('[data-crest-side="'+side+'"]');
   if((await group.locator('.team-odd').innerText())!==price)throw Error('Price under wrong team crest');
