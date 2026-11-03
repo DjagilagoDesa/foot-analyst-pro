@@ -12,13 +12,14 @@
   if(!quote)return '<footer class="opinion-team-odds fine" style="'+style+'">Cotes victoire non enregistrées</footer>';
   const settled=['won','lost'].includes(p.status)&&Number.isInteger(p.home_score)&&Number.isInteger(p.away_score);
   const winner=settled?(p.home_score===p.away_score?'draw':p.home_score>p.away_score?'home':'away'):null;
-  const source=quote.bookmaker+' via ESPN · consultation avant-match : '+new Date(quote.observed_at).toLocaleString('fr-FR',{timeZone:'Europe/Paris'});
-  return '<footer class="opinion-team-odds" style="'+style+'" title="'+esc(source)+'"><span class="fine">Cotes victoire avant-match</span>'+['home','draw','away'].filter(side=>side!=='draw'||winner==='draw').map(side=>{
+  const recovered=quote.kind==='historical_close';
+  const source=quote.bookmaker+' via ESPN · '+(recovered?'archive récupérée après le match le ':'consultation avant-match : ')+new Date(recovered?quote.retrieved_at:quote.observed_at).toLocaleString('fr-FR',{timeZone:'Europe/Paris'})+(recovered?' · heure de modification source non fournie':'');
+  return '<footer class="opinion-team-odds" style="'+style+'" title="'+esc(source)+'"><span class="fine">'+(recovered?'Cotes de clôture récupérées · '+esc(quote.bookmaker):'Cotes victoire avant-match')+'</span>'+['home','draw','away'].filter(side=>side!=='draw'||winner==='draw').map(side=>{
    const value=quote.markets?.[side];if(!Number.isFinite(value)||value<=1)return '';
    const name=side==='draw'?'Match nul':p.match[side].name;
    const cls=winner?(side===winner?'result-won':'result-lost'):'gold';
    return '<div class="'+cls+'" data-odds-outcome="'+side+'">'+esc(name)+' · '+value.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+(winner?' · '+(side===winner?'✓ Gagné':'✗ Perdu'):'')+'</div>';
-  }).join('')+'</footer>';
+  }).join('')+(recovered&&/^https:\/\/www\.espn\.com\/soccer\/match\/_\/gameId\/\d+$/.test(quote.source_url||'')?'<a class="fine" href="'+esc(quote.source_url)+'" target="_blank" rel="noopener noreferrer">Source ESPN · archive</a>':'')+'</footer>';
  }
  function render(board){
   lastDay=board.day;lastBoard=board;
