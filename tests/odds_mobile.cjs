@@ -20,7 +20,19 @@ module.exports=async browser=>{
  await page.clock.fastForward(300001);
  await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
  if(!(await page.locator('[data-total]').innerText()).includes('expirée'))throw Error('Expired odds still calculate a payout');
- await page.locator('[data-book]').selectOption('manual');
+ if(await page.locator('[data-book]').count())throw Error('Source selector remains visible');
+ await page.locator('[data-refresh]').click();
+ await page.waitForFunction(()=>document.querySelector('[data-total]').textContent.includes('38,85'));
+ await page.evaluate(async()=>{
+  document.getElementById('ticket').replaceChildren();
+  const match=i=>({id:String(i),league:'fra.1',date:new Date(Date.now()+3600000).toISOString(),home:{id:String(i*2),name:'Paris <club>'},away:{id:String(i*2+1),name:'Lille'}});
+  await window.OddsTicket.mount(document.getElementById('ticket'),[{match:match(3),market:'home',analysis:{market_odds:{books:[]}}},{match:match(4),market:'away',analysis:{market_odds:{books:[]}}}]);
+ });
+ const ticketText=await page.locator('#ticket').innerText();
+ if(!ticketText.includes('Victoire Paris <club>')||!ticketText.includes('Victoire Lille'))throw Error('Selection missing actual team name');
+ if(/Victoire domicile|Victoire extérieur|Source des cotes|via ESPN/.test(ticketText))throw Error('Unwanted generic labels or source selector remain');
+ if(await page.locator('club').count())throw Error('Team name not escaped');
+ await page.locator('[data-stake]').fill('10');
  await page.locator('[data-odd="0"]').fill('1,85');
  if((await page.locator('[data-total]').innerText()).includes('Retour potentiel'))throw Error('Missing leg produced a total');
  await page.locator('[data-odd="1"]').fill('2,10');
