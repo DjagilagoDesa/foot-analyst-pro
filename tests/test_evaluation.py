@@ -50,6 +50,24 @@ class Evaluation(unittest.TestCase):
         with self.assertRaises(ValueError):
             evaluate([], as_of=datetime(2026, 11, 3))
 
+    def test_error_audit_uses_only_eligible_frozen_choices(self):
+        lost = pick(1, 70, 'lost')
+        lost.update(group='challenge', home_score=0, away_score=2,
+                    selection_basis={'home': {'matches': 10}, 'away': {'matches': 10}})
+        legacy = pick(2, 35, 'lost'); legacy.pop('model_version')
+        late = pick(3, 80, 'lost'); late['published_at'] = late['match']['date']
+        report = evaluate([lost, copy.deepcopy(lost), legacy, late, pick(4, 80, 'pending')])
+        self.assertEqual(report['audit']['losses'], 2)
+        self.assertEqual(len(report['audit']['recent_losses']), 2)
+        self.assertEqual(report['audit']['archived_inputs'], 1)
+        self.assertEqual(report['audit']['missing_inputs'], 1)
+        self.assertEqual(report['audit']['unversioned'], 1)
+        self.assertEqual(report['breakdown']['group']['challenge']['count'], 1)
+        self.assertEqual(lost['status'], 'lost')
+        window = evaluate([lost], as_of=datetime(2026, 12, 10, tzinfo=timezone.utc), window_days=30)
+        self.assertEqual(window['audit']['recent_losses'], [])
+        self.assertEqual(window['audit']['missing_inputs'], 0)
+
     def test_empty_and_legacy(self):
         self.assertIsNone(evaluate([])['overall']['brier'])
         old = pick(1, 70, 'lost'); del old['model_version']
