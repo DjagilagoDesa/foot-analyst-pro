@@ -28,7 +28,7 @@
  }
  function summary(data){
   if(!data.books?.length)return '<p class="fine">'+esc(data.message||'Cotes indisponibles.')+'</p>';
-  return data.books.map(b=>'<div class="message"><strong>'+esc(b.bookmaker)+' · via ESPN</strong><div class="analysis">'+Object.entries(b.markets).map(([k,v])=>'<div class="stat"><span>'+esc(label(k))+'</span><b>'+fmt(v)+'</b></div>').join('')+'</div></div>').join('')+'<p class="fine">Consulté le '+esc(date(data.observed_at))+'. Heure de modification par le bookmaker non fournie. '+(fresh(data)?'':'Consultation expirée. ')+'Cotes indicatives pouvant différer de ton bookmaker.</p>';
+  return data.books.map(b=>'<div class="message"><strong>'+esc(b.bookmaker)+' · via ESPN</strong><div class="analysis">'+Object.entries(b.markets).map(([k,v])=>'<div class="stat"><span>'+esc(label(k))+'</span><b>'+fmt(v)+'</b></div>').join('')+'</div></div>').join('')+'<p class="fine">Consulté le '+esc(date(data.observed_at))+'. Heure de modification par le bookmaker non fournie. '+(fresh(data)?'':'Consultation expirée. ')+'Cotes converties et arrondies à deux décimales, pouvant différer de ton bookmaker.</p>';
  }
  async function matchPanel(match){
   const root=document.getElementById('detailContent');if(!root)return;
