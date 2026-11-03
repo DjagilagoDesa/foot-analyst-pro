@@ -49,3 +49,15 @@ consultation avant match ni heure de mise à jour source n’est inventée. Ce s
 les champs de clôture fournis par ESPN, pas une preuve que l’application connaissait
 ces prix lors de son pronostic. Les choix, résultats, probabilités et taux officiel
 ne sont pas révisés. Une archive incomplète ou indisponible reste absente.
+
+
+## Présentation finale des cotes dans les avis
+
+Le pied d’un avis réglé affiche uniquement le chiffre de la cote victoire du
+vainqueur du match, sans nom, titre, source ou autre texte. La couleur dépend du résultat du pari éditorial : vert si ce pari est
+gagné, rouge s’il est perdu, même quand la sélection portait sur les buts ou une
+double chance. L’équipe perdante n’est pas affichée. Aucun pied de cote n’est
+montré avant le résultat, sur un nul, un avis annulé ou sans cote disponible.
+Les titres, liens source et messages d’absence de cote sont retirés de ce pied ;
+la provenance et les contrôles de récupération restent conservés dans les données.
+Cette présentation remplace les règles d’affichage décrites plus haut.

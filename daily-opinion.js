@@ -7,19 +7,12 @@
  const visible=()=>!document.hidden&&!document.getElementById('home').classList.contains('hidden');
  const message=s=>'<p class="fine">'+esc(s)+'</p>';
  function teamOdds(p){
-  const quote=p.team_odds;
-  const style='text-align:right;margin-top:12px;font-size:13px;font-weight:800';
-  if(!quote)return '<footer class="opinion-team-odds fine" style="'+style+'">Cotes victoire non enregistrées</footer>';
-  const settled=['won','lost'].includes(p.status)&&Number.isInteger(p.home_score)&&Number.isInteger(p.away_score);
-  const winner=settled?(p.home_score===p.away_score?'draw':p.home_score>p.away_score?'home':'away'):null;
-  const recovered=quote.kind==='historical_close';
-  const source=quote.bookmaker+' via ESPN · '+(recovered?'archive récupérée après le match le ':'consultation avant-match : ')+new Date(recovered?quote.retrieved_at:quote.observed_at).toLocaleString('fr-FR',{timeZone:'Europe/Paris'})+(recovered?' · heure de modification source non fournie':'');
-  return '<footer class="opinion-team-odds" style="'+style+'" title="'+esc(source)+'"><span class="fine">'+(recovered?'Cotes de clôture récupérées · '+esc(quote.bookmaker):'Cotes victoire avant-match')+'</span>'+['home','draw','away'].filter(side=>side!=='draw'||winner==='draw').map(side=>{
-   const value=quote.markets?.[side];if(!Number.isFinite(value)||value<=1)return '';
-   const name=side==='draw'?'Match nul':p.match[side].name;
-   const cls=winner?(side===winner?'result-won':'result-lost'):'gold';
-   return '<div class="'+cls+'" data-odds-outcome="'+side+'">'+esc(name)+' · '+value.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+(winner?' · '+(side===winner?'✓ Gagné':'✗ Perdu'):'')+'</div>';
-  }).join('')+(recovered&&/^https:\/\/www\.espn\.com\/soccer\/match\/_\/gameId\/\d+$/.test(quote.source_url||'')?'<a class="fine" href="'+esc(quote.source_url)+'" target="_blank" rel="noopener noreferrer">Source ESPN · archive</a>':'')+'</footer>';
+  if(!['won','lost'].includes(p.status)||!Number.isInteger(p.home_score)||!Number.isInteger(p.away_score)||p.home_score===p.away_score)return '';
+  const side=p.home_score>p.away_score?'home':'away';
+  const value=p.team_odds?.markets?.[side];
+  if(!Number.isFinite(value)||value<=1)return '';
+  const cls=p.status==='won'?'result-won':'result-lost';
+  return '<footer class="opinion-team-odds '+cls+'" style="text-align:right;margin-top:12px;font-size:13px;font-weight:800" data-odds-outcome="'+side+'">'+value.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+'</footer>';
  }
  function render(board){
   lastDay=board.day;lastBoard=board;
