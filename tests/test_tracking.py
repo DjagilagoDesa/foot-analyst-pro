@@ -32,6 +32,23 @@ class Tracking(unittest.TestCase):
   d=self.client.get('/api/tracking/performance').json;self.assertEqual((d['won'],d['lost'],d['success_pct']),(0,2,0))
  def test_extra_time_excluded(self):
   self.post();self.finish(4);d=self.client.get('/api/tracking/performance').json;self.assertEqual(d['void'],1);self.assertIsNone(d['success_pct'])
+ def test_postponed_is_void_without_affecting_percentage(self):
+  self.post();self.post('btts');self.finish()
+  c=self.info['header']['competitions'][0]
+  c['status']={'type':{'state':'pre','completed':False,'name':'STATUS_POSTPONED'},'period':0}
+  d=self.client.get('/api/tracking/performance').json
+  self.assertEqual((d['won'],d['lost'],d['pending'],d['void']),(0,0,0,2))
+  self.assertIsNone(d['success_pct'])
+  # Refreshing again must not turn a void selection into a retroactive win.
+  self.finish()
+  d=self.client.get('/api/tracking/performance').json
+  self.assertEqual((d['won'],d['lost'],d['void']),(0,0,2))
+ def test_unavailable_or_invalid_result_stays_pending(self):
+  self.post();self.finish()
+  self.info['header']['competitions'][0]['competitors'][0]['score']='unknown'
+  d=self.client.get('/api/tracking/performance').json
+  self.assertEqual((d['pending'],d['source_errors']),(1,1))
+  self.assertIsNone(d['success_pct'])
  def test_ownership(self):
   with patch.object(tracking,'current_user',return_value={'id':'other'}):self.assertEqual(self.post().status_code,404)
  def test_no_retroactive(self):
