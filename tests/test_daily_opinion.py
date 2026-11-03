@@ -70,6 +70,17 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(after, original)
         self.assertEqual(picks, original)
 
+    def test_selection_inputs_are_frozen_before_the_result(self):
+        source = result(1)
+        picks = choose([source], [], NOW, DAY)
+        self.assertEqual(picks[0]['selection_basis']['home']['matches'], 10)
+        self.assertEqual(picks[0]['selection_basis']['captured_at'], NOW.isoformat())
+        source['home']['wins'] = 0
+        source['prediction']['markets']['home_or_draw'] = 20
+        self.assertEqual(picks[0]['selection_basis']['home']['wins'], 6)
+        self.assertEqual(picks[0]['selection_basis']['markets']['home_or_draw'], 80)
+        self.assertEqual(choose([], picks, NOW, DAY), picks)
+
     def test_paris_midnight_and_dst(self):
         self.assertEqual(today(datetime(2026, 11, 1, 23, 5, tzinfo=timezone.utc)), '2026-11-02')
         self.assertEqual(today(datetime(2026, 7, 1, 22, 5, tzinfo=timezone.utc)), '2026-07-02')
