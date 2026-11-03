@@ -5,7 +5,7 @@
  let busy=false,lastDay='',lastBoard=null;
  const day=()=>new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Paris'});
  const visible=()=>!document.hidden&&!document.getElementById('home').classList.contains('hidden');
- const message=s=>'<p class="fine">'+esc(s)+'</p>';
+ const message=s=>'<p class="opinion-state">'+esc(s)+'</p>';
  function teamOdds(p){
   if(!['won','lost'].includes(p.status)||!Number.isInteger(p.home_score)||!Number.isInteger(p.away_score)||p.home_score===p.away_score)return '';
   const side=p.home_score>p.away_score?'home':'away';
@@ -17,15 +17,14 @@
  function render(board){
   lastDay=board.day;lastBoard=board;
   const date=new Date(board.day+'T12:00:00+01:00').toLocaleDateString('fr-FR',{timeZone:'Europe/Paris',day:'numeric',month:'long'});
-  const count=(board.groups||[]).reduce((n,g)=>n+g.picks.length,0);
-  let html='<div class="row"><strong class="gold">Avis du '+esc(date)+'</strong><span class="fine">'+count+' / 6 choix</span></div>';
+  let html='<div class="row"><strong class="gold">Avis du '+esc(date)+'</strong></div>';
   const p=board.performance;
-  if(p)html+='<div class="opinion-performance"><h3>Taux officiel de l’application</h3><div class="analysis"><div class="stat"><span>Réussite</span><b>'+(p.success_pct===null?'—':esc(p.success_pct)+' %')+'</b></div><div class="stat"><span>Gagnés</span><b>'+esc(p.won)+'</b></div><div class="stat"><span>Perdus</span><b>'+esc(p.lost)+'</b></div><div class="stat"><span>En attente</span><b>'+esc(p.pending)+'</b></div></div>'+(p.success_pct===null?message('Le taux apparaîtra après les premiers résultats vérifiés.'):'')+'</div>';
+  if(p)html+='<div class="opinion-performance"><h3>Performance</h3><div class="analysis"><div class="stat"><span>Réussite</span><b>'+(p.success_pct===null?'—':esc(p.success_pct)+' %')+'</b></div><div class="stat"><span>Gagnés</span><b>'+esc(p.won)+'</b></div><div class="stat"><span>Perdus</span><b>'+esc(p.lost)+'</b></div><div class="stat"><span>En attente</span><b>'+esc(p.pending)+'</b></div></div>'+'</div>';
   if(board.status==='preparing')html+=message('Préparation des choix…');
   if(board.stale&&board.status!=='preparing')html+=message('Actualisation en retard.');
   html+=(board.groups||[]).map(group=>'<div class="opinion-group"><h3>'+esc(group.title)+'</h3>'+group.picks.map(p=>{
    const m=p.match, state={won:'✓ Gagné',lost:'✗ Perdu',void:'Annulé / non réglable',pending:new Date(m.date)>new Date()?'À venir':'Résultat à vérifier'}[p.status];
-   return '<article class="opinion-pick"><div class="row"><strong>'+esc(m.home.name)+' – '+esc(m.away.name)+'</strong><span class="opinion-prob">'+esc(p.probability)+' %</span></div><p class="gold">'+esc(p.market_label)+'</p><p class="fine">'+esc(new Date(m.date).toLocaleTimeString('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'}))+' · <span class="'+({won:'result-won',lost:'result-lost'}[p.status]||'')+'">'+esc(state)+'</span>'+(p.home_score!==null?' · '+esc(p.home_score)+' – '+esc(p.away_score):'')+'</p><details><summary>Pourquoi ce choix ?</summary><p>'+esc(p.rationale)+'</p><p class="fine">Buts attendus par le modèle : '+esc(p.expected_goals.home)+' – '+esc(p.expected_goals.away)+'. Estimation publiée à '+esc(new Date(p.published_at).toLocaleTimeString('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'}))+'.</p><button type="button" class="day" data-opinion-match="'+esc(m.id)+'">OUVRIR LE MATCH</button></details>'+teamOdds(p)+'</article>';
+   return '<article class="opinion-pick"><div class="row"><strong>'+esc(m.home.name)+' – '+esc(m.away.name)+'</strong><span class="opinion-prob">'+esc(p.probability)+' %</span></div><p class="gold">'+esc(p.market_label)+'</p><p class="opinion-state">'+esc(new Date(m.date).toLocaleTimeString('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'}))+' · <span class="'+({won:'result-won',lost:'result-lost'}[p.status]||'')+'">'+esc(state)+'</span>'+(p.home_score!==null?' · '+esc(p.home_score)+' – '+esc(p.away_score):'')+'</p><details><summary>Pourquoi ce choix ?</summary><p>'+esc(p.rationale)+'</p><button type="button" class="day" data-opinion-match="'+esc(m.id)+'">OUVRIR LE MATCH</button></details>'+teamOdds(p)+'</article>';
   }).join('')+(!group.picks.length?message('Aucun choix admissible pour le moment.'):'')+'</div>').join('');
   if(board.source_errors||board.result_source_errors)html+=message('Données partiellement indisponibles.');
   for(const id of targets){
