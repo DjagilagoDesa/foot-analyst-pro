@@ -377,7 +377,7 @@ def _badge(t):
     logos=t.get('logos') or []
     return t.get('logo') or (logos[0].get('href') if logos else '')
 
-def _fixture(e, league):
+def _fixture(e, league, observed_at=None):
     comp=(e.get('competitions') or [{}])[0]
     competitors=comp.get('competitors') or []
     if len(competitors)!=2:return None
@@ -390,13 +390,20 @@ def _fixture(e, league):
     def score(value):
         if isinstance(value,dict): value=value.get('displayValue',value.get('value'))
         return str(value) if value is not None else None
-    return {'id':str(e.get('id','')),'league':league,'date':e.get('date'),
+    result = {'id':str(e.get('id','')),'league':league,'date':e.get('date'),
       'home':{'id':str(ht.get('id','')),'name':ht.get('displayName') or ht.get('name') or 'Domicile','badge':_badge(ht)},
       'away':{'id':str(at.get('id','')),'name':at.get('displayName') or at.get('name') or 'Extérieur','badge':_badge(at)},
       'state':state.get('state','pre'),'completed':bool(state.get('completed')),
       'home_score':score(h.get('score')),'away_score':score(a.get('score')),
       'status_name':state.get('name',''),'status_detail':state.get('shortDetail') or state.get('detail',''),
       'clock':status.get('displayClock',''),'period':status.get('period')}
+
+    if observed_at:
+        from market_odds import extract
+        result['market_odds']={'books':extract(e,observed_at), 'observed_at':observed_at,
+            'expires_at':min(datetime.fromisoformat(e['date'].replace('Z','+00:00')),
+                datetime.fromisoformat(observed_at)+timedelta(minutes=5)).isoformat(), 'source':'ESPN'}
+    return result
 
 @app.get('/api/fixtures')
 def fixtures():
@@ -409,8 +416,13 @@ def fixtures():
     if selected!='all' and selected not in LEAGUES:return jsonify({'error':'invalid_league'}),400
     leagues_to_check=LEAGUES if selected=='all' else [selected]
     def load(lg):
-        data=fetch(f'{ESPN}/{lg}/scoreboard',{'dates':d.strftime('%Y%m%d'),'limit':200},ttl=20 if abs((d-datetime.now(timezone.utc).date()).days)<=1 else 1800)
-        return [x for e in data.get('events') or [] if (x:=_fixture(e,lg))]
+        url=f'{ESPN}/{lg}/scoreboard';params={'dates':d.strftime('%Y%m%d'),'limit':200}
+        started=time.time()
+        data=fetch(url,params,ttl=20 if abs((d-datetime.now(timezone.utc).date()).days)<=1 else 60)
+        with LOCK:
+            cached=CACHE.get((url,tuple(sorted(params.items()))))
+            observed=datetime.fromtimestamp(cached[0] if cached else started,timezone.utc).isoformat()
+        return [x for e in data.get('events') or [] if (x:=_fixture(e,lg,observed))]
     found=[];failed=[]
     with ThreadPoolExecutor(max_workers=len(leagues_to_check)) as pool:
         futures={pool.submit(load,lg):lg for lg in leagues_to_check}
