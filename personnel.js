@@ -1,13 +1,17 @@
 /* Match personnel updates reuse saved analyses and never spend a trial. */
 (() => {
-  let timer=null, generation=0;
+  let timer=null, generation=0, resume=null;
+  const INTERVAL=300000;
   const TITLE='Compositions et disponibilités signalées';
   const esc=value=>escapeHtml(value==null?'':String(value));
   const stamp=value=>{
     const d=new Date(value);
     return Number.isNaN(d.getTime())?'date indisponible':d.toLocaleString('fr-FR',{timeZone:'Europe/Paris'});
   };
-  function stop(){clearTimeout(timer);timer=null;generation++;}
+  function stop(){
+    clearTimeout(timer);timer=null;generation++;
+    if(resume){document.removeEventListener('visibilitychange',resume);window.removeEventListener('pageshow',resume);resume=null;}
+  }
   function visible(el){return el.isConnected&&!document.hidden&&!el.closest('.hidden');}
   function historyMarkup(snapshots,names){
     if(!Array.isArray(snapshots)||snapshots.length<2)return '';
@@ -24,6 +28,7 @@
     stop();
     if(!data||!data.tracking_id||!data.league||!/^\d+$/.test(String(data.event_id||'')))return;
     const token=generation;
+    let pending=false, lastAttempt=Date.now();
     let context=data.personnel_context||null,snapshots=data.personnel_snapshots||[];
     let section=el.querySelector('[data-personnel-section]');
     if(!section){
@@ -43,8 +48,9 @@
       status.textContent=ended()?'Archive figée après le coup d’envoi.':context?.fixture_verified&&context?.kickoff?'Dernière consultation : '+stamp(context.observed_at)+'. Actualisation toutes les 5 minutes tant que cette analyse est affichée.':'Actualise pour vérifier les effectifs, sans utiliser d’analyse offerte supplémentaire.';
     }
     async function update(){
-      if(token!==generation||!visible(el))return;
+      if(token!==generation||!visible(el)||pending)return;
       if(ended()){draw();return;}
+      pending=true;lastAttempt=Date.now();
       button.disabled=true;status.textContent='Vérification des effectifs…';
       try{
         const result=await window.Accounts.request('/api/account/analysis/'+encodeURIComponent(data.tracking_id)+'/personnel',{});
@@ -62,12 +68,19 @@
         draw();
         if(result.status!=='updated'&&!ended())status.textContent='Pas de nouvelle information vérifiée. '+(context?.observed_at?'Dernière consultation conservée : '+stamp(context.observed_at)+'.':'Réessaie avant le match.');
       }catch(e){if(token===generation&&visible(el))status.textContent='Effectifs non actualisés : '+e.message;}
-      finally{if(token===generation){button.disabled=!!ended();schedule();}}
+      finally{pending=false;if(token===generation){button.disabled=!!ended();schedule();}}
     }
     function schedule(){
       clearTimeout(timer);
-      if(token===generation&&context?.fixture_verified&&context?.kickoff&&!ended())timer=setTimeout(()=>{if(visible(el))update();else schedule();},300000);
+      if(token===generation&&context?.fixture_verified&&context?.kickoff&&!ended())timer=setTimeout(()=>{if(visible(el))update();else schedule();},INTERVAL);
     }
+    resume=()=>{
+      if(token!==generation||!visible(el)||pending)return;
+      if(ended()){clearTimeout(timer);draw();return;}
+      if(context?.fixture_verified&&context?.kickoff&&Date.now()-lastAttempt>=INTERVAL)update();
+    };
+    document.addEventListener('visibilitychange',resume);
+    window.addEventListener('pageshow',resume);
     button.onclick=update;draw();schedule();
   }
   window.Personnel={attach,stop};
