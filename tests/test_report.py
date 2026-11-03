@@ -17,6 +17,12 @@ class ReportTests(unittest.TestCase):
         self.assertIn('Lyon : résultats détaillés indisponibles', section['text'])
         self.assertIn('pas nécessairement les cinq derniers matchs toutes compétitions', section['text'])
         self.assertEqual(data['prediction']['markets']['home'], 48)
+        freshness = next(s for s in result['sections'] if s['title'] == 'Ancienneté des résultats utilisés')
+        self.assertIn('2026-10-06', freshness['text'])
+        self.assertIn('Lyon : date du dernier résultat utilisé indisponible', freshness['text'])
+        sources = [s for s in result['sections'] if s.get('source_url')]
+        self.assertEqual(len(sources), 1)
+        self.assertTrue(sources[0]['source_url'].endswith('/6'))
 
     def test_report_uses_real_metrics_and_balanced_scenarios(self):
         team=dict(wins=7,draws=3,losses=2,matches=12,goals_for_avg=1.7,goals_against_avg=1.1)

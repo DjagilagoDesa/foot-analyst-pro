@@ -1,12 +1,18 @@
 """Read-only evaluation of frozen editorial probabilities; never tunes on outcomes."""
 import math
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 MODEL_VERSION = 'poisson-10-v1'
 
 
-def evaluate(picks):
+def evaluate(picks, *, as_of=None, window_days=None):
+    """Optional rolling window uses kickoff, never publication or settlement time."""
+    as_of = as_of or datetime.now(timezone.utc)
+    if as_of.tzinfo is None:
+        raise ValueError("as_of must include a timezone")
+    if window_days is not None and (isinstance(window_days, bool) or not isinstance(window_days, int) or window_days <= 0):
+        raise ValueError("window_days must be a positive integer")
     groups = defaultdict(list)
     excluded = defaultdict(int)
     events = set()
@@ -26,7 +32,16 @@ def evaluate(picks):
         if not valid:
             excluded['invalid_snapshot'] += 1
             continue
+        if kickoff > as_of:
+            excluded['future_fixture'] += 1
+            continue
+        if window_days is not None and kickoff < as_of - timedelta(days=window_days):
+            excluded['outside_window'] += 1
+            continue
         match = pick['match']
+        if not all(isinstance(value, str) and value.strip() for value in (match.get('league'), match.get('id'), pick.get('market'))):
+            excluded['invalid_snapshot'] += 1
+            continue
         identity = (match.get('league'), match.get('id'), pick.get('market'))
         if identity in events:
             excluded['duplicate'] += 1
@@ -55,6 +70,7 @@ def evaluate(picks):
                 breakdown={kind: {name: metrics(values) for (k, name), values in sorted(groups.items()) if k == kind}
                            for kind in ('market', 'league', 'model', 'confidence')},
                 excluded=dict(excluded), scope='daily_opinion_only',
+                window=dict(days=window_days, as_of=as_of.isoformat()),
                 roi=None, roi_reason='No bookmaker odds recorded at publication.',
                 limitations=['Selected editorial picks only; not all model predictions.',
                              'Markets may be correlated; counts are not independent trials.',

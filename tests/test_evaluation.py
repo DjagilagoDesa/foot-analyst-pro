@@ -1,5 +1,6 @@
 import copy
 import unittest
+from datetime import datetime, timezone
 from evaluation import evaluate
 
 
@@ -27,6 +28,27 @@ class Evaluation(unittest.TestCase):
         report = evaluate(samples)
         self.assertEqual(report['overall']['count'], 1)
         self.assertEqual(report['excluded'], dict(duplicate=1, invalid_snapshot=5, pending=1, void=1))
+
+    def test_rolling_window_uses_kickoff_and_excludes_future(self):
+        now = datetime(2026, 11, 3, tzinfo=timezone.utc)
+        recent = pick(1, 80, 'won')
+        old = pick(2, 80, 'lost')
+        old['match']['date'] = '2026-09-01T20:00:00Z'
+        old['published_at'] = '2026-09-01T12:00:00Z'
+        future = pick(3, 80, 'won')
+        future['match']['date'] = '2026-11-04T20:00:00Z'
+        report = evaluate([recent, old, future], as_of=now, window_days=30)
+        self.assertEqual(report['overall']['count'], 1)
+        self.assertEqual(report['excluded'], dict(outside_window=1, future_fixture=1))
+        self.assertEqual(evaluate([recent, old], as_of=now)['overall']['count'], 2)
+
+    def test_missing_identity_and_invalid_window(self):
+        invalid = pick(1, 80, 'won'); del invalid['match']['id']
+        self.assertEqual(evaluate([invalid])['excluded']['invalid_snapshot'], 1)
+        with self.assertRaises(ValueError):
+            evaluate([], window_days=0)
+        with self.assertRaises(ValueError):
+            evaluate([], as_of=datetime(2026, 11, 3))
 
     def test_empty_and_legacy(self):
         self.assertIsNone(evaluate([])['overall']['brier'])
