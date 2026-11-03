@@ -28,7 +28,7 @@
  }
  function summary(data,match){
   if(!data.books?.length)return '<p class="fine">'+esc(data.message||'Cotes indisponibles.')+'</p>';
-  return data.books.map(b=>'<div class="message"><strong>'+esc(b.bookmaker)+' · via ESPN</strong><div class="analysis">'+Object.entries(b.markets).map(([k,v])=>'<div class="stat"><span>'+esc(k==='home'?match.home.name:k==='away'?match.away.name:label(k))+'</span><b>'+fmt(v)+'</b></div>').join('')+'</div></div>').join('')+'<p class="fine">Consulté le '+esc(date(data.observed_at))+'. Heure de modification par le bookmaker non fournie. '+(fresh(data)?'':'Consultation expirée. ')+'Cotes converties et arrondies à deux décimales, pouvant différer de ton bookmaker.</p>';
+  return data.books.map(b=>'<div class="message" title="'+esc(b.bookmaker+' via ESPN')+'"><div class="analysis">'+Object.entries(b.markets).map(([k,v])=>'<div class="stat"><span>'+esc(k==='home'?match.home.name:k==='away'?match.away.name:label(k))+'</span><b>'+fmt(v)+'</b></div>').join('')+'</div></div>').join('');
  }
  async function matchPanel(match){
   const root=document.getElementById('detailContent');if(!root)return;
@@ -55,23 +55,20 @@
   await Promise.all(legs.map(async r=>{r.odds=r.analysis?.market_odds||await load(r.match);}));
   if(!host.isConnected)return;
   const books=[...new Set(legs.flatMap(r=>(r.odds.books||[]).map(b=>b.bookmaker)))];
-  host.innerHTML='<h3>🎟️ Simulation de ton ticket</h3><p class="fine">Le choix privilégie le produit probabilité × cote parmi les marchés cotés du profil. Sans cote exacte disponible, il suit les probabilités du modèle. Les pourcentages restent inchangés.</p><label>Source des cotes <select data-book>'+books.map(b=>'<option value="'+esc(b)+'">'+esc(b)+' via ESPN</option>').join('')+'<option value="manual">Saisir les cotes de mon bookmaker</option></select></label><div data-legs></div><label>Mise (€) <input data-stake type="text" inputmode="decimal" placeholder="Ta mise" autocomplete="off"></label><div data-total role="status" aria-live="polite"></div><button class="day" type="button" data-refresh>ACTUALISER LES COTES</button><p class="fine">Simulation : aucun pari placé. Le retour inclut la mise ; le bénéfice la déduit. Les cotes saisies ne sont pas vérifiées. Les bookmakers peuvent refuser un combiné, limiter le gain ou appliquer d’autres règles. Les doubles conditions d’un match nécessitent leur propre cote.</p>';
+  host.innerHTML='<h3>🎟️ Simulation de ton ticket</h3><label>Source des cotes <select data-book>'+books.map(b=>'<option value="'+esc(b)+'">'+esc(b)+' via ESPN</option>').join('')+'<option value="manual">Saisir les cotes de mon bookmaker</option></select></label><div data-legs></div><label>Mise (€) <input data-stake type="text" inputmode="decimal" placeholder="Ta mise" autocomplete="off"></label><div data-total role="status" aria-live="polite"></div><button class="day" type="button" data-refresh>ACTUALISER LES COTES</button>';
   const select=host.querySelector('[data-book]'),rows=host.querySelector('[data-legs]'),stake=host.querySelector('[data-stake]'),out=host.querySelector('[data-total]');
   function draw(){
    rows.innerHTML=legs.map((r,i)=>{
     const quote=select.value==='manual'?null:price(r.odds,r.market,select.value);
     r.quote=quote;
-    const provenance=quote?'Consulté le '+date(r.odds.observed_at)+' ; heure de modification source inconnue.':select.value==='manual'?'Cote saisie personnellement, non vérifiée.':'Cote exacte indisponible ou consultation expirée : saisis celle de ton bookmaker.';
-    return '<div class="message"><strong>'+esc(r.match.home.name+' – '+r.match.away.name)+'</strong><p class="gold">'+esc(label(r.market))+'</p><label>Cote décimale <input data-odd="'+i+'" type="text" inputmode="decimal" autocomplete="off" '+(quote?'value="'+quote+'" readonly':'placeholder="Ex. 1,85"')+'></label><p class="fine">'+esc(provenance)+'</p><p data-comparison="'+i+'" class="fine"></p></div>';
+    return '<div class="message"><strong>'+esc(r.match.home.name+' – '+r.match.away.name)+'</strong><p class="gold">'+esc(label(r.market))+'</p><label>Cote décimale <input data-odd="'+i+'" type="text" inputmode="decimal" autocomplete="off" '+(quote?'value="'+quote+'" readonly':'placeholder="Ex. 1,85"')+'></label></div>';
    }).join('');update();
   }
   function update(){
    const inputs=[...rows.querySelectorAll('[data-odd]')],prices=inputs.map(input=>number(input.value));
    let expired=false;
    inputs.forEach((input,i)=>{
-    const r=legs[i],p=prices[i];if(r.quote&&!fresh(r.odds))expired=true;
-    const implied=100/p,model=Number(r.probability);
-    rows.querySelector('[data-comparison="'+i+'"]').textContent=Number.isFinite(p)&&p>1&&p<=10000?'Seuil de rentabilité brut : '+fmt(implied)+' %'+(Number.isFinite(model)?' · Modèle : '+fmt(model)+' %. Écart indicatif : '+fmt(model-implied)+' points.':'')+' Cet écart ne prouve pas un avantage.':'';
+    const r=legs[i];if(r.quote&&!fresh(r.odds))expired=true;
    });
    const repeated=new Set(),seen=new Set();
    for(const r of legs)for(const id of [r.match.home.id,r.match.away.id]){if(seen.has(String(id)))repeated.add(id);seen.add(String(id));}

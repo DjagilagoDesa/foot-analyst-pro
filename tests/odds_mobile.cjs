@@ -13,6 +13,7 @@ module.exports=async browser=>{
   const match=i=>({id:String(i),league:'fra.1',date:new Date(Date.now()+3600000).toISOString(),home:{id:String(i*2),name:'Équipe <img src=x onerror=alert(1)>'},away:{id:String(i*2+1),name:'Extérieur'}});
   await window.OddsTicket.mount(document.getElementById('ticket'),[{match:match(1),market:'btts',probability:60},{match:match(2),market:'over_2_5',probability:65}]);
  });
+ if((await page.locator('#ticket').innerText()).includes('Le choix privilégie'))throw Error('Redundant simulator copy remains');
  await page.locator('[data-stake]').fill('10');
  await page.waitForFunction(()=>document.querySelector('[data-total]').textContent.includes('38,85'));
  if(await page.locator('img,book').count())throw Error('Unescaped source content');
@@ -35,6 +36,7 @@ module.exports=async browser=>{
  if(!(await page.locator('[data-team-price="home"]').innerText()).includes('2,05'))throw Error('No price beside home team');
  if(!(await page.locator('[data-team-price="away"]').innerText()).includes('3,05'))throw Error('No price beside away team');
  if(!(await page.locator('[data-prices]').innerText()).includes('Paris'))throw Error('Odds missing actual team names');
+ if(/Consulté le|Heure de modification|Cotes converties/.test(await page.locator('[data-prices]').innerText()))throw Error('Redundant quote copy remains');
  if(errors.length)throw Error(errors.join('; '));await page.close();
  const calendar=await browser.newPage({viewport:{width:390,height:844}});
  await calendar.route('**/api/fixtures?**',async route=>{
