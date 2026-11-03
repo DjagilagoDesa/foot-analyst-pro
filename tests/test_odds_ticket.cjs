@@ -1,0 +1,16 @@
+const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm');
+const context={window:{},document:{addEventListener(){}},escapeHtml:String,setInterval(){},Date,Map,WeakMap,URLSearchParams,Number,Set};
+vm.createContext(context);vm.runInContext(fs.readFileSync('odds-ticket.js','utf8'),context);
+const o=context.window.OddsTicket;
+const x=o.calculate([1.85,2.1],10);
+assert(Math.abs(x.total-3.885)<1e-10);assert(Math.abs(x.gross-38.85)<1e-10);assert(Math.abs(x.net-28.85)<1e-10);
+for(const prices of [[],[1],[0],[NaN],[Infinity],[10001]])assert.equal(o.calculate(prices,10),null);
+for(const stake of [0,-1,NaN,Infinity,1000001])assert.equal(o.calculate([2],stake),null);
+assert.equal(o.number('1,85'),1.85);assert(Number.isNaN(o.number('1.8x')));
+const data={expires_at:new Date(Date.now()+60000).toISOString(),books:[{bookmaker:'Book',markets:{btts:2.1,over_2_5:1.5}}]};
+assert.equal(o.price(data,'home_or_draw_and_btts'),undefined);
+const options=[{market:'btts',probability:62},{market:'over_2_5',probability:70}];
+assert.equal(o.rank(options,data)[0].market,'btts');
+data.expires_at='2000-01-01T00:00:00Z';
+assert.equal(o.price(data,'btts'),undefined);assert.equal(o.rank(options,data)[0].market,'over_2_5');
+console.log('Odds: decimal inputs, exact-market lookup, expiry, model comparison and gross/net returns OK');
