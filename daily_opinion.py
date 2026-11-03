@@ -340,7 +340,10 @@ def init_app(app, server):
             db.execute(SCHEMA)
             rows = db.execute('SELECT payload FROM daily_opinion_boards WHERE day<=? ORDER BY day', (today(),)).fetchall()
         picks = [pick for row in rows for pick in json.loads(row['payload']).get('picks', [])]
-        response = jsonify(evaluate(picks))
+        as_of = datetime.now(timezone.utc)
+        result = evaluate(picks, as_of=as_of)
+        result['last_30_days'] = evaluate(picks, as_of=as_of, window_days=30)
+        response = jsonify(result)
         response.headers['Cache-Control'] = 'no-store'
         return response
 

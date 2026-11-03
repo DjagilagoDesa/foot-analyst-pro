@@ -1,7 +1,7 @@
 """Match-specific editorial reasoning from observed results, without invented news."""
 from datetime import datetime
 
-REPORT_VERSION = 9
+REPORT_VERSION = 10
 
 def number(value):
     return f'{float(value):.2f}'.rstrip('0').rstrip('.').replace('.', ',')
@@ -357,6 +357,20 @@ def report(data, names=None, histories=None):
             + ('Les tendances ci-dessus reposent sur les résultats détaillés disponibles. ' if hr and ar else 'Les résultats détaillés ne sont pas joints à cette analyse enregistrée : aucune série, tendance chronologique ou ventilation par terrain n’est déduite des seules moyennes. ')
             + 'Classement, enjeu de titre/Europe/maintien, absences, compositions, calendrier à venir et intentions tactiques ne sont pas vérifiés ici. '
             'Les buts attendus sont une projection Poisson, pas des xG mesurés sur les occasions. Les pourcentages ne sont pas calibrés sur une performance prédictive démontrée et ne sont pas une analyse en direct.')
+    freshness = []
+    for name, rows in ((home, hr), (away, ar)):
+        freshness.append(f"{name} : dernier résultat utilisé daté du {rows[0]['date'][:10]}." if rows else
+                         f'{name} : date du dernier résultat utilisé indisponible.')
+    freshness.append('La date de génération de cette analyse ne prouve pas que les actualités du jour ont été vérifiées. '
+                     'Les dates ci-dessus décrivent les résultats utilisés, pas la date de consultation de la source.')
+    add('Ancienneté des résultats utilisés', ' '.join(freshness))
+    # Direct links point only to historical matches actually present in this report.
+    for name, rows in ((home, hr), (away, ar)):
+        linked = next((row for row in rows if row['match_id'].isdigit()), None)
+        if linked:
+            sections.append(dict(title=f'Source du dernier résultat référencé : {name}',
+                                 text=f"{linked['date'][:10]} : adversaire {linked['opponent']}, {linked['gf']} but(s) marqué(s), {linked['ga']} encaissé(s). Cette fiche documente ce résultat uniquement.",
+                                 source_url='https://www.espn.com/soccer/match/_/gameId/'+linked['match_id']))
     add('Données utilisées et points à vérifier',limits)
     return dict(version=REPORT_VERSION,verdict=verdict,sections=sections,
                 method='Lecture conditionnelle des résultats disponibles et modèle Poisson indépendant',
