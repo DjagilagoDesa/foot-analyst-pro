@@ -33,15 +33,23 @@ def judgement(result, market):
     hn, an = m['home']['name'], m['away']['name']
     goals = result['prediction']['expected_goals']
     total = round(goals['home'] + goals['away'], 2)
-    if market in ('home', 'home_or_draw'):
-        return (f"Mon scénario est favorable à {hn} : {goals['home']} but(s) attendu(s) contre {goals['away']} pour {an}. "
-                f"Le point de vigilance est l’attaque de {an}, qui marque {a['goals_for_avg']} but(s) par match ; "
-                f"{hn} en concède {h['goals_against_avg']}. Une victoire extérieure ferait perdre ce choix.")
-    if market in ('away', 'away_or_draw'):
-        return (f"Je retiens le scénario de {an}, dont l’attaque marque {a['goals_for_avg']} but(s) en moyenne "
-                f"face à une défense de {hn} qui en concède {h['goals_against_avg']}. "
-                f"Le modèle attend {goals['away']} but(s) à l’extérieur contre {goals['home']} à domicile. "
-                f"Le risque contraire vient de {hn}, avec {h['wins']} victoires sur ses dix matchs étudiés.")
+    if market in ('home', 'home_or_draw', 'away', 'away_or_draw'):
+        home_side = market in ('home', 'home_or_draw')
+        chosen, opponent = (hn, an) if home_side else (an, hn)
+        own_goals, other_goals = (goals['home'], goals['away']) if home_side else (goals['away'], goals['home'])
+        own_stats, other_stats = (h, a) if home_side else (a, h)
+        double = market.endswith('_or_draw')
+        cover = f"la victoire de {chosen} ou le nul" if double else f"la victoire de {chosen}"
+        risk = f"Une victoire de {opponent} ferait perdre ce choix." if double else f"Un nul ou une victoire de {opponent} ferait perdre ce choix."
+        comparison = (f"{opponent} reste devant dans la projection de buts ; couvrir le nul ne fait pas de {chosen} le favori."
+                      if own_goals < other_goals else
+                      "La projection de buts est à égalité ; elle ne désigne pas de favori."
+                      if own_goals == other_goals else
+                      f"La projection de buts penche vers {chosen}, sans assurer le résultat.")
+        return (f"Je retiens {cover}, estimée à {result['prediction']['markets'].get(market)} %. "
+                f"Le modèle prévoit {own_goals} but(s) pour {chosen} contre {other_goals} pour {opponent}. "
+                f"{comparison} {chosen} marque {own_stats['goals_for_avg']} but(s) par match et en concède {own_stats['goals_against_avg']}, "
+                f"contre {other_stats['goals_for_avg']} marqué(s) pour {opponent}. {risk}")
     if market.startswith('over_') or market.startswith('under_'):
         return (f"Je privilégie ici le total de buts plutôt que le vainqueur : le modèle prévoit {total} buts au total. "
                 f"Les défenses de {hn} et {an} concèdent respectivement {h['goals_against_avg']} et {a['goals_against_avg']} but(s) par match. "
