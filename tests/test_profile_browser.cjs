@@ -24,6 +24,8 @@ fs.mkdirSync('artifacts',{recursive:true});
  await page.locator('#nicknameForm .btn').click();
  await page.getByRole('heading',{name:'Jordan Pro',exact:true}).waitFor();
  await page.locator('nav [data-page="tickets"]').click();
+ if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Ticket builder overflows mobile');
+ if(/Choisis tes préférences|Une analyse par nouvelle rencontre|sans connexion aux cotes Winamax/.test(await page.locator('#tickets').innerText()))throw Error('Redundant ticket-builder copy remains');
  const data={home:'Paris',away:'Lyon',home_scored_avg:2,home_conceded_avg:1,away_scored_avg:1.5,away_conceded_avg:1.2,sample_matches_per_team:10};
  // The manual form was replaced by the ticket builder. Exercise the metered
  // analysis endpoint through the signed-in browser, then verify quota/history UI.
