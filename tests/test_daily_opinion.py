@@ -72,9 +72,12 @@ class SelectionTests(unittest.TestCase):
 
     def test_selection_inputs_are_frozen_before_the_result(self):
         source = result(1)
+        source['history'] = {'home': [{'id': 'past-1', 'home_goals': 2}], 'away': []}
         picks = choose([source], [], NOW, DAY)
         self.assertEqual(picks[0]['selection_basis']['home']['matches'], 10)
         self.assertEqual(picks[0]['selection_basis']['captured_at'], NOW.isoformat())
+        source['history']['home'][0]['home_goals'] = 9
+        self.assertEqual(picks[0]['selection_basis']['history']['home'][0]['home_goals'], 2)
         source['home']['wins'] = 0
         source['prediction']['markets']['home_or_draw'] = 20
         self.assertEqual(picks[0]['selection_basis']['home']['wins'], 6)
