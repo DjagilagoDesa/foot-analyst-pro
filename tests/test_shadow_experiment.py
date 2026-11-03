@@ -75,6 +75,23 @@ class ShadowTests(unittest.TestCase):
         self.assertNotIn('candidate',report.json)
         self.assertEqual(report.headers['Cache-Control'],'no-store')
 
+    def test_evaluation_window_fixed_at_first_snapshot(self):
+        self.record();r=self.service.report()
+        self.assertEqual(r['evaluation_window']['start'],NOW.isoformat())
+        self.assertEqual(r['evaluation_window']['end'],(NOW+timedelta(days=90)).isoformat())
+        self.assertEqual(r['evaluation_window']['days'],90)
+        self.service.clock=lambda:NOW+timedelta(days=91)
+        self.assertEqual(self.service.report()['evaluation_window'],r['evaluation_window'])
+        late=self.pair();late['match']['id']='1001';late['match']['date']=(NOW+timedelta(days=91,hours=3)).isoformat()
+        with database() as db:
+            db.execute("UPDATE shadow_pairs SET status='complete',home_score=2,away_score=1")
+            db.execute('''INSERT INTO shadow_pairs(experiment,league,event_id,day,recorded_at,starts_at,payload,status,home_score,away_score)
+                VALUES(?,?,?,?,?,?,?,?,?,?)''',(VERSION,'fra.1','1001','2027-02-02',self.service.clock().isoformat(),
+                late['match']['date'],json.dumps(late),'complete',2,1))
+        result=self.service.report()
+        self.assertEqual(result['registered'],2)
+        self.assertEqual(result['comparison']['test']['btts']['count'],1)
+
     def test_first_snapshot_immutable_across_workers(self):
         pair=self.pair();self.record(pair)
         changed=copy.deepcopy(pair);changed['candidate']['markets']['btts']=99

@@ -64,9 +64,12 @@ Le bilan garde les Brier et écarts de calibration séparés par marché et comp
 Les intervalles par semaines sont descriptifs, indisponibles avant huit semaines,
 non corrigés pour comparaisons multiples ; les clubs et marchés restent corrélés.
 
+La première fenêtre d'évaluation est fixée **avant activation** à 90 jours à partir
+de la première paire enregistrée. Les coups d'envoi hors de cette fenêtre n'entrent
+pas dans ce premier bilan, même si le worker continue de conserver les nouvelles
+paires. L'API expose les bornes exactes dès le premier enregistrement.
 Aucun ajustement automatique, arrêt anticipé sur bon résultat ou promotion n'existe.
-Il faudra une revue avec une période d'évaluation fixée à l'avance avant tout changement
-des probabilités affichées. Le service de comparaison n'est actif qu'après déploiement
+Il faudra une revue après cette fenêtre avant tout changement des probabilités affichées. Le service de comparaison n'est actif qu'après déploiement
 et première requête à l'application ; les tests locaux ne constituent pas un démarrage
 sur le serveur de production.
 

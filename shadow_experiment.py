@@ -26,6 +26,7 @@ INTERVAL = 900
 DAILY_LIMIT = 12
 BATCH_LIMIT = 2
 MARGIN_SECONDS = 60
+TEST_WINDOW_DAYS = 90
 SEED_PATH = Path(__file__).with_name('shadow_seed.json.gz')
 SCHEMA = (
     '''CREATE TABLE IF NOT EXISTS shadow_results (
@@ -263,8 +264,11 @@ class ShadowExperiment:
             control = db.execute('SELECT checked_at,metadata FROM shadow_control WHERE experiment=?',(VERSION,)).fetchone()
             coverage = [dict(r) for r in db.execute('SELECT reason,count(*) AS fixtures,sum(attempts) AS attempts FROM shadow_attempts WHERE experiment=? GROUP BY reason',(VERSION,)).fetchall()]
         counts = dict(Counter(r['status'] for r in records)); rows=[]
+        window_start = instant(records[0]['recorded_at']) if records else None
+        window_end = window_start + timedelta(days=TEST_WINDOW_DAYS) if window_start else None
         for record in records:
             if record['status']!='complete': continue
+            if window_end and instant(record['starts_at']) >= window_end: continue
             pair=json.loads(record['payload']); m=pair['match']
             if instant(record['recorded_at']) >= instant(record['starts_at']): continue
             rows.append(dict(id=m['id'],league=m['league'],date=m['date'],split='test',
@@ -275,6 +279,10 @@ class ShadowExperiment:
         return dict(experiment=VERSION,status=status,registered=len(records),counts=counts,
                     checked_at=control['checked_at'],last_cycle=json.loads(control['metadata']),
                     comparison=extended_review({'predictions':rows}),
+                    evaluation_window=dict(days=TEST_WINDOW_DAYS,
+                        start=window_start.isoformat() if window_start else None,
+                        end=window_end.isoformat() if window_end else None,
+                        policy='first_90_days_fixed_before_activation_no_early_promotion'),
                     coverage=coverage,
                     scope='bounded_prospective_daily10_shadow_only',
                     note='Actual pre-kickoff snapshots; retrospective training seed. No model promotion or official performance changes. Daily10 variant differs from the historical adaptive20 experiment.')
