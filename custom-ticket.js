@@ -6,7 +6,7 @@ function ticketMarkets(markets){
  }
  return values;
 }
-function ticketSelection(markets, profile){
+function ticketSelection(markets, profile, odds){
  markets=ticketMarkets(markets);
  const jointKeys=['home_or_draw','away_or_draw'].flatMap(side=>['btts','btts_no','over_1_5','over_2_5','under_1_5','under_2_5'].map(goal=>side+'_and_'+goal));
  const allowed=profile==='mixed'?jointKeys:['home','away','home_or_draw','away_or_draw','over_1_5','over_2_5','under_1_5','under_2_5','btts','btts_no'];
@@ -15,7 +15,8 @@ function ticketSelection(markets, profile){
  const bands={prudent:[75,100],balanced:[60,80],offensive:[45,65],mixed:[55,85]};
  const [min,max]=bands[profile]||bands.balanced;
  const pool=options.filter(x=>x.probability>=min&&x.probability<=max);
- return (pool.length?pool:options).sort((a,b)=>b.probability-a.probability||allowed.indexOf(a.market)-allowed.indexOf(b.market))[0];
+ const choices=pool.length?pool:options;
+ return (window.OddsTicket?.rank(choices,odds)||choices.sort((a,b)=>b.probability-a.probability||allowed.indexOf(a.market)-allowed.indexOf(b.market)))[0];
 }
 (()=>{
  const el=id=>document.getElementById(id),esc=escapeHtml;
@@ -75,7 +76,8 @@ function ticketSelection(markets, profile){
     const d=await window.Accounts.request('/api/analyze',{league:m.league,home_id:m.home.id,away_id:m.away.id,event_id:m.id,label:name(m)});
     if(d.status==='locked'){renderLockedAnalysis(target);el('customNotice').innerHTML=message('Premium est nécessaire pour poursuivre. Les analyses déjà obtenues restent dans ton historique.');return;}
     if(d.status!=='ok'){failures.push(name(m)+' : '+(d.message||'données insuffisantes'));continue;}
-    const leg=ticketSelection(d.prediction?.markets||{},profile);
+    d.market_odds=await window.OddsTicket?.load(m);
+    const leg=ticketSelection(d.prediction?.markets||{},profile,d.market_odds);
     if(!leg){failures.push(name(m)+' : aucune probabilité exploitable.');continue;}
     results.push({match:m,analysis:d,...leg});
     }catch(error){if(error.code==='login_required')throw error;failures.push(name(m)+' : '+error.message);}
@@ -87,9 +89,10 @@ function ticketSelection(markets, profile){
    const repeated=new Set(),teams=new Set();for(const r of results){for(const id of [r.match.home.id,r.match.away.id]){if(teams.has(String(id)))repeated.add(String(id));teams.add(String(id));}}
    const profileName={prudent:'Prudent',balanced:'Équilibré',offensive:'Offensif',mixed:'Double chance & buts'}[profile];
    const limited=results.filter(r=>r.analysis.analysis_basis&&['home','away'].some(side=>r.analysis.analysis_basis[side].sample<10));
-   target.innerHTML=(limited.length?message('Échantillon limité pour '+limited.map(r=>name(r.match)).join(', ')+'. Les probabilités et le combiné sont particulièrement incertains ; consulte les bases de calcul dans les analyses.'):'' )+'<div class="panel premium"><h2>Ton ticket personnalisé · '+esc(profileName)+'</h2>'+results.map((r,i)=>'<div class="panel"><h3>'+esc((i+1)+'. '+name(r.match))+'</h3><p class="gold"><strong>'+esc(labels[r.market])+'</strong></p><p>Probabilité du modèle : <strong>'+esc(r.probability)+' %</strong></p><p class="fine">Sélection dans la plage du profil choisi lorsqu’elle est disponible ; sinon, choix du marché avec la probabilité la plus élevée. Pour le profil Double chance & buts, les deux conditions doivent se réaliser sur le même match et leur probabilité est calculée ensemble. Ce tri n’établit pas la rentabilité d’un pari.</p><details><summary>Pourquoi ce choix ? Voir l’analyse du match</summary>'+renderAnalysisReport(r.analysis)+'</details></div>').join('')+
+   target.innerHTML=(limited.length?message('Échantillon limité pour '+limited.map(r=>name(r.match)).join(', ')+'. Les probabilités et le combiné sont particulièrement incertains ; consulte les bases de calcul dans les analyses.'):'' )+'<div class="panel premium"><h2>Ton ticket personnalisé · '+esc(profileName)+'</h2>'+results.map((r,i)=>'<div class="panel"><h3>'+esc((i+1)+'. '+name(r.match))+'</h3><p class="gold"><strong>'+esc(labels[r.market])+'</strong></p><p>Probabilité du modèle : <strong>'+esc(r.probability)+' %</strong></p><p class="fine">Sélection dans la plage du profil choisi lorsqu’elle est disponible ; sinon, choix du marché avec la probabilité la plus élevée. Pour le profil Double chance & buts, les deux conditions doivent se réaliser sur le même match et leur probabilité est calculée ensemble. Une cote exacte disponible peut départager les choix du profil selon le produit probabilité × cote ; les probabilités du modèle restent inchangées. Ce tri n’établit pas la rentabilité d’un pari.</p><details><summary>Pourquoi ce choix ? Voir l’analyse du match</summary>'+renderAnalysisReport(r.analysis)+'</details></div>').join('')+
     (repeated.size?message('Plusieurs rencontres concernent la même équipe : leur dépendance empêche de présenter une probabilité combinée crédible. Les sélections sont affichées séparément.'):message('Estimation combinée sous hypothèse d’indépendance : '+(joint*100).toFixed(2).replace('.',',')+' %. Cote équitable théorique : '+(1/joint).toFixed(2).replace('.',',')+'. Ce n’est pas une cote bookmaker.'))+
     '<p class="fine">Une sélection par match. Les matchs peuvent rester dépendants ; le produit des probabilités est une approximation non calibrée. Ajouter des matchs augmente le risque d’échec. Aucune garantie de gain, aucun pari placé par l’application.</p></div>';
+   window.OddsTicket?.mount(target,results);
   }catch(e){target.innerHTML=message('Ticket non finalisé : '+e.message,true)+message('Les analyses déjà terminées restent accessibles dans ton historique.');if(e.code==='login_required')window.Accounts.needsLogin(target);}
   finally{busy=false;draw();drawFixtures();await window.Accounts.afterAnalysis();}
  };
