@@ -16,6 +16,7 @@ def evaluate(picks, *, as_of=None, window_days=None):
     groups = defaultdict(list)
     excluded = defaultdict(int)
     events = set()
+    cases = []
     for pick in picks:
         if pick.get('status') not in ('won', 'lost'):
             excluded[pick.get('status', 'unknown')] += 1
@@ -47,10 +48,22 @@ def evaluate(picks, *, as_of=None, window_days=None):
             excluded['duplicate'] += 1
             continue
         events.add(identity)
+        cases.append(dict(event_id=match['id'], league=match['league'],
+                          kickoff=kickoff.isoformat(), published_at=published.isoformat(),
+                          home=(match.get('home') or {}).get('name'),
+                          away=(match.get('away') or {}).get('name'),
+                          market=pick['market'], group=pick.get('group', 'legacy-unknown'),
+                          probability=probability, status=pick['status'],
+                          home_score=pick.get('home_score'), away_score=pick.get('away_score'),
+                          expected_goals=pick.get('expected_goals'),
+                          rationale=pick.get('rationale'),
+                          model_version=pick.get('model_version', 'legacy-unversioned'),
+                          selection_basis=pick.get('selection_basis')))
         value = (probability / 100, int(pick['status'] == 'won'))
         for key in [('overall', 'all'), ('market', pick.get('market', 'unknown')),
                     ('league', match.get('league', 'unknown')),
                     ('model', pick.get('model_version', 'legacy-unversioned')),
+                    ('group', pick.get('group', 'legacy-unknown')),
                     ('confidence', str(min(int(probability // 10) * 10, 90)))]:
             groups[key].append(value)
 
@@ -68,7 +81,13 @@ def evaluate(picks, *, as_of=None, window_days=None):
                     evidence='insufficient' if n < 100 else 'descriptive_only')
     return dict(overall=metrics(groups.get(('overall', 'all'), [])),
                 breakdown={kind: {name: metrics(values) for (k, name), values in sorted(groups.items()) if k == kind}
-                           for kind in ('market', 'league', 'model', 'confidence')},
+                           for kind in ('market', 'league', 'model', 'confidence', 'group')},
+                audit=dict(recent_losses=sorted([c for c in cases if c['status'] == 'lost'],
+                                               key=lambda c: c['kickoff'], reverse=True)[:50],
+                           losses=sum(c['status'] == 'lost' for c in cases),
+                           archived_inputs=sum(c['selection_basis'] is not None for c in cases),
+                           missing_inputs=sum(c['selection_basis'] is None for c in cases),
+                           unversioned=sum(c['model_version'] == 'legacy-unversioned' for c in cases)),
                 excluded=dict(excluded), scope='daily_opinion_only',
                 window=dict(days=window_days, as_of=as_of.isoformat()),
                 roi=None, roi_reason='No bookmaker odds recorded at publication.',
