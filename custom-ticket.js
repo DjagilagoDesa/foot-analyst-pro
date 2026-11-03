@@ -62,8 +62,8 @@ async function ticketVerifyFixtures(results){
  const upcoming=m=>m.state==='pre'&&!m.completed&&new Date(m.date).getTime()>Date.now()&&!/POSTPONED|CANCELED|CANCELLED|ABANDONED|SUSPENDED/.test(m.status_name||'');
  const message=(s,error=false)=>'<div class="message '+(error?'error':'')+'">'+esc(s)+'</div>';
  function draw(){
-  el('customCount').textContent=chosen.length+' match(s) sélectionné(s) · 10 maximum';
-  el('customChosen').innerHTML=chosen.length?chosen.map((m,i)=>'<div class="panel ticket-picked"><strong>'+esc(name(m))+'</strong><p class="fine">'+esc(dateText(m.date))+' · '+esc(m.league)+'</p><button type="button" class="day" data-remove="'+i+'" '+(busy?'disabled':'')+'>RETIRER</button></div>').join(''):message('Ajoute au moins deux matchs pour construire ton combiné.');
+  el('customCount').textContent=chosen.length+' / 10 matchs';
+  el('customChosen').innerHTML=chosen.length?chosen.map((m,i)=>'<div class="panel ticket-picked"><strong>'+esc(name(m))+'</strong><button type="button" class="day" data-remove="'+i+'" '+(busy?'disabled':'')+'>RETIRER</button></div>').join(''):message('Choisis 2 matchs minimum.');
   el('customChosen').querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{if(busy)return;chosen.splice(Number(b.dataset.remove),1);el('customTicketResult').innerHTML='';draw();drawFixtures();});
   const button=el('customGenerate');
   button.disabled=busy;
@@ -81,7 +81,7 @@ async function ticketVerifyFixtures(results){
  function drawFixtures(){
   const q=el('customFilter').value.trim().toLocaleLowerCase('fr');
   const list=fixtures.filter(m=>!q||name(m).toLocaleLowerCase('fr').includes(q));
-  el('customFixtures').innerHTML=list.length?list.map(m=>'<button type="button" class="match" data-pick="'+esc(key(m))+'" '+(busy||chosen.some(x=>key(x)===key(m))?'disabled':'')+'>'+badge(m.home.badge,m.home.name)+'<span class="names"><strong>'+esc(name(m))+'</strong><small>'+esc(dateText(m.date))+' · '+esc(m.league)+'</small></span><span class="gold">'+(chosen.some(x=>key(x)===key(m))?'✓':'＋')+'</span></button>').join(''):message('Aucun match à venir dans cette liste. Essaie une autre date ou ajoute un match depuis sa fiche.');
+  el('customFixtures').innerHTML=list.length?list.map(m=>'<button type="button" class="match" data-pick="'+esc(key(m))+'" '+(busy||chosen.some(x=>key(x)===key(m))?'disabled':'')+'>'+badge(m.home.badge,m.home.name)+'<span class="names"><strong>'+esc(name(m))+'</strong><span class="match-time">'+esc(new Date(m.date).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}))+'</span></span><span class="gold">'+(chosen.some(x=>key(x)===key(m))?'✓':'＋')+'</span></button>').join(''):message('Aucun match à venir dans cette liste. Essaie une autre date ou ajoute un match depuis sa fiche.');
   el('customFixtures').querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>add(fixtures.find(m=>key(m)===b.dataset.pick)));
  }
  async function load(){
