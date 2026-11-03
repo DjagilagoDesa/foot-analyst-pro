@@ -497,6 +497,9 @@ import sys
 from daily_opinion import init_app as init_daily_opinion
 init_daily_opinion(app, sys.modules[__name__])
 
+from shadow_experiment import init_app as init_shadow_experiment
+init_shadow_experiment(app, sys.modules[__name__])
+
 if __name__=='__main__':
     app.run(host='0.0.0.0',port=int(os.environ.get('PORT','10000')))
 
