@@ -23,6 +23,8 @@ module.exports=async function(browser){
   await page.locator('#homeDailyOpinion .opinion-pick').first().waitFor();
   assert.equal(await page.locator('#homeDailyOpinion .opinion-pick').count(),6);
   assert.equal(await page.locator('#homeDailyOpinion .opinion-group').count(),3);
+ assert.equal(await page.locator('#homeDailyOpinion .fine').count(),0);
+ assert.doesNotMatch(await page.locator('#home').innerText(),/Chaque match mérite|FOOTBALL INTELLIGENCE|6 \/ 6 choix/);
   const cards=page.locator('#homeDailyOpinion .opinion-pick');
   assert.doesNotMatch(await page.locator('#homeDailyOpinion').innerText(),/Sélection partielle|Prudent ne signifie|Dernière vérification|Méthode et actualisation/);
   const first=cards.nth(0).locator('.opinion-team-odds');
@@ -42,7 +44,9 @@ module.exports=async function(browser){
   assert.doesNotMatch(await page.locator('#homeDailyOpinion .opinion-performance').innerText(),/Uniquement les choix quotidiens|Calcul :/);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   await page.locator('#homeDailyOpinion .opinion-pick details summary').first().click();
-  await page.locator('#homeDailyOpinion [data-opinion-match]').first().click();
+  assert.doesNotMatch(await page.locator('#homeDailyOpinion').innerText(),/Buts attendus par le modèle|Estimation publiée/);
+ await page.screenshot({path:'artifacts/home-clean-'+width+'.png',fullPage:true});
+ await page.locator('#homeDailyOpinion [data-opinion-match]').first().click();
   await page.locator('#detail:not(.hidden) #analyzeBtn').waitFor();
   await page.locator('nav [data-page="dailyTickets"]').click();
   await page.locator('#trackingResult .stat').first().waitFor();
