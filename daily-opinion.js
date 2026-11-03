@@ -12,7 +12,7 @@
   const value=p.team_odds?.markets?.[side];
   if(!Number.isFinite(value)||value<=1)return '';
   const cls=p.status==='won'?'result-won':'result-lost';
-  return '<footer class="opinion-team-odds '+cls+'" style="text-align:right;margin-top:12px;font-size:13px;font-weight:800" data-odds-outcome="'+side+'">'+esc(p.match[side].name)+' · '+value.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+'</footer>';
+  return '<footer class="opinion-team-odds '+cls+'" style="text-align:right;margin-top:12px;font-size:13px;font-weight:800" data-odds-outcome="'+side+'">'+value.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+'</footer>';
  }
  function render(board){
   lastDay=board.day;lastBoard=board;
