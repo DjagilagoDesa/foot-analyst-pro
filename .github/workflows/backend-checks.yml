@@ -57,6 +57,7 @@ jobs:
             artifacts/profile-mobile.png
             artifacts/personnel-mobile.png
             artifacts/odds-mobile.png
+            artifacts/odds-calendar-mobile.png
           if-no-files-found: ignore
 
   opponent-research:
