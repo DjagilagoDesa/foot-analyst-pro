@@ -15,3 +15,20 @@ Le taux officiel de l’application, cumulé depuis la première publication, co
 Seuls les choix de Avis du jour entrent dans ce taux officiel. Les analyses et tickets personnels en sont exclus et leur espace affiche uniquement un historique de résultats, sans autre pourcentage de réussite.
 
 Ce tableau public ne consomme aucun essai personnel et ne crée pas de données dans l’historique privé. Les analyses individuelles et le suivi personnel existants conservent leur fonctionnement.
+
+## Cotes victoire archivées
+
+Chaque avis peut conserver un instantané 1X2 ESPN (bookmaker et consultation)
+observé avant le coup d’envoi. Les choix déjà publiés encore à venir peuvent
+recevoir leur premier instantané au rafraîchissement suivant, sans modifier leur
+marché, leur probabilité ou leur historique de résultat. Une cote conservée est
+figée ; les anciens matchs terminés ne sont jamais complétés rétroactivement.
+Les données périmées, futures, incomplètes ou concernant d’autres équipes sont
+écartées. Aucune migration ni modification du taux officiel.
+
+En bas à droite de chaque avis, les cotes victoire des équipes utilisent le score
+final à 90 minutes : vainqueur vert, perdant rouge. En cas de nul, les deux cotes
+victoire sont rouges et celle du nul est verte. Ces couleurs sont indépendantes
+du gain ou de la perte du pari éditorial (buts, double chance, etc.). Les avis non
+réglés restent neutres ; une absence d’archive est explicitement indiquée. Les
+prix sont indicatifs, avec la même limite de fraîcheur source qu’ailleurs.
