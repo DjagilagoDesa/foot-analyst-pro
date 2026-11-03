@@ -482,12 +482,8 @@ def metered_analysis(func):
                            preview_sections=['Jugement du match','Arguments des deux équipes',
                                              'Surprises possibles','Confrontations passées','Probabilités'])
         if cached is not None:
-            if cached.get('league') == 'uefa.champions':
-                import app as server
-                from match_availability import refresh_cached
-                if refresh_cached(server, cached):
-                    with database() as db:
-                        db.execute("UPDATE account_analyses SET result=? WHERE user_id=? AND request_key=? AND status='complete'", (json.dumps(cached,ensure_ascii=False),user['id'],key))
+            if cached.get('league'):
+                cached = refresh_personnel_result(user['id'], cached.get('tracking_id'), cached)
             if cached.get('league') == 'uefa.champions' and not cached.get('domestic_context'):
                 import app as server
                 from champions_context import collect
@@ -535,3 +531,39 @@ def metered_analysis(func):
 
 
 
+
+
+def refresh_personnel_result(user_id, analysis_id, cached):
+    import app as server
+    from match_availability import refresh_cached
+    if not analysis_id:
+        return cached
+    with database() as db:
+        row = db.execute("SELECT result FROM account_analyses WHERE id=? AND user_id=? AND status='complete'", (analysis_id,user_id)).fetchone()
+    if not row: return cached
+    original = row['result']
+    latest = json.loads(original)
+    if not refresh_cached(server, latest): return latest
+    with database() as db:
+        saved = db.execute("UPDATE account_analyses SET result=? WHERE id=? AND user_id=? AND status='complete' AND result=? RETURNING id",
+                           (json.dumps(latest,ensure_ascii=False),analysis_id,user_id,original)).fetchone()
+        if not saved:
+            row = db.execute("SELECT result FROM account_analyses WHERE id=? AND user_id=? AND status='complete'", (analysis_id,user_id)).fetchone()
+            return json.loads(row['result']) if row else cached
+    return latest
+
+
+@bp.post('/api/account/analysis/<analysis_id>/personnel')
+def refresh_analysis_personnel(analysis_id):
+    write_guard(); user=current_user(csrf=True)
+    rate_limit('personnel-refresh',30,900,user['id'])
+    with database() as db:
+        row=db.execute("SELECT result FROM account_analyses WHERE id=? AND user_id=? AND status='complete'",(analysis_id,user['id'])).fetchone()
+    if not row: raise AccountError('Analyse enregistrée introuvable.',404)
+    original=json.loads(row['result'])
+    updated=refresh_personnel_result(user['id'],analysis_id,original)
+    from match_availability import section
+    changed=(updated.get('personnel_context') or {}).get('observed_at') != (original.get('personnel_context') or {}).get('observed_at')
+    return jsonify(status='updated' if changed else 'not_modified',tracking_id=analysis_id,
+                   personnel_context=updated.get('personnel_context'),
+                   personnel_snapshots=updated.get('personnel_snapshots',[]),section=section(updated))

@@ -1,7 +1,7 @@
 """Match-specific editorial reasoning from observed results, without invented news."""
 from datetime import datetime
 
-REPORT_VERSION = 10
+REPORT_VERSION = 11
 
 def number(value):
     return f'{float(value):.2f}'.rstrip('0').rstrip('.').replace('.', ',')
@@ -80,7 +80,7 @@ def surprise_reading(home, away, h, a, p, hr, ar):
         text+=f'Le modèle place la victoire de {outsider} devant le nul, mais à {number(up)} % elle reste minoritaire. '
     text+=('La mention « à examiner » exige au moins 20 % de victoire et deux signaux favorables ; c’est un filtre éditorial non validé, pas une nouvelle probabilité. '
            'Ces signaux viennent des mêmes résultats que le modèle : ils ne sont pas indépendants et n’augmentent pas les pourcentages. '
-           'Une surprise peut se produire même sans signal. Aucune comparaison aux cotes, aux absences ou aux compositions n’est disponible ici.')
+           'Une surprise peut se produire même sans signal. Ce filtre statistique ne tient pas compte des cotes, absences ou compositions ; les éventuels signalements d’effectifs figurent dans la section dédiée.')
     return text
 
 
@@ -355,7 +355,8 @@ def report(data, names=None, histories=None):
     limits=(f'Échantillons : {h["matches"]} résultats pour {home}, {a["matches"]} pour {away}. '
             + ('Des saisons n’ont pas pu être récupérées : couverture partielle. ' if partial else '')
             + ('Les tendances ci-dessus reposent sur les résultats détaillés disponibles. ' if hr and ar else 'Les résultats détaillés ne sont pas joints à cette analyse enregistrée : aucune série, tendance chronologique ou ventilation par terrain n’est déduite des seules moyennes. ')
-            + 'Classement, enjeu de titre/Europe/maintien, absences, compositions, calendrier à venir et intentions tactiques ne sont pas vérifiés ici. '
+            + ('Les effectifs signalés par la source sont présentés séparément : leur confirmation officielle et leur impact individuel ne sont pas établis. ' if data.get('personnel_context') else 'Les absences et compositions ne sont pas vérifiées ici. ')
+            + 'Classement, enjeu de titre/Europe/maintien, calendrier à venir et intentions tactiques ne sont pas vérifiés ici. '
             'Les buts attendus sont une projection Poisson, pas des xG mesurés sur les occasions. Les pourcentages ne sont pas calibrés sur une performance prédictive démontrée et ne sont pas une analyse en direct.')
     freshness = []
     for name, rows in ((home, hr), (away, ar)):

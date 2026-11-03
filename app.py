@@ -172,7 +172,7 @@ def frontend_icon():
     return send_from_directory('.', 'icon.svg')
 
 @app.get('/api/health')
-def healthcheck(): return jsonify({'status':'ok','version':'54','champions_context_version':1,'personnel_context_version':1,'adaptive_analysis_version':1,'sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
+def healthcheck(): return jsonify({'status':'ok','version':'54','champions_context_version':1,'personnel_context_version':2,'adaptive_analysis_version':1,'sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
 
 @app.get('/api/leagues')
 def leagues(): return jsonify({'leagues':LEAGUES})
@@ -301,7 +301,7 @@ def analyze():
     hm,hbasis,he = evidence(home,hm,he)
     am,abasis,ae = evidence(away,am,ae)
     hs,as_=summary(hm,home),summary(am,away)
-    result={'league':league,'home_id':home,'away_id':away,'home':hs,'away':as_,'source':'ESPN unofficial API','data_quality':{'home_games':len(hm),'away_games':len(am),'source_errors':{'home':he,'away':ae}},'generated_at':datetime.now(timezone.utc).isoformat(),'disclaimer':'Statistical estimates are not certainties. Odds, injuries, lineups and xG are not included.'}
+    result={'league':league,'home_id':home,'away_id':away,'home':hs,'away':as_,'source':'ESPN unofficial API','data_quality':{'home_games':len(hm),'away_games':len(am),'source_errors':{'home':he,'away':ae}},'generated_at':datetime.now(timezone.utc).isoformat(),'disclaimer':'Statistical estimates are not certainties. Odds and xG are not included. Personnel reports are separate context and do not adjust probabilities.'}
     result['analysis_basis'] = {'home':hbasis,'away':abasis,'minimum_sample':MIN_SAMPLE,'maximum_sample':20,'window_days':540}
     if len(hm)<MIN_SAMPLE or len(am)<MIN_SAMPLE:
         result.update({'status':'insufficient_data','message':f"Recherche élargie terminée : {len(hm)} résultat(s) exploitable(s) à domicile et {len(am)} à l’extérieur. Au moins {MIN_SAMPLE} par équipe sont nécessaires pour chiffrer des marchés ; aucune donnée manquante n’est inventée."})
@@ -322,8 +322,9 @@ def analyze():
         result['competition_profile']['adaptive_history'] = True
     if league == 'uefa.champions' and result.get('status') == 'ok':
         result['domestic_context'] = context
-        from match_availability import collect as collect_personnel
-        result['personnel_context'] = collect_personnel(sys.modules[__name__], league, home, away, result['event_id'])
+    if result.get('status') == 'ok':
+        from match_availability import collect as collect_personnel, apply_context
+        apply_context(result, collect_personnel(sys.modules[__name__], league, home, away, result['event_id']))
     if result.get('status')=='ok':result['report']=build_report(result, histories={'home':hm,'away':am})
     return jsonify(result)
 
@@ -351,6 +352,10 @@ def daily_tickets_script():
 @app.get('/custom-ticket.js')
 def custom_ticket_script():
     return send_from_directory('.', 'custom-ticket.js', mimetype='application/javascript')
+
+@app.get('/personnel.js')
+def personnel_script():
+    return send_from_directory('.', 'personnel.js', mimetype='application/javascript')
 
 @app.get('/profile.js')
 def profile_script():

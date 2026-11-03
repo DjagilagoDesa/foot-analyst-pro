@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, live-scores-v46, profile-v47, analysis-premium-v48]
   pull_request:
-    paths: ['shadow_experiment.py', 'opponent_review.py', 'shadow_seed.json.gz', 'docs/SHADOW_EXPERIMENT.md', 'opponent_benchmark.py', 'tools/benchmark_opponents.py', 'tools/collect_opponent_archive.py', 'docs/opponent-research.md', 'app.py', 'accounts.py', 'profile.js', 'engine.py', 'analysis_report.py', 'daily_opinion.py', 'custom-ticket.js', 'daily-tickets.js', 'Dockerfile', 'index.html', 'tests/**', '.github/workflows/backend-checks.yml']
+    paths: ['match_availability.py', 'personnel.js', 'docs/PERSONNEL_CONTEXT.md', 'shadow_experiment.py', 'opponent_review.py', 'shadow_seed.json.gz', 'docs/SHADOW_EXPERIMENT.md', 'opponent_benchmark.py', 'tools/benchmark_opponents.py', 'tools/collect_opponent_archive.py', 'docs/opponent-research.md', 'app.py', 'accounts.py', 'profile.js', 'engine.py', 'analysis_report.py', 'daily_opinion.py', 'custom-ticket.js', 'daily-tickets.js', 'Dockerfile', 'index.html', 'tests/**', '.github/workflows/backend-checks.yml']
 permissions:
   contents: read
 jobs:
@@ -31,6 +31,7 @@ jobs:
       - run: python -m unittest discover -s tests -v
         env:
           TEST_DATABASE_URL: postgresql://foot_test:ci-only-password@localhost:5432/foot_test
+      - run: node --check personnel.js
       - run: node --check profile.js
       - run: node tests/test_calendar.js
       - run: node --check ticket-builder.js
@@ -50,7 +51,9 @@ jobs:
         if: always()
         with:
           name: profile-mobile-preview
-          path: artifacts/profile-mobile.png
+          path: |
+            artifacts/profile-mobile.png
+            artifacts/personnel-mobile.png
           if-no-files-found: ignore
 
   opponent-research:
