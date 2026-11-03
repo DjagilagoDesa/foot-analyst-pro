@@ -46,6 +46,12 @@ module.exports=async browser=>{
  await calendar.locator('#fixtures .team-odd').first().waitFor();
  const listing=await calendar.locator('#fixtures').innerText();
  if(!['2,05','3,05','4,20','Example book'].every(s=>listing.includes(s)))throw Error('Calendar does not show sourced 1X2 odds');
+ for(const [side,price] of [['home','2,05'],['away','3,05']]){
+  const group=calendar.locator('[data-crest-side="'+side+'"]');
+  if((await group.locator('.team-odd').innerText())!==price)throw Error('Price under wrong team crest');
+  const icon=await group.locator('.crest,.placeholder').boundingBox(),odd=await group.locator('.team-odd').boundingBox();
+  if(!icon||!odd||odd.y<icon.y+icon.height)throw Error('Price is not below its crest');
+ }
  if(await calendar.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Calendar odds overflow mobile');
  await calendar.screenshot({path:'artifacts/odds-calendar-mobile.png',fullPage:true});
  await calendar.close();
