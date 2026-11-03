@@ -87,6 +87,45 @@ class PersonnelTests(unittest.TestCase):
         self.assertIn('Signalements contradictoires pour Gardien',text)
         self.assertNotIn('Si l’absence de Gardien est confirmée',text)
 
+    def test_source_returning_after_kickoff_does_not_update_context(self):
+        from unittest.mock import patch
+        data=payload();data['header']['competitions'][0]['date']=(NOW+timedelta(seconds=1)).isoformat()
+        class Clock(datetime):
+            values=iter([NOW,NOW+timedelta(seconds=2)])
+            @classmethod
+            def now(cls,tz=None): return next(cls.values)
+        with patch('match_availability.datetime',Clock):
+            context=collect(self.source(data),'fra.1','1','2','123')
+        self.assertFalse(context['fixture_verified'])
+        self.assertEqual(context['reason'],'fixture_not_upcoming')
+
+    def test_all_supported_leagues_are_accepted_and_unknown_rejected(self):
+        import app
+        for league in app.LEAGUES:
+            with self.subTest(league=league):
+                context=collect(self.source(),league,'1','2','123',now=NOW)
+                self.assertTrue(context['fixture_verified'])
+                self.assertEqual(context['league'],league)
+                self.assertEqual(context['event_id'],'123')
+        source=self.source()
+        self.assertFalse(collect(source,'unsupported','1','2','123',now=NOW)['fixture_verified'])
+        source.fetch.assert_not_called()
+
+    def test_repeated_checks_preserve_first_state_and_only_archive_changes(self):
+        cached=dict(league='fra.1',home_id='1',away_id='2',event_id='123',prediction={'home':75},generated_at=NOW.isoformat(),report={'sections':[]})
+        source=self.source()
+        self.assertTrue(refresh_cached(source,cached,now=NOW))
+        first=copy.deepcopy(cached['personnel_context'])
+        self.assertTrue(refresh_cached(source,cached,now=NOW+timedelta(minutes=6)))
+        self.assertEqual(len(cached['personnel_snapshots']),1)
+        changed=payload();changed['rosters'][0]['roster'][0]['athlete']['displayName']='Nouveau titulaire'
+        source.fetch.return_value=changed
+        self.assertTrue(refresh_cached(source,cached,now=NOW+timedelta(minutes=12)))
+        self.assertEqual(cached['personnel_snapshots'][0],first)
+        self.assertEqual(len(cached['personnel_snapshots']),2)
+        self.assertEqual(cached['prediction'],{'home':75})
+        self.assertEqual(cached['generated_at'],NOW.isoformat())
+
     def test_report_explains_conditional_impact_and_suspension_scope(self):
         context=collect(self.source(),'uefa.champions','1','2','123',now=NOW)
         text=section(dict(personnel_context=context,home_id='1',away_id='2',home_name='Paris',away_name='Madrid'))['text']

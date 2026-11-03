@@ -58,6 +58,7 @@ fs.mkdirSync('artifacts',{recursive:true});
  if(!await page.locator('#deletePanel').isVisible().then(visible=>!visible))throw Error('Deletion form remains visible after account deletion');
  console.log('Web account deletion: authenticated account and private data deleted OK');
  await require('./daily_opinion_mobile.cjs')(browser);
+ await require('./personnel_mobile.cjs')(browser);
  await browser.close();
 })().catch(e=>{console.error(e);process.exit(1)});
 

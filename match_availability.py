@@ -3,10 +3,13 @@
 A listed starter is not proof of club confirmation. Missing players are never
 inferred to be injured; suspensions are not assumed to apply across competitions.
 """
+import copy
+import json
 from datetime import datetime, timezone
 from tracking import fixture_info
 
-VERSION = 1
+VERSION = 2
+SUPPORTED_LEAGUES = ('eng.1','esp.1','ita.1','ger.1','fra.1','bra.1','por.1','ned.1','usa.1','arg.1','mex.1','uefa.champions','uefa.europa')
 REFRESH_SECONDS = 300
 MAX_REPORT_AGE_DAYS = 7
 
@@ -27,19 +30,22 @@ def instant(value):
 
 
 def collect(server, league, home_id, away_id, event_id, now=None):
+    fixed_now = now
     now = now or datetime.now(timezone.utc)
     ids = (str(home_id), str(away_id))
     result = dict(version=VERSION, observed_at=now.isoformat(), status='unavailable',
-                  fixture_verified=False, teams={}, source='ESPN', source_url=None,
+                  fixture_verified=False, teams={}, source='ESPN', source_url=None, league=league, event_id=str(event_id),
                   report_age_limit_days=MAX_REPORT_AGE_DAYS,
                   limitation='Couverture ESPN partielle. Une liste vide ne prouve pas l’absence de blessés ou suspendus. Confirmation officielle des compositions non vérifiée. Aucun ajustement des probabilités.')
-    if league != 'uefa.champions' or not str(event_id).isdigit():
+    if league not in getattr(server, 'LEAGUES', SUPPORTED_LEAGUES) or not str(event_id).isdigit():
         result['reason'] = 'missing_fixture'
         return result
     result['source_url'] = f'https://www.espn.com/soccer/match/_/gameId/{event_id}'
     try:
         data = server.fetch(f'{server.ESPN}/{league}/summary', {'event':str(event_id)}, ttl=120)
         info = fixture_info(data)
+        now = fixed_now or datetime.now(timezone.utc)
+        result['observed_at'] = now.isoformat()
         if str((data.get('header') or {}).get('id')) != str(event_id) or (info['home_id'], info['away_id']) != ids:
             result['reason'] = 'fixture_mismatch'
             return result
@@ -141,9 +147,29 @@ def section(data):
     return dict(title='Compositions et disponibilités signalées', text=' '.join(lines), source_url=context.get('source_url'))
 
 
+def context_signature(context):
+    """Preserve changed source states; repeated checks do not duplicate history."""
+    return json.dumps({k:v for k,v in context.items() if k != 'observed_at'}, sort_keys=True, ensure_ascii=False)
+
+
+def apply_context(cached, context):
+    old = cached.get('personnel_context')
+    snapshots = cached.setdefault('personnel_snapshots', [])
+    if not snapshots and old:
+        snapshots.append(copy.deepcopy(old))
+    if not snapshots or context_signature(snapshots[-1]) != context_signature(context):
+        snapshots.append(copy.deepcopy(context))
+    cached['personnel_context'] = copy.deepcopy(context)
+    if cached.get('report'):
+        title = 'Compositions et disponibilités signalées'
+        cached['report']['sections'] = [s for s in cached['report']['sections'] if s['title'] != title]
+        cached['report']['sections'].append(section(cached))
+
+
 def refresh_cached(server, cached, now=None):
-    """Update upcoming personnel context without recalculating the saved prediction."""
-    if cached.get('league') != 'uefa.champions': return False
+    """Refresh source context only; retain prior states, original odds and generated_at."""
+    if cached.get('league') not in getattr(server, 'LEAGUES', SUPPORTED_LEAGUES): return False
+    fixed_now = now
     now = now or datetime.now(timezone.utc)
     old = cached.get('personnel_context') or {}
     try:
@@ -151,11 +177,7 @@ def refresh_cached(server, cached, now=None):
         if old.get('kickoff') and instant(old['kickoff']) <= now: return False
     except (KeyError, ValueError, TypeError, AttributeError):
         pass
-    context = collect(server, cached['league'], cached.get('home_id'), cached.get('away_id'), cached.get('event_id', ''), now=now)
+    context = collect(server, cached['league'], cached.get('home_id'), cached.get('away_id'), cached.get('event_id', ''), now=fixed_now)
     if not context.get('fixture_verified'): return False
-    cached['personnel_context'] = context
-    if cached.get('report'):
-        title = 'Compositions et disponibilités signalées'
-        cached['report']['sections'] = [s for s in cached['report']['sections'] if s['title'] != title]
-        cached['report']['sections'].append(section(cached))
+    apply_context(cached, context)
     return True
