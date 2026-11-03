@@ -33,7 +33,10 @@ base pour qu'une réponse lente ne puisse pas écraser un état plus récent.
 
 Sur une analyse affichée, un contrôle automatique est prévu toutes les cinq minutes
 avant le coup d'envoi. Il n'émet pas de requêtes quand la page est masquée et s'arrête
-lors d'un changement d'écran ou d'une déconnexion. L'historique possède les mêmes
+lors d'un changement d'écran ou d'une déconnexion. Au retour de l'application
+au premier plan (ou d'une page restaurée), un contrôle reprend immédiatement si
+la dernière tentative date d'au moins cinq minutes. Les événements de reprise
+rapprochés ne lancent pas plusieurs requêtes concurrentes. L'historique possède les mêmes
 commandes pour les rencontres encore à venir. Un ancien état passé est figé ; une
 source en panne, une rencontre commencée, reportée ou incorrecte n'écrase pas la
 dernière information vérifiée. L'heure est recontrôlée après la réponse réseau.
