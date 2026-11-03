@@ -8,7 +8,7 @@ module.exports=async browser=>{
  await page.evaluate(()=>{
   window.escapeHtml=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const now=Date.now();window.calls=[];
-  const first={observed_at:new Date(now-600000).toISOString(),kickoff:new Date(now+86400000).toISOString(),teams:{'1':{starters:[],availability:[]}}};
+  const first={fixture_verified:true,observed_at:new Date(now-600000).toISOString(),kickoff:new Date(now+86400000).toISOString(),teams:{'1':{starters:[],availability:[]}}};
   const latest={...first,observed_at:new Date(now).toISOString(),teams:{'1':{starters:[{name:'Titulaire <img src=x onerror=alert(1)>'}],availability:[]}}};
   window.testPersonnel={tracking_id:'saved-id',league:'fra.1',event_id:'123',home_id:'1',away_id:'2',home_name:'Paris',away_name:'Lyon',personnel_context:first,personnel_snapshots:[first]};
   window.Accounts={request:async(path,data)=>{window.calls.push({path,data});return {status:'updated',personnel_context:latest,personnel_snapshots:[first,latest],section:{title:'Compositions et disponibilités signalées',text:'Paris : titulaire signalé par la source. Confirmation officielle non vérifiée.',source_url:'https://www.espn.com/soccer/match/_/gameId/123'}};}};

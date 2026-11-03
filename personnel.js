@@ -40,10 +40,11 @@
     function draw(){
       archive.innerHTML=historyMarkup(snapshots,{[data.home_id]:data.home_name||'Domicile',[data.away_id]:data.away_name||'Extérieur'});
       button.disabled=!!ended();
-      status.textContent=ended()?'Archive figée après le coup d’envoi.':context?.observed_at?'Dernière consultation : '+stamp(context.observed_at)+'. Actualisation toutes les 5 minutes tant que cette analyse est affichée.':'Actualisation sans utiliser d’analyse offerte supplémentaire.';
+      status.textContent=ended()?'Archive figée après le coup d’envoi.':context?.fixture_verified&&context?.kickoff?'Dernière consultation : '+stamp(context.observed_at)+'. Actualisation toutes les 5 minutes tant que cette analyse est affichée.':'Actualise pour vérifier les effectifs, sans utiliser d’analyse offerte supplémentaire.';
     }
     async function update(){
-      if(token!==generation||!visible(el)||ended())return;
+      if(token!==generation||!visible(el))return;
+      if(ended()){draw();return;}
       button.disabled=true;status.textContent='Vérification des effectifs…';
       try{
         const result=await window.Accounts.request('/api/account/analysis/'+encodeURIComponent(data.tracking_id)+'/personnel',{});
@@ -65,7 +66,7 @@
     }
     function schedule(){
       clearTimeout(timer);
-      if(token===generation&&!ended())timer=setTimeout(()=>{if(visible(el))update();else schedule();},300000);
+      if(token===generation&&context?.fixture_verified&&context?.kickoff&&!ended())timer=setTimeout(()=>{if(visible(el))update();else schedule();},300000);
     }
     button.onclick=update;draw();schedule();
   }

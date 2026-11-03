@@ -143,9 +143,13 @@ class AccountTests(unittest.TestCase):
                 self.assertEqual(db.execute('SELECT COUNT(*) AS n FROM '+table).fetchone()['n'],0)
 
     def test_rate_limit_and_no_storage_mode(self):
-        for _ in range(21):
-            r=self.post('/api/account/login',dict(email='none@example.com',password=self.pw))
-        self.assertEqual(r.status_code,429)
+        # Keep the fixed-window limiter test inside one window, including when CI
+        # happens to run across a 15-minute boundary.
+        fixed_time=int(accounts.time.time())//900*900+1
+        with patch('accounts.time.time',return_value=fixed_time):
+            for _ in range(21):
+                r=self.post('/api/account/login',dict(email='none@example.com',password=self.pw))
+            self.assertEqual(r.status_code,429)
         server.app.config['ACCOUNT_DATABASE_URL']=''
         self.assertFalse(self.client.get('/api/account').json['available'])
         self.assertEqual(self.post('/api/account/register',dict(email='a@example.com',nickname='Name',password=self.pw,accept_privacy=True)).status_code,503)
