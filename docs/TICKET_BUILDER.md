@@ -16,10 +16,11 @@ La cote affichée est théorique et la probabilité combinée suppose des matchs
 ## Cotes et simulation de ticket
 
 Les fiches affichent les prix 1X2 et les totaux effectivement fournis dans le
-scoreboard ESPN, en décimal, avec le bookmaker et l’heure de consultation. Le flux
+scoreboard ESPN, en décimal arrondi à deux chiffres, avec le bookmaker et l’heure de consultation. Le flux
 ne fournit pas systématiquement une date de modification de chaque prix : cette
 limite est affichée. Seule la ligne courante `close` est utilisée, jamais la ligne
-d’ouverture. La rencontre, les équipes et le statut avant-match sont vérifiés.
+d’ouverture. Un moneyline sans match nul est exclu pour éviter de confondre
+qualification et résultat à 90 minutes. La rencontre, les équipes et le statut avant-match sont vérifiés.
 L’API ne renvoie aucune URL d’affiliation.
 
 La récupération est mise en cache 60 secondes côté serveur et client. Une
