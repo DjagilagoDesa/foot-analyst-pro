@@ -46,8 +46,12 @@ function builderSelection(markets,risk,type,odds){
     results.push({match,analysis:d,...choice});teams.add(String(match.home.id));teams.add(String(match.away.id));
    }
    if(results.length!==count){target.innerHTML=message('Je ne peux pas proposer les '+count+' matchs demandés avec ces critères. '+results.length+' sélection(s) admissible(s) trouvée(s). Aucun ticket incomplet présenté comme terminé.',true)+skipped.map(s=>message(s)).join('')+message('Les analyses terminées sont conservées dans ton historique. Essaie un autre profil, davantage de types de paris ou moins de matchs.');return;}
+   target.innerHTML=message('Vérification des matchs…');
+   await ticketVerifyFixtures(results);
+   if(run!==generation)return;
    const missed=await window.Tracking.record(results.map(r=>({analysis:r.analysis,market:r.market})));
    if(run!==generation)return;
+   ticketAssertFuture(results);
    const joint=results.reduce((p,r)=>p*r.probability/100,1);
    target.innerHTML='<div class="panel premium"><h2>Ton ticket · '+count+' matchs</h2>'+results.map((r,i)=>'<div class="message"><strong>'+esc((i+1)+'. '+r.match.home.name+' – '+r.match.away.name)+'</strong><p class="gold">'+esc(label(r.market))+'</p><p>Probabilité du modèle : '+esc(r.probability)+' %</p><details><summary>Analyse, surprises et confrontations</summary>'+renderAnalysisReport(r.analysis)+'</details></div>').join('')+message('Estimation combinée : '+(joint*100).toFixed(2).replace('.',',')+' % · Cote théorique : '+(1/joint).toFixed(2).replace('.',',')+'.')+(missed?message(missed+' sélection(s) non enregistrée(s) dans le suivi : rencontre non vérifiable, ancienne analyse ou match commencé.'):'')+'</div>';
    window.OddsTicket?.mount(target,results);
