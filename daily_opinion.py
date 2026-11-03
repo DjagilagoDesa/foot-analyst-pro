@@ -13,6 +13,7 @@ from flask import jsonify
 from accounts import database, configured, DAILY_OPINION_SCHEMA
 from tracking import fixture_info, score, resolve
 from evaluation import evaluate, MODEL_VERSION
+from selection_test import decision as selection_decision, report as selection_report
 
 PARIS = ZoneInfo('Europe/Paris')
 INTERVAL = 900
@@ -138,6 +139,7 @@ def choose(results, existing, now, day):
                                   source_errors=r.get('source_errors'), history=r.get('history'),
                                   captured_at=now.isoformat())),
                               model_version='poisson-ucl-540d-v1' if m['league']=='uefa.champions' else MODEL_VERSION, published_at=now.isoformat(), status='pending', home_score=None, away_score=None))
+            picks[-1]['selection_test'] = selection_decision(picks[-1], now)
             used_events.add(m['id'])
             used_teams.update(ids)
             missing -= 1
@@ -408,6 +410,18 @@ def init_app(app, server):
         result = evaluate(picks, as_of=as_of)
         result['last_30_days'] = evaluate(picks, as_of=as_of, window_days=30)
         response = jsonify(result)
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+
+    @app.get('/api/daily-opinion/selection-test')
+    def selection_test_report():
+        if not configured():
+            return jsonify(status='unavailable'), 503
+        with database() as db:
+            db.execute(SCHEMA)
+            rows = db.execute('SELECT payload FROM daily_opinion_boards WHERE day<=? ORDER BY day', (today(),)).fetchall()
+        picks = [p for row in rows for p in json.loads(row['payload']).get('picks', [])]
+        response = jsonify(selection_report(picks))
         response.headers['Cache-Control'] = 'no-store'
         return response
 
