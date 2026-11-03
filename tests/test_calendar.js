@@ -28,4 +28,4 @@ assert.equal((context.finalHtml.match(/data-match=/g)||[]).length,1);assert.matc
 assert.match(context.emptyHtml,/Aucun match terminé/);
 console.log('Calendar UI: live/final scores, zero scores, filters and empty state OK');
 
-assert.match(context.oddsHtml,/2,05/);assert.match(context.oddsHtml,/3,05/);assert.match(context.oddsHtml,/Match nul : 4,20/);assert.match(context.oddsHtml,/Source &lt;img&gt;/);assert(!context.oddsHtml.includes('<img>'));assert.match(context.expiredOddsHtml,/Cotes indisponibles ou expirées/);assert(!context.expiredOddsHtml.includes('2,05'));
+assert.match(context.oddsHtml,/2,05/);assert.match(context.oddsHtml,/3,05/);assert.doesNotMatch(context.oddsHtml,/Match nul|Source|odds-source|fra\.1/);assert(!context.oddsHtml.includes('<img>'));assert.match(context.expiredOddsHtml,/—/);assert(!context.expiredOddsHtml.includes('2,05'));
