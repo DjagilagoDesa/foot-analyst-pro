@@ -1,10 +1,10 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
 async function run(mode){
- let clock=Date.now(),feedCalls=0,tracked=0;
+ let clock=Date.parse('2026-11-03T12:00:00Z'),feedCalls=0,tracked=0;
  class Clock extends Date{constructor(...args){super(...(args.length?args:[clock]));}static now(){return clock;}}
  const ids={};for(const id of ['builderDate','builderSource','builderCount','builderChoose','builderSourceInfo','builderRisk','builderMarket','builderForm','builderResult','builderSubmit','customDate'])ids[id]={value:'',disabled:false,hidden:false,textContent:'',innerHTML:'',scrollIntoView(){}};
  ids.builderSource.value=mode==='personal'?'personal':'auto';ids.builderCount.value='3';ids.builderRisk.value='balanced';ids.builderMarket.value='joint';
- const fixtures=Array.from({length:3},(_,i)=>({id:i,league:'fra.1',state:'pre',date:new Date(Date.now()+3600000*(i+1)).toISOString(),home:{id:i*2,name:'Home'+i},away:{id:i*2+1,name:'Away'+i}}));let calls=0;
+ const fixtures=Array.from({length:3},(_,i)=>({id:i,league:'fra.1',state:'pre',date:new Date(clock+3600000*(i+1)).toISOString(),home:{id:i*2,name:'Home'+i},away:{id:i*2+1,name:'Away'+i}}));let calls=0;
  const c={document:{getElementById:id=>ids[id]},escapeHtml:x=>String(x),Date:Clock,Set,api:async()=>{
   feedCalls++;
   if((feedCalls>1&&mode==='source-failed')||(feedCalls>2&&mode==='source-failed-after-save'))throw Error('offline');
