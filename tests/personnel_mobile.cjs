@@ -27,7 +27,21 @@ module.exports=async browser=>{
  await page.evaluate(()=>document.getElementById('detail').classList.add('hidden'));
  await page.clock.fastForward(300001);
  if(await page.evaluate(()=>window.calls.length)!==2)throw Error('Hidden analysis made a request');
- await page.evaluate(()=>{window.Personnel.stop();document.getElementById('detail').classList.remove('hidden');});
+ await page.evaluate(()=>{
+  document.getElementById('detail').classList.remove('hidden');
+  document.dispatchEvent(new Event('visibilitychange'));
+  window.dispatchEvent(new Event('pageshow'));
+ });
+ await page.waitForFunction(()=>window.calls.length===3);
+ await page.evaluate(()=>{
+  document.dispatchEvent(new Event('visibilitychange'));
+  window.dispatchEvent(new Event('pageshow'));
+ });
+ if(await page.evaluate(()=>window.calls.length)!==3)throw Error('Repeated resume events made duplicate requests');
+ await page.evaluate(()=>window.Personnel.stop());
+ await page.clock.fastForward(300001);
+ await page.evaluate(()=>window.dispatchEvent(new Event('pageshow')));
+ if(await page.evaluate(()=>window.calls.length)!==3)throw Error('Stopped analysis refreshed on resume');
  if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Personnel panel overflows mobile');
  fs.mkdirSync('artifacts',{recursive:true});await page.screenshot({path:'artifacts/personnel-mobile.png',fullPage:true});
  if(errors.length)throw Error(errors.join('; '));
