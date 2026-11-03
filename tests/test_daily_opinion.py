@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 
 from flask import Flask
 from accounts import database
-from daily_opinion import DailyOpinion, candidates_for, choose, init_app, today, upcoming, retain_team_odds
+from daily_opinion import DailyOpinion, candidates_for, choose, init_app, today, upcoming, retain_team_odds, judgement
 
 
 NOW = datetime(2026, 11, 1, 9, tzinfo=timezone.utc)
@@ -69,6 +69,32 @@ class SelectionTests(unittest.TestCase):
         after = choose(changed, picks, NOW + timedelta(hours=8), DAY)
         self.assertEqual(after, original)
         self.assertEqual(picks, original)
+
+    def test_selection_inputs_are_frozen_before_the_result(self):
+        source = result(1)
+        source['history'] = {'home': [{'id': 'past-1', 'home_goals': 2}], 'away': []}
+        picks = choose([source], [], NOW, DAY)
+        self.assertEqual(picks[0]['selection_basis']['home']['matches'], 10)
+        self.assertEqual(picks[0]['selection_basis']['captured_at'], NOW.isoformat())
+        source['history']['home'][0]['home_goals'] = 9
+        self.assertEqual(picks[0]['selection_basis']['history']['home'][0]['home_goals'], 2)
+        source['home']['wins'] = 0
+        source['prediction']['markets']['home_or_draw'] = 20
+        self.assertEqual(picks[0]['selection_basis']['home']['wins'], 6)
+        self.assertEqual(picks[0]['selection_basis']['markets']['home_or_draw'], 80)
+        self.assertEqual(choose([], picks, NOW, DAY), picks)
+
+    def test_double_chance_does_not_mislabel_the_projected_favourite(self):
+        r = result(1)
+        r['prediction']['expected_goals'] = {'home': 1.07, 'away': 1.44}
+        text = judgement(r, 'home_or_draw')
+        self.assertIn('Adversaire 1 reste devant', text)
+        self.assertNotIn('scénario est favorable', text)
+        self.assertIn('victoire de Club 1 ou le nul', text)
+        self.assertIn('Un nul ou une victoire', judgement(r, 'home'))
+        self.assertIn('Un nul ou une victoire', judgement(r, 'away'))
+        r['prediction']['expected_goals'] = {'home': 1, 'away': 1}
+        self.assertIn('ne désigne pas de favori', judgement(r, 'away_or_draw'))
 
     def test_paris_midnight_and_dst(self):
         self.assertEqual(today(datetime(2026, 11, 1, 23, 5, tzinfo=timezone.utc)), '2026-11-02')
