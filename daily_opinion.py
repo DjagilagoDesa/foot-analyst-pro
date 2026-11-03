@@ -14,6 +14,7 @@ from accounts import database, configured, DAILY_OPINION_SCHEMA
 from tracking import fixture_info, score, resolve
 from evaluation import evaluate, MODEL_VERSION
 from selection_test import decision as selection_decision, report as selection_report
+from venue_test import build as build_venue, freeze as freeze_venue, report as venue_report
 
 PARIS = ZoneInfo('Europe/Paris')
 INTERVAL = 900
@@ -140,6 +141,7 @@ def choose(results, existing, now, day):
                                   captured_at=now.isoformat())),
                               model_version='poisson-ucl-540d-v1' if m['league']=='uefa.champions' else MODEL_VERSION, published_at=now.isoformat(), status='pending', home_score=None, away_score=None))
             picks[-1]['selection_test'] = selection_decision(picks[-1], now)
+            picks[-1]['venue_test'] = freeze_venue(r, now)
             used_events.add(m['id'])
             used_teams.update(ids)
             missing -= 1
@@ -292,9 +294,14 @@ class DailyOpinion:
             return None
         home = self.server.summary(home_games, match['home']['id'])
         away = self.server.summary(away_games, match['away']['id'])
-        return dict(match=match, home=home, away=away, history=dict(home=home_games, away=away_games),
-                    source_errors=dict(home=he, away=ae),
-                    prediction=self.server.probabilities(home, away))
+        result = dict(match=match, home=home, away=away, history=dict(home=home_games, away=away_games),
+                      source_errors=dict(home=he, away=ae), prediction=self.server.probabilities(home, away))
+        try:
+            result['venue_test'] = build_venue(self.server, result, datetime.now(timezone.utc))
+        except Exception as error:
+            self.app.logger.warning('Venue test unavailable (%s)', type(error).__name__)
+            result['venue_test'] = dict(status='unavailable', reason='calculation_error')
+        return result
 
     def settle(self, board, recover_odds=True):
         errors = 0
@@ -422,6 +429,18 @@ def init_app(app, server):
             rows = db.execute('SELECT payload FROM daily_opinion_boards WHERE day<=? ORDER BY day', (today(),)).fetchall()
         picks = [p for row in rows for p in json.loads(row['payload']).get('picks', [])]
         response = jsonify(selection_report(picks))
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+
+    @app.get('/api/daily-opinion/venue-test')
+    def venue_test_report():
+        if not configured():
+            return jsonify(status='unavailable'), 503
+        with database() as db:
+            db.execute(SCHEMA)
+            rows = db.execute('SELECT payload FROM daily_opinion_boards WHERE day<=? ORDER BY day', (today(),)).fetchall()
+        picks = [p for row in rows for p in json.loads(row['payload']).get('picks', [])]
+        response = jsonify(venue_report(picks))
         response.headers['Cache-Control'] = 'no-store'
         return response
 
