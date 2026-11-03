@@ -2,7 +2,7 @@
 (() => {
  const esc=escapeHtml, cache=new Map(), panels=new WeakMap();
  const labels={home:'Victoire domicile',draw:'Match nul',away:'Victoire extérieur',home_or_draw:'Double chance 1X',away_or_draw:'Double chance X2',over_1_5:'Plus de 1,5 but',over_2_5:'Plus de 2,5 buts',over_3_5:'Plus de 3,5 buts',under_1_5:'Moins de 1,5 but',under_2_5:'Moins de 2,5 buts',under_3_5:'Moins de 3,5 buts',btts:'Les deux équipes marquent',btts_no:'Les deux équipes marquent : non'};
- const label=k=>k.split('_and_').map(x=>labels[x]||x).join(' + ');
+ const label=(k,match)=>k.split('_and_').map(x=>x==='home'&&match?.home?.name?'Victoire '+match.home.name:x==='away'&&match?.away?.name?'Victoire '+match.away.name:labels[x]||x).join(' + ');
  const number=v=>{const s=String(v??'').trim();return /^\d+(?:[.,]\d+)?$/.test(s)?Number(s.replace(',','.')):NaN;};
  const fmt=n=>n.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2});
  const date=v=>new Date(v).toLocaleString('fr-FR',{timeZone:'Europe/Paris'});
@@ -55,13 +55,13 @@
   await Promise.all(legs.map(async r=>{r.odds=r.analysis?.market_odds||await load(r.match);}));
   if(!host.isConnected)return;
   const books=[...new Set(legs.flatMap(r=>(r.odds.books||[]).map(b=>b.bookmaker)))];
-  host.innerHTML='<h3>🎟️ Simulation de ton ticket</h3><label>Source des cotes <select data-book>'+books.map(b=>'<option value="'+esc(b)+'">'+esc(b)+' via ESPN</option>').join('')+'<option value="manual">Saisir les cotes de mon bookmaker</option></select></label><div data-legs></div><label>Mise (€) <input data-stake type="text" inputmode="decimal" placeholder="Ta mise" autocomplete="off"></label><div data-total role="status" aria-live="polite"></div><button class="day" type="button" data-refresh>ACTUALISER LES COTES</button>';
-  const select=host.querySelector('[data-book]'),rows=host.querySelector('[data-legs]'),stake=host.querySelector('[data-stake]'),out=host.querySelector('[data-total]');
+  host.innerHTML='<h3>🎟️ Simulation de ton ticket</h3><div data-legs></div><label>Mise (€) <input data-stake type="text" inputmode="decimal" placeholder="Ta mise" autocomplete="off"></label><div data-total role="status" aria-live="polite"></div><button class="day" type="button" data-refresh>ACTUALISER LES COTES</button>';
+  const book=books[0],rows=host.querySelector('[data-legs]'),stake=host.querySelector('[data-stake]'),out=host.querySelector('[data-total]');
   function draw(){
    rows.innerHTML=legs.map((r,i)=>{
-    const quote=select.value==='manual'?null:price(r.odds,r.market,select.value);
+    const quote=price(r.odds,r.market,book);
     r.quote=quote;
-    return '<div class="message"><strong>'+esc(r.match.home.name+' – '+r.match.away.name)+'</strong><p class="gold">'+esc(label(r.market))+'</p><label>Cote décimale <input data-odd="'+i+'" type="text" inputmode="decimal" autocomplete="off" '+(quote?'value="'+quote+'" readonly':'placeholder="Ex. 1,85"')+'></label></div>';
+    return '<div class="message"><strong>'+esc(r.match.home.name+' – '+r.match.away.name)+'</strong><p class="gold">'+esc(label(r.market,r.match))+'</p><label>Cote décimale <input data-odd="'+i+'" type="text" inputmode="decimal" autocomplete="off" '+(quote?'value="'+quote+'" readonly':'placeholder="Ex. 1,85"')+'></label></div>';
    }).join('');update();
   }
   function update(){
@@ -76,7 +76,7 @@
    const value=calculate(prices,number(stake.value));
    out.textContent=started?'Le match a commencé : simulation avant-match indisponible.':expired?'Consultation des cotes expirée : actualise avant de calculer.':repeated.size?'Plusieurs rencontres concernent la même équipe : simulation combinée indisponible.':!value?'Renseigne une cote valide pour chaque sélection et ta mise pour calculer le ticket.':'Cote totale : '+fmt(value.total)+' · Retour potentiel : '+fmt(value.gross)+' € · Bénéfice potentiel : '+fmt(value.net)+' € si toutes les sélections gagnent.';
   }
-  select.onchange=draw;rows.oninput=update;stake.oninput=update;
+  rows.oninput=update;stake.oninput=update;
   host.querySelector('[data-refresh]').onclick=async e=>{
    const button=e.currentTarget;button.disabled=true;
    await Promise.all(legs.map(async r=>{r.odds=await load(r.match,true);}));
@@ -86,5 +86,5 @@
  }
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)document.querySelectorAll('[data-odds-ticket]').forEach(p=>panels.get(p)?.());});
  setInterval(()=>document.querySelectorAll('[data-odds-ticket]').forEach(p=>panels.get(p)?.()),30000);
- window.OddsTicket={load,price,rank,mount,matchPanel,calculate,number};
+ window.OddsTicket={load,price,rank,mount,matchPanel,calculate,number,label};
 })();
