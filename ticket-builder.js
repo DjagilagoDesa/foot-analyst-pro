@@ -1,10 +1,10 @@
 /* Button-driven ticket creation, powered by the existing football model. */
-function builderSelection(markets,risk,type){
+function builderSelection(markets,risk,type,odds){
  const values=ticketMarkets(markets);
  const types={all:['home','away','home_or_draw','away_or_draw','over_1_5','over_2_5','under_1_5','under_2_5','btts','btts_no'],double:['home_or_draw','away_or_draw'],goals:['over_1_5','over_2_5','under_1_5','under_2_5'],btts:['btts','btts_no'],joint:['home_or_draw','away_or_draw'].flatMap(s=>['btts','btts_no','over_1_5','over_2_5','under_1_5','under_2_5'].map(g=>s+'_and_'+g))};
  const [min,max]=({prudent:[75,100],balanced:[60,80],offensive:[45,65]})[risk]||[60,80];
  const choices=(types[type]||types.all).filter(k=>Number.isFinite(values[k])&&values[k]>=min&&values[k]<=max&&values[k]<100).map(market=>({market,probability:values[market]}));
- return choices.sort((a,b)=>b.probability-a.probability)[0]||null;
+ return (window.OddsTicket?.rank(choices,odds)||choices.sort((a,b)=>b.probability-a.probability))[0]||null;
 }
 (()=>{
  const get=id=>document.getElementById(id),esc=escapeHtml;
@@ -40,7 +40,8 @@ function builderSelection(markets,risk,type){
     if(run!==generation)return;
     if(d.status==='locked'){renderLockedAnalysis(target);return;}
     if(d.status!=='ok'){skipped.push(name+' : '+(d.message||'données insuffisantes'));continue;}
-    const choice=builderSelection(d.prediction?.markets||{},risk,type);
+    d.market_odds=await window.OddsTicket?.load(match);
+    const choice=builderSelection(d.prediction?.markets||{},risk,type,d.market_odds);
     if(!choice){skipped.push(name+' : aucun pari ne respecte le profil et le type choisis');continue;}
     results.push({match,analysis:d,...choice});teams.add(String(match.home.id));teams.add(String(match.away.id));
    }
@@ -49,6 +50,7 @@ function builderSelection(markets,risk,type){
    if(run!==generation)return;
    const joint=results.reduce((p,r)=>p*r.probability/100,1);
    target.innerHTML='<div class="panel premium"><h2>Ton ticket · '+count+' matchs</h2>'+results.map((r,i)=>'<div class="message"><strong>'+esc((i+1)+'. '+r.match.home.name+' – '+r.match.away.name)+'</strong><p class="gold">'+esc(label(r.market))+'</p><p>Probabilité du modèle : '+esc(r.probability)+' %</p><details><summary>Analyse, surprises et confrontations</summary>'+renderAnalysisReport(r.analysis)+'</details></div>').join('')+message('Probabilité combinée estimée sous hypothèse d’indépendance : '+(joint*100).toFixed(2).replace('.',',')+' %. Cote équitable théorique : '+(1/joint).toFixed(2).replace('.',',')+' — pas une cote Winamax ou bookmaker.')+(missed?message(missed+' sélection(s) non enregistrée(s) dans le suivi : rencontre non vérifiable, ancienne analyse ou match commencé.'):message('Sélections enregistrées dans Mon suivi IA.'))+'<p class="fine">'+(personal?'Tous les matchs de ta sélection ont été inclus.':esc(available)+' matchs à venir retrouvés ; au maximum 16 étudiés dans l’ordre horaire. Ce périmètre ne garantit pas les meilleurs choix disponibles.')+' Les doubles conditions sur un match sont calculées conjointement. Les probabilités ne garantissent pas le résultat ; les matchs peuvent aussi être dépendants. Aucun pari n’est placé.</p></div>';
+   window.OddsTicket?.mount(target,results);
   }catch(error){if(run===generation){target.innerHTML=message(error.message,true);if(error.code==='login_required')window.Accounts.needsLogin(target);}}
   finally{busy=false;button.disabled=false;refresh();await window.Accounts.afterAnalysis();}
  };

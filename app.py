@@ -353,6 +353,10 @@ def daily_tickets_script():
 def custom_ticket_script():
     return send_from_directory('.', 'custom-ticket.js', mimetype='application/javascript')
 
+@app.get('/odds-ticket.js')
+def odds_ticket_script():
+    return send_from_directory('.', 'odds-ticket.js', mimetype='application/javascript')
+
 @app.get('/personnel.js')
 def personnel_script():
     return send_from_directory('.', 'personnel.js', mimetype='application/javascript')
@@ -416,6 +420,41 @@ def fixtures():
     if len(failed)==len(leagues_to_check):return jsonify({'error':'upstream_unavailable','message':'Sources sportives temporairement indisponibles'}),503
     found.sort(key=lambda x:x.get('date') or '')
     return jsonify({'events':found,'partial':bool(failed),'failed_leagues':failed,'source':'ESPN unofficial','date':day,'updated_at':datetime.now(timezone.utc).isoformat()})
+
+@app.get('/api/odds')
+def match_odds():
+    league=request.args.get('league','');event_id=request.args.get('event_id','')
+    home=request.args.get('home_id','');away=request.args.get('away_id','')
+    if league not in LEAGUES or not all(x.isdigit() for x in (event_id,home,away)) or home==away:
+        return jsonify(error='invalid_match'),400
+    try:
+        day=datetime.strptime(request.args.get('date','')[:10],'%Y-%m-%d').date()
+    except (ValueError,TypeError):return jsonify(error='invalid_date'),400
+    if not 0 <= (day-datetime.now(timezone.utc).date()).days <= 90:
+        return jsonify(error='date_out_of_range'),400
+    url=f'{ESPN}/{league}/scoreboard';params={'dates':day.strftime('%Y%m%d'),'limit':200}
+    started=time.time()
+    try:
+        data=fetch(url,params,ttl=60)
+        with LOCK:
+            cached=CACHE.get((url,tuple(sorted(params.items()))))
+            observed=datetime.fromtimestamp(cached[0] if cached else started,timezone.utc).isoformat()
+        source=next((e for e in data.get('events',[]) if str(e.get('id'))==event_id),None)
+        fixture=_fixture(source,league) if source else None
+        if not fixture or fixture['home']['id']!=home or fixture['away']['id']!=away:
+            return jsonify(error='match_not_verified'),404
+        from market_odds import extract
+        books=extract(source,observed)
+        response=jsonify(event_id=event_id,books=books,source='ESPN',
+            source_url='https://www.espn.com/soccer/match/_/gameId/'+event_id,
+            observed_at=observed,kickoff=fixture['date'],expires_at=min(
+                datetime.fromisoformat(fixture['date'].replace('Z','+00:00')),
+                datetime.fromisoformat(observed)+timedelta(minutes=5)).isoformat(),
+            message='' if books else 'Aucune cote avant-match disponible pour cette rencontre.')
+        response.headers['Cache-Control']='no-store'
+        return response
+    except (requests.RequestException,ValueError,KeyError,TypeError):
+        return jsonify(error='odds_unavailable',message='Cotes temporairement indisponibles.'),503
 
 @app.get('/api/team-next')
 def team_next():
