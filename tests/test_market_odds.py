@@ -27,11 +27,18 @@ class OddsTests(unittest.TestCase):
         books=extract(fixture(),'2026-01-01T00:00:00+00:00')
         self.assertEqual(books[0]['markets']['home'],2.5)
         self.assertEqual(books[0]['markets']['draw'],3.5)
-        self.assertEqual(books[0]['markets']['over_2_5'],1.909091)
+        self.assertEqual(books[0]['markets']['over_2_5'],1.91)
         self.assertNotIn('home_or_draw',books[0]['markets'])
         self.assertIsNone(books[0]['source_updated_at'])
         data=fixture();data['competitions'][0]['odds'][0]['moneyline']['home']={'open':{'odds':'+110'}}
         self.assertNotIn('home',extract(data,'observed')[0]['markets'])
+
+    def test_two_way_moneyline_is_not_presented_as_90_minute_odds(self):
+        data=fixture();data['competitions'][0]['odds'][0]['moneyline'].pop('draw')
+        markets=extract(data,'observed')[0]['markets']
+        self.assertNotIn('home',markets)
+        self.assertNotIn('away',markets)
+        self.assertIn('over_2_5',markets)
 
     def test_non_prematch_and_missing_providers_not_quoted(self):
         for state in ('in','post'):
