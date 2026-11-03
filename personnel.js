@@ -38,14 +38,14 @@
     }
     section.querySelector('.personnel-controls')?.remove();
     const controls=document.createElement('div');controls.className='personnel-controls';
-    controls.innerHTML='<button class="day" type="button">↻ ACTUALISER LES EFFECTIFS</button><p class="fine" role="status" aria-live="polite"></p><div class="personnel-archive"></div>';
+    controls.innerHTML='<button class="day" type="button">↻ ACTUALISER LES EFFECTIFS</button><p role="status" aria-live="polite"></p><div class="personnel-archive"></div>';
     section.appendChild(controls);
     const button=controls.querySelector('button'),status=controls.querySelector('[role="status"]'),archive=controls.querySelector('.personnel-archive');
     function ended(){return context?.kickoff&&new Date(context.kickoff).getTime()<=Date.now();}
     function draw(){
       archive.innerHTML=historyMarkup(snapshots,{[data.home_id]:data.home_name||'Domicile',[data.away_id]:data.away_name||'Extérieur'});
       button.disabled=!!ended();
-      status.textContent=ended()?'Archive figée après le coup d’envoi.':context?.fixture_verified&&context?.kickoff?'Dernière consultation : '+stamp(context.observed_at)+'. Actualisation toutes les 5 minutes tant que cette analyse est affichée.':'Actualise pour vérifier les effectifs, sans utiliser d’analyse offerte supplémentaire.';
+      status.textContent=ended()?'Archive du match':context?.fixture_verified&&context?.kickoff?'Mis à jour le '+stamp(context.observed_at):'';
     }
     async function update(){
       if(token!==generation||!visible(el)||pending)return;
