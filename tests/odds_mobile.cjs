@@ -38,7 +38,7 @@ module.exports=async browser=>{
  if(errors.length)throw Error(errors.join('; '));await page.close();
  const calendar=await browser.newPage({viewport:{width:390,height:844}});
  await calendar.route('**/api/fixtures?**',async route=>{
-  const now=Date.now();const event={id:'123',league:'fra.1',state:'pre',date:new Date(now+3600000).toISOString(),home:{id:'1',name:'Paris'},away:{id:'2',name:'Lyon'},market_odds:{observed_at:new Date(now).toISOString(),expires_at:new Date(now+300000).toISOString(),books:[{bookmaker:'Example book',markets:{home:2.05,draw:4.2,away:3.05}}]}};
+  const now=Date.now();const event={id:'123',league:'fra.1',state:'pre',date:new Date(now+3600000).toISOString(),home:{id:'1',name:'Borussia Mönchengladbach'},away:{id:'2',name:'Stade Brestois 29'},market_odds:{observed_at:new Date(now).toISOString(),expires_at:new Date(now+300000).toISOString(),books:[{bookmaker:'Example book',markets:{home:2.05,draw:4.2,away:3.05}}]}};
   await route.fulfill({json:{events:[event],updated_at:new Date(now).toISOString()}});
  });
  await calendar.goto('http://127.0.0.1:19047/');
