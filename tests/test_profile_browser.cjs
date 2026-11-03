@@ -59,6 +59,7 @@ fs.mkdirSync('artifacts',{recursive:true});
  console.log('Web account deletion: authenticated account and private data deleted OK');
  await require('./daily_opinion_mobile.cjs')(browser);
  await require('./personnel_mobile.cjs')(browser);
+ await require('./odds_mobile.cjs')(browser);
  await browser.close();
 })().catch(e=>{console.error(e);process.exit(1)});
 
