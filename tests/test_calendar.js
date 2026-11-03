@@ -15,6 +15,10 @@ calendarCache=[final,upcoming,live];calendarDay=$('date').value;matchFilter='all
 matchFilter='live';renderCalendar();globalThis.liveHtml=$('fixtures').innerHTML;
 matchFilter='finished';renderCalendar();globalThis.finalHtml=$('fixtures').innerHTML;
 calendarCache=[];renderCalendar();globalThis.emptyHtml=$('fixtures').innerHTML;
+const quoted={...upcoming,date:new Date(Date.now()+3600000).toISOString(),market_odds:{expires_at:new Date(Date.now()+60000).toISOString(),observed_at:new Date().toISOString(),books:[{bookmaker:'Source <img>',markets:{home:2.05,draw:4.2,away:3.05}}]}};
+calendarCache=[quoted];matchFilter='all';renderCalendar();globalThis.oddsHtml=$('fixtures').innerHTML;
+quoted.market_odds.expires_at='2000-01-01T00:00:00Z';renderCalendar();globalThis.expiredOddsHtml=$('fixtures').innerHTML;
+
 `,context);
 assert.equal(context.results.liveScore,'2 – 1');assert.equal(context.results.zeroScore,'0 – 0');assert.equal(context.results.upcoming,'VS');
 assert.match(context.results.liveBadge,/EN DIRECT/);assert.match(context.results.liveBadge,/67/);assert.match(context.results.finalBadge,/TERMINÉ/);
@@ -23,3 +27,5 @@ assert.equal((context.liveHtml.match(/data-match=/g)||[]).length,1);assert.match
 assert.equal((context.finalHtml.match(/data-match=/g)||[]).length,1);assert.match(context.finalHtml,/0 – 0/);
 assert.match(context.emptyHtml,/Aucun match terminé/);
 console.log('Calendar UI: live/final scores, zero scores, filters and empty state OK');
+
+assert.match(context.oddsHtml,/2,05/);assert.match(context.oddsHtml,/3,05/);assert.match(context.oddsHtml,/Match nul : 4,20/);assert.match(context.oddsHtml,/Source &lt;img&gt;/);assert(!context.oddsHtml.includes('<img>'));assert.match(context.expiredOddsHtml,/Cotes indisponibles ou expirées/);assert(!context.expiredOddsHtml.includes('2,05'));

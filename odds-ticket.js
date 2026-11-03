@@ -26,16 +26,25 @@
   if(!quoted.length)return options.sort((a,b)=>b.probability-a.probability);
   return quoted.sort((a,b)=>b.probability*price(data,b.market)-a.probability*price(data,a.market));
  }
- function summary(data){
+ function summary(data,match){
   if(!data.books?.length)return '<p class="fine">'+esc(data.message||'Cotes indisponibles.')+'</p>';
-  return data.books.map(b=>'<div class="message"><strong>'+esc(b.bookmaker)+' · via ESPN</strong><div class="analysis">'+Object.entries(b.markets).map(([k,v])=>'<div class="stat"><span>'+esc(label(k))+'</span><b>'+fmt(v)+'</b></div>').join('')+'</div></div>').join('')+'<p class="fine">Consulté le '+esc(date(data.observed_at))+'. Heure de modification par le bookmaker non fournie. '+(fresh(data)?'':'Consultation expirée. ')+'Cotes converties et arrondies à deux décimales, pouvant différer de ton bookmaker.</p>';
+  return data.books.map(b=>'<div class="message"><strong>'+esc(b.bookmaker)+' · via ESPN</strong><div class="analysis">'+Object.entries(b.markets).map(([k,v])=>'<div class="stat"><span>'+esc(k==='home'?match.home.name:k==='away'?match.away.name:label(k))+'</span><b>'+fmt(v)+'</b></div>').join('')+'</div></div>').join('')+'<p class="fine">Consulté le '+esc(date(data.observed_at))+'. Heure de modification par le bookmaker non fournie. '+(fresh(data)?'':'Consultation expirée. ')+'Cotes converties et arrondies à deux décimales, pouvant différer de ton bookmaker.</p>';
  }
  async function matchPanel(match){
   const root=document.getElementById('detailContent');if(!root)return;
   const panel=document.createElement('section');panel.className='panel';panel.innerHTML='<h3>Cotes du match · 90 minutes</h3><div data-prices>Chargement des cotes…</div><button type="button" class="day">ACTUALISER LES COTES</button>';
   root.querySelector('#analyzeBtn')?.before(panel);
   const out=panel.querySelector('[data-prices]'),button=panel.querySelector('button');
-  async function update(){button.disabled=true;const data=await load(match,true);if(panel.isConnected){out.innerHTML=summary(data);button.disabled=false;}}
+  async function update(){
+   button.disabled=true;const data=await load(match,true);
+   if(panel.isConnected){
+    out.innerHTML=summary(data,match);button.disabled=false;
+    for(const side of ['home','away']){
+     const badge=root.querySelector('[data-team-price="'+side+'"]');
+     const value=price(data,side);if(badge)badge.textContent=value?'Cote : '+fmt(value):'Cote indisponible';
+    }
+   }
+  }
   button.onclick=update;await update();
  }
  async function mount(target,results){

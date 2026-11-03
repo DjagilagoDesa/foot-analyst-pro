@@ -69,3 +69,13 @@ class OddsTests(unittest.TestCase):
         key=(url,tuple(sorted(params.items())))
         with patch.dict(server.CACHE,{key:(1000,{'events':[data]})}),patch.object(server,'fetch',return_value={'events':[data]}):
             self.assertEqual(client.get(query).json['observed_at'],datetime.fromtimestamp(1000,timezone.utc).isoformat())
+
+    def test_calendar_includes_the_same_observed_prices(self):
+        data=fixture();client=server.app.test_client()
+        with patch.object(server,'fetch',return_value={'events':[data]}):
+            response=client.get('/api/fixtures?league=fra.1&date='+data['date'][:10])
+        self.assertEqual(response.status_code,200)
+        snapshot=response.json['events'][0]['market_odds']
+        self.assertEqual(snapshot['books'][0]['markets']['home'],2.5)
+        self.assertEqual(snapshot['books'][0]['markets']['away'],1.8)
+        self.assertEqual(snapshot['books'][0]['observed_at'],snapshot['observed_at'])
