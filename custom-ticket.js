@@ -1,3 +1,7 @@
+/* Match-aware labels share the ticket's actual home/away identity. */
+function ticketLabel(market,match,labels){
+ return market.split('_and_').map(k=>['home','home_win'].includes(k)&&match?.home?.name?'Victoire '+match.home.name:['away','away_win'].includes(k)&&match?.away?.name?'Victoire '+match.away.name:labels[k]||k).join(' + ');
+}
 /* Personal ticket builder: reuses authenticated, metered match analyses. */
 function ticketMarkets(markets){
  const values={...markets};
@@ -128,7 +132,7 @@ async function ticketVerifyFixtures(results){
    const repeated=new Set(),teams=new Set();for(const r of results){for(const id of [r.match.home.id,r.match.away.id]){if(teams.has(String(id)))repeated.add(String(id));teams.add(String(id));}}
    const profileName={prudent:'Prudent',balanced:'Équilibré',offensive:'Offensif',mixed:'Double chance & buts'}[profile];
    const limited=results.filter(r=>r.analysis.analysis_basis&&['home','away'].some(side=>r.analysis.analysis_basis[side].sample<10));
-   target.innerHTML=(limited.length?message('Échantillon limité pour '+limited.map(r=>name(r.match)).join(', ')+'. Les probabilités et le combiné sont particulièrement incertains ; consulte les bases de calcul dans les analyses.'):'' )+'<div class="panel premium"><h2>Ton ticket personnalisé · '+esc(profileName)+'</h2>'+results.map((r,i)=>'<div class="panel"><h3>'+esc((i+1)+'. '+name(r.match))+'</h3><p class="gold"><strong>'+esc(labels[r.market])+'</strong></p><p>Probabilité du modèle : <strong>'+esc(r.probability)+' %</strong></p><details><summary>Pourquoi ce choix ? Voir l’analyse du match</summary>'+renderAnalysisReport(r.analysis)+'</details></div>').join('')+
+   target.innerHTML=(limited.length?message('Échantillon limité pour '+limited.map(r=>name(r.match)).join(', ')+'. Les probabilités et le combiné sont particulièrement incertains ; consulte les bases de calcul dans les analyses.'):'' )+'<div class="panel premium"><h2>Ton ticket personnalisé · '+esc(profileName)+'</h2>'+results.map((r,i)=>'<div class="panel"><h3>'+esc((i+1)+'. '+name(r.match))+'</h3><p class="gold"><strong>'+esc(ticketLabel(r.market,r.match,labels))+'</strong></p><p>Probabilité du modèle : <strong>'+esc(r.probability)+' %</strong></p><details><summary>Pourquoi ce choix ? Voir l’analyse du match</summary>'+renderAnalysisReport(r.analysis)+'</details></div>').join('')+
     (repeated.size?message('Plusieurs rencontres concernent la même équipe : leur dépendance empêche de présenter une probabilité combinée crédible. Les sélections sont affichées séparément.'):message('Estimation combinée : '+(joint*100).toFixed(2).replace('.',',')+' % · Cote théorique : '+(1/joint).toFixed(2).replace('.',',')+'.'))+
     '</div>';
    window.OddsTicket?.mount(target,results);
