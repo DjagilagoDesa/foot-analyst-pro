@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 
 from flask import Flask
 from accounts import database
-from daily_opinion import DailyOpinion, candidates_for, choose, init_app, today, upcoming
+from daily_opinion import DailyOpinion, candidates_for, choose, init_app, today, upcoming, retain_team_odds
 
 
 NOW = datetime(2026, 11, 1, 9, tzinfo=timezone.utc)
@@ -73,6 +73,37 @@ class SelectionTests(unittest.TestCase):
     def test_paris_midnight_and_dst(self):
         self.assertEqual(today(datetime(2026, 11, 1, 23, 5, tzinfo=timezone.utc)), '2026-11-02')
         self.assertEqual(today(datetime(2026, 7, 1, 22, 5, tzinfo=timezone.utc)), '2026-07-02')
+
+
+class TeamOddsArchiveTests(unittest.TestCase):
+    def sources(self):
+        match=result(1)['match']
+        match['market_odds']={'observed_at':NOW.isoformat(),'books':[{'bookmaker':'Example',
+            'markets':{'home':2.05,'draw':3.5,'away':3.05,'over_1_5':1.2}}]}
+        return match
+
+    def test_freezes_team_victory_prices_independently_of_editorial_market(self):
+        match=self.sources();picks=choose([result(1,{'over_1_5':80})],[],NOW,DAY)
+        retain_team_odds(picks,[match],NOW)
+        quote=copy.deepcopy(picks[0]['team_odds'])
+        self.assertEqual(quote['markets'],{'home':2.05,'draw':3.5,'away':3.05})
+        self.assertEqual(picks[0]['market'],'over_1_5')
+        match['market_odds']['books'][0]['markets']['home']=9
+        retain_team_odds(picks,[match],NOW+timedelta(minutes=1))
+        self.assertEqual(picks[0]['team_odds'],quote)
+
+    def test_never_invents_historical_odds_or_uses_stale_future_mismatched_data(self):
+        for mode in ('missing','stale','future','wrong_team','started','settled','invalid'):
+            match=self.sources();picks=choose([result(1)],[],NOW,DAY);now=NOW
+            if mode=='missing':match.pop('market_odds')
+            if mode=='stale':match['market_odds']['observed_at']=(NOW-timedelta(minutes=6)).isoformat()
+            if mode=='future':match['market_odds']['observed_at']=(NOW+timedelta(seconds=1)).isoformat()
+            if mode=='wrong_team':match['home']['id']='999'
+            if mode=='started':now=NOW+timedelta(hours=4)
+            if mode=='settled':picks[0]['status']='won'
+            if mode=='invalid':match['market_odds']['books'][0]['markets']['home']=True
+            retain_team_odds(picks,[match],now)
+            self.assertNotIn('team_odds',picks[0],mode)
 
 
 class PersistenceTests(unittest.TestCase):

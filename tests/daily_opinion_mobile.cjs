@@ -11,12 +11,25 @@ module.exports=async function(browser){
    return {group,probability,market_label:'Double chance 1X',rationale:'Explication propre à la rencontre de test '+n,expected_goals:{home:2,away:1},published_at:new Date().toISOString(),status:'pending',home_score:null,away_score:null,
     match:{id:String(n),league:'fra.1',date:new Date(Date.now()+3600000).toISOString(),state:'pre',completed:false,status_name:'STATUS_SCHEDULED',home:{id:String(n*2),name:'Paris Saint-Germain '+n,badge:''},away:{id:String(n*2+1),name:'Olympique de Marseille '+n,badge:''}}};
   })}))};
+  const picks=board.groups.flatMap(g=>g.picks);
+  for(const p of picks.slice(0,3))p.team_odds={bookmaker:'Example <book>',observed_at:new Date().toISOString(),markets:{home:2.05,draw:3.5,away:3.05}};
+  Object.assign(picks[0],{status:'won',market_label:'Plus de 1,5 but',home_score:1,away_score:3});
+  Object.assign(picks[1],{status:'lost',home_score:3,away_score:1});
+  Object.assign(picks[2],{status:'won',home_score:1,away_score:1});
   await page.route('**/api/daily-opinion',r=>r.fulfill({contentType:'application/json',body:JSON.stringify(board)}));
   await page.route('**/api/tracking/performance',r=>r.fulfill({contentType:'application/json',body:JSON.stringify({won:99,lost:0,pending:0,void:0,success_pct:100,recent:[],note:'Personal history'})}));
   await page.goto('http://127.0.0.1:19047/');
   await page.locator('#homeDailyOpinion .opinion-pick').first().waitFor();
   assert.equal(await page.locator('#homeDailyOpinion .opinion-pick').count(),6);
   assert.equal(await page.locator('#homeDailyOpinion .opinion-group').count(),3);
+  const cards=page.locator('#homeDailyOpinion .opinion-pick');
+  assert.match(await cards.nth(0).locator('[data-odds-outcome="away"].result-won').innerText(),/3,05/);
+  assert.match(await cards.nth(0).locator('[data-odds-outcome="home"].result-lost').innerText(),/2,05/);
+  assert.match(await cards.nth(1).locator('[data-odds-outcome="home"].result-won').innerText(),/2,05/);
+  assert.match(await cards.nth(2).locator('[data-odds-outcome="draw"].result-won').innerText(),/3,50/);
+  assert.match(await cards.nth(3).locator('.opinion-team-odds').innerText(),/non enregistrées/);
+  assert.equal(await cards.nth(0).locator('.opinion-team-odds').evaluate(el=>getComputedStyle(el).textAlign),'right');
+
   assert.match(await page.locator('#homeDailyOpinion .opinion-performance').innerText(),/66.7 %/);
   assert.doesNotMatch(await page.locator('#homeDailyOpinion .opinion-performance').innerText(),/Uniquement les choix quotidiens|Calcul :/);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);

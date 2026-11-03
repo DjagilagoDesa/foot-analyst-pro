@@ -132,6 +132,34 @@ def choose(results, existing, now, day):
     return picks
 
 
+def retain_team_odds(picks, matches, now):
+    """Freeze observed 90-minute 1X2 prices before kickoff, independently of the pick market."""
+    sources={str(m['id']):m for m in matches}
+    for pick in picks:
+        if pick.get('team_odds') or pick.get('status')!='pending':
+            continue
+        original=pick['match']; match=sources.get(str(original['id']))
+        if not match or not upcoming(original,now,today(now)) or not upcoming(match,now,today(now)):
+            continue
+        if match['date']!=original['date'] or any(str(match[side]['id'])!=str(original[side]['id']) for side in ('home','away')):
+            continue
+        snapshot=match.get('market_odds') or {}
+        try:
+            observed=datetime.fromisoformat(snapshot['observed_at'].replace('Z','+00:00'))
+            kickoff=datetime.fromisoformat(original['date'].replace('Z','+00:00'))
+            if observed.tzinfo is None or not 0 <= (now-observed).total_seconds() <= 300 or observed>=kickoff:
+                continue
+        except (KeyError,ValueError,TypeError,AttributeError):
+            continue
+        for book in snapshot.get('books') or []:
+            prices=book.get('markets') or {}
+            if not book.get('bookmaker') or not all(type(prices.get(k)) in (int,float) and math.isfinite(prices[k]) and prices[k]>1 for k in ('home','draw','away')):
+                continue
+            pick['team_odds']={'bookmaker':book['bookmaker'],'markets':{k:prices[k] for k in ('home','draw','away')},
+                'observed_at':observed.isoformat(),'captured_at':now.isoformat(),'source':'ESPN'}
+            break
+
+
 class DailyOpinion:
     def __init__(self, app, server):
         self.app, self.server = app, server
@@ -197,6 +225,7 @@ class DailyOpinion:
             # Re-check the real clock after network calls: never publish a started match.
             publication = datetime.now(timezone.utc) if self.app.testing is False else now
             picks = choose(results, existing, publication, day)
+            retain_team_odds(picks, matches, publication)
             updated = dict(day=day, picks=picks, generated_at=board.get('generated_at') or publication.isoformat(),
                            checked_at=publication.isoformat(), source_errors=failures,
                            fixtures_found=len(matches), candidates_examined=len(eligible))
@@ -224,8 +253,12 @@ class DailyOpinion:
                     (start + timedelta(days=1, microseconds=-1)).astimezone(timezone.utc).strftime('%Y%m%d')}
         found, errors = {}, 0
         def load(league, date):
-            data = self.server.fetch(f'{self.server.ESPN}/{league}/scoreboard', {'dates': date, 'limit': 200}, ttl=120)
-            return [self.server._fixture(e, league) for e in data.get('events', [])]
+            url=f'{self.server.ESPN}/{league}/scoreboard';params={'dates':date,'limit':200}
+            started=time.time()
+            data = self.server.fetch(url, params, ttl=120)
+            cached=getattr(self.server,'CACHE',{}).get((url,tuple(sorted(params.items()))))
+            observed=datetime.fromtimestamp(cached[0] if cached else started,timezone.utc).isoformat()
+            return [self.server._fixture(e, league, observed) for e in data.get('events', [])]
         with ThreadPoolExecutor(max_workers=8) as pool:
             jobs = [pool.submit(load, league, date) for league in self.server.LEAGUES for date in utc_days]
             for job in as_completed(jobs):
