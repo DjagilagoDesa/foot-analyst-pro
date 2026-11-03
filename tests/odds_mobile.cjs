@@ -47,7 +47,7 @@ module.exports=async browser=>{
  await calendar.locator('nav [data-page="calendar"]').click();
  await calendar.locator('#fixtures .team-odd').first().waitFor();
  const listing=await calendar.locator('#fixtures').innerText();
- if(!['2,05','3,05'].every(s=>listing.includes(s)))throw Error('Calendar does not show team odds');
+ if(!['2,05','4,20','3,05'].every(s=>listing.includes(s)))throw Error('Calendar does not show team odds');
  if(/Match nul|Example book|fra\.1/.test(listing))throw Error('Small metadata still appears beneath team names');
  for(const [side,price] of [['home','2,05'],['away','3,05']]){
   const group=calendar.locator('[data-crest-side="'+side+'"]');
@@ -55,6 +55,8 @@ module.exports=async browser=>{
   const icon=await group.locator('.crest,.placeholder').boundingBox(),odd=await group.locator('.team-odd').boundingBox();
   if(!icon||!odd||odd.y<icon.y+icon.height)throw Error('Price is not below its crest');
  }
+ const homeOdd=await calendar.locator('[data-crest-side="home"] .team-odd').boundingBox(),drawOdd=await calendar.locator('.draw-odd').boundingBox(),awayOdd=await calendar.locator('[data-crest-side="away"] .team-odd').boundingBox();
+ if(!drawOdd||drawOdd.x<=homeOdd.x||drawOdd.x>=awayOdd.x||Math.abs(drawOdd.y-homeOdd.y)>2||Math.abs(drawOdd.y-awayOdd.y)>2)throw Error('Draw odds not centered between aligned team odds');
  if(await calendar.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Calendar odds overflow mobile');
  await calendar.screenshot({path:'artifacts/odds-calendar-mobile.png',fullPage:true});
  await calendar.close();
