@@ -280,14 +280,22 @@ class DailyOpinion:
         away = self.server.summary(away_games, match['away']['id'])
         return dict(match=match, home=home, away=away, prediction=self.server.probabilities(home, away))
 
-    def settle(self, board):
+    def settle(self, board, recover_odds=True):
         errors = 0
         for pick in board.get('picks', []):
-            if pick['status'] != 'pending':
+            settled=pick['status'] in ('won','lost')
+            missing_odds=recover_odds and settled and not pick.get('team_odds')
+            if pick['status'] != 'pending' and not missing_odds:
                 continue
             m = pick['match']
             try:
-                info = fixture_info(self.server.fetch(f"{self.server.ESPN}/{m['league']}/summary", {'event': m['id']}, ttl=120))
+                data=self.server.fetch(f"{self.server.ESPN}/{m['league']}/summary", {'event': m['id']}, ttl=120)
+                if missing_odds:
+                    from market_odds import historical_close
+                    quote=historical_close(data,pick)
+                    if quote:pick['team_odds']=quote
+                    continue
+                info = fixture_info(data)
                 if info['home_id'] != str(m['home']['id']) or info['away_id'] != str(m['away']['id']):
                     raise ValueError('teams_mismatch')
                 void = any(x in info['name'] for x in ('CANCEL', 'ABANDON', 'POSTPON'))
@@ -301,8 +309,15 @@ class DailyOpinion:
                 else:
                     h, a = score(info['home'].get('score')), score(info['away'].get('score'))
                     pick.update(status='won' if resolve(pick['market'], h, a) else 'lost', home_score=h, away_score=a)
+                    if recover_odds and not pick.get('team_odds'):
+                        try:
+                            from market_odds import historical_close
+                            quote=historical_close(data,pick)
+                            if quote:pick['team_odds']=quote
+                        except (ValueError,KeyError,TypeError,StopIteration,AttributeError):
+                            pass
             except Exception:
-                errors += 1
+                if not missing_odds:errors += 1
         board['result_source_errors'] = errors
 
     def settle_previous(self, day):
@@ -310,9 +325,11 @@ class DailyOpinion:
             rows = db.execute('SELECT day,payload FROM daily_opinion_boards WHERE day<? ORDER BY day', (day,)).fetchall()
         for row in rows:
             board = json.loads(row['payload'])
-            if not any(p['status'] == 'pending' for p in board.get('picks', [])):
+            recent=(datetime.fromisoformat(day)-datetime.fromisoformat(row['day'])).days<=7
+            if not any(p['status']=='pending' or (recent and p['status'] in ('won','lost') and not p.get('team_odds')) for p in board.get('picks',[])):
                 continue
-            self.settle(board)
+            if recent:self.settle(board)
+            else:self.settle(board,recover_odds=False)
             with database() as db:
                 # A slower worker must never overwrite results saved by another.
                 db.execute('UPDATE daily_opinion_boards SET payload=? WHERE day=? AND payload=?',

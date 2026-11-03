@@ -49,3 +49,34 @@ def extract(event, observed_at, now=None):
             books.append({'bookmaker': str(provider['name']), 'markets': markets,
                           'observed_at': observed_at, 'source_updated_at': None})
     return books
+
+
+def historical_close(data, pick, now=None):
+    """Use explicitly labelled closing prices from a verified final match, not live prices."""
+    from tracking import fixture_info, score
+    now=now or datetime.now(timezone.utc)
+    match=pick['match'];info=fixture_info(data)
+    if str(data.get('header',{}).get('id'))!=str(match['id']):
+        return None
+    kickoff=datetime.fromisoformat(match['date'].replace('Z','+00:00'))
+    if info['date']!=kickoff or info['date']>=now or info['state']!='post' or not info['completed']:
+        return None
+    if ((info['period'] is None and info['name']!='STATUS_FULL_TIME')
+        or (info['period'] is not None and int(info['period'])!=2)
+        or any(x in info['name'] for x in ('EXTRA','PENALT','CANCEL','ABANDON','POSTPON'))):
+        return None
+    if info['home_id']!=str(match['home']['id']) or info['away_id']!=str(match['away']['id']):
+        return None
+    if score(info['home'].get('score'))!=pick.get('home_score') or score(info['away'].get('score'))!=pick.get('away_score'):
+        return None
+    for book in data.get('odds') or data.get('pickcenter') or []:
+        provider=book.get('provider') or {};markets={}
+        for side in ('home','draw','away'):
+            value=decimal_price((book.get('moneyline',{}).get(side,{}).get('close') or {}).get('odds'))
+            if value:markets[side]=value
+        if provider.get('name') and len(markets)==3:
+            return {'bookmaker':provider['name'],'markets':markets,'source':'ESPN',
+                'kind':'historical_close','observed_at':None,'source_updated_at':None,
+                'retrieved_at':now.isoformat(),
+                'source_url':'https://www.espn.com/soccer/match/_/gameId/'+str(match['id'])}
+    return None

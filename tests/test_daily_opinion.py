@@ -159,6 +159,20 @@ class PersistenceTests(unittest.TestCase):
         new, _ = self.service.read('2026-11-02')
         self.assertEqual(new, {})
 
+    def test_recovery_enriches_settled_pick_without_changing_outcome_or_model(self):
+        pick=choose([result(1)],[],NOW,DAY)[0]
+        pick.update(status='won',home_score=3,away_score=1)
+        original=copy.deepcopy(pick);board={'picks':[pick]}
+        quote={'kind':'historical_close','markets':{'home':2.5,'draw':3.5,'away':1.8},'bookmaker':'Example'}
+        with patch('market_odds.historical_close',return_value=quote):
+            self.server.fetch.return_value={}
+            self.service.settle(board)
+        self.assertEqual(pick['team_odds'],quote)
+        self.assertEqual({k:v for k,v in pick.items() if k!='team_odds'},original)
+        with patch('market_odds.historical_close',side_effect=AssertionError('must preserve archive')):
+            self.service.settle(board)
+        self.assertEqual(pick['team_odds'],quote)
+
     def test_database_lease_prevents_duplicate_generation(self):
         with database() as db:
             db.execute('INSERT INTO daily_opinion_boards(day,payload,lease_until) VALUES(?,?,?)', (DAY, '{}', int(NOW.timestamp()) + 300))
@@ -227,7 +241,7 @@ class PersistenceTests(unittest.TestCase):
             for n in range(1, 10):
                 db.execute('INSERT INTO daily_opinion_boards(day,payload) VALUES(?,?)',
                            (f'2026-02-{n:02}', '{"picks": []}'))
-        def settle(board):
+        def settle(board, recover_odds=True):
             board['picks'][0]['status'] = 'won'
         with patch.object(self.service, 'settle', side_effect=settle):
             self.service.settle_previous(DAY)
@@ -237,7 +251,7 @@ class PersistenceTests(unittest.TestCase):
     def test_fixture_outage_still_settles_current_and_previous_choices(self):
         self.refresh()
         original, checked = self.service.read(DAY)
-        def settle(board):
+        def settle(board, recover_odds=True):
             board['picks'][0]['status'] = 'won'
         with patch.object(self.service, 'fixtures', side_effect=RuntimeError('offline')), \
              patch.object(self.service, 'settle_previous') as previous, \
@@ -257,7 +271,7 @@ class PersistenceTests(unittest.TestCase):
         with database() as db:
             db.execute('INSERT INTO daily_opinion_boards(day,payload) VALUES(?,?)',
                        (old_day, json.dumps({'picks': [pick]})))
-        def settle(board):
+        def settle(board, recover_odds=True):
             newer = copy.deepcopy(board)
             newer['picks'][0]['status'] = 'won'
             with database() as db:

@@ -32,3 +32,20 @@ victoire sont rouges et celle du nul est verte. Ces couleurs sont indépendantes
 du gain ou de la perte du pari éditorial (buts, double chance, etc.). Les avis non
 réglés restent neutres ; une absence d’archive est explicitement indiquée. Les
 prix sont indicatifs, avec la même limite de fraîcheur source qu’ailleurs.
+
+
+## Récupération des anciennes cotes
+
+Sur un avis réglé sans instantané initial, les champs explicitement nommés `close`
+dans la fiche ESPN peuvent fournir un triplet 1X2. L’événement, les deux équipes,
+le coup d’envoi, le score final et la fin à 90 minutes sont vérifiés. Une ligne
+d’ouverture seule ne suffit pas. Une archive déjà conservée n’est jamais écrasée.
+La récupération concerne les choix du jour et les avis des sept derniers jours
+lors de leur actualisation ; les autres résultats continuent leur règlement normal.
+
+Ces données sont étiquetées « Cotes de clôture récupérées » avec le bookmaker et un
+lien ESPN. Elles portent une date de récupération après match ; aucune date de
+consultation avant match ni heure de mise à jour source n’est inventée. Ce sont
+les champs de clôture fournis par ESPN, pas une preuve que l’application connaissait
+ces prix lors de son pronostic. Les choix, résultats, probabilités et taux officiel
+ne sont pas révisés. Une archive incomplète ou indisponible reste absente.

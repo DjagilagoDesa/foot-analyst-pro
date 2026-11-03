@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 import requests
 import app as server
-from market_odds import decimal_price, extract
+from market_odds import decimal_price, extract, historical_close
 
 
 def fixture():
@@ -79,3 +79,38 @@ class OddsTests(unittest.TestCase):
         self.assertEqual(snapshot['books'][0]['markets']['home'],2.5)
         self.assertEqual(snapshot['books'][0]['markets']['away'],1.8)
         self.assertEqual(snapshot['books'][0]['observed_at'],snapshot['observed_at'])
+
+    def past_data(self):
+        event=fixture();event['date']=(datetime.now(timezone.utc)-timedelta(hours=12)).isoformat()
+        comp=event['competitions'][0];comp['date']=event['date']
+        comp['status']={'type':{'state':'post','name':'STATUS_FULL_TIME','completed':True},'period':2}
+        comp['competitors'][0]['score']='3';comp['competitors'][1]['score']='1'
+        data={'header':{'id':'123','competitions':[comp]},'odds':copy.deepcopy(comp['odds'])}
+        pick={'match':{'id':'123','date':event['date'],'home':{'id':'1'},'away':{'id':'2'}},'home_score':3,'away_score':1}
+        return data,pick
+
+    def test_recovers_only_explicit_closing_prices_with_post_match_provenance(self):
+        data,pick=self.past_data();quote=historical_close(data,pick)
+        self.assertEqual(quote['markets'],{'home':2.5,'draw':3.5,'away':1.8})
+        self.assertEqual(quote['kind'],'historical_close')
+        self.assertIsNone(quote['observed_at'])
+        self.assertIsNone(quote['source_updated_at'])
+        self.assertIn('retrieved_at',quote)
+        self.assertTrue(quote['source_url'].endswith('/123'))
+        data['header']['competitions'][0]['status'].pop('period')
+        self.assertIsNotNone(historical_close(data,pick))
+        data['header']['competitions'][0]['status']['type']['name']='STATUS_FINAL'
+        self.assertIsNone(historical_close(data,pick))
+
+    def test_rejects_wrong_match_score_time_and_non_closing_or_missing_prices(self):
+        for mode in ('event','teams','kickoff','score','live','extra','opening','draw_missing'):
+            data,pick=self.past_data();comp=data['header']['competitions'][0]
+            if mode=='event':data['header']['id']='999'
+            if mode=='teams':comp['competitors'][0]['team']['id']='999'
+            if mode=='kickoff':pick['match']['date']=(datetime.now(timezone.utc)-timedelta(hours=10)).isoformat()
+            if mode=='score':pick['home_score']=4
+            if mode=='live':comp['status']['type']['state']='in'
+            if mode=='extra':comp['status']['period']=4
+            if mode=='opening':data['odds'][0]['moneyline']['home']={'open':{'odds':'+150'}}
+            if mode=='draw_missing':data['odds'][0]['moneyline'].pop('draw')
+            self.assertIsNone(historical_close(data,pick),mode)
