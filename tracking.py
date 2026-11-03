@@ -92,7 +92,7 @@ def init_app(app, fetch, base, leagues):
         for row,job in jobs:
             try:
                 info=job.result()
-                void=any(x in info['name'] for x in ('CANCEL','ABANDON'))
+                void=any(x in info['name'] for x in ('CANCEL','ABANDON','POSTPON'))
                 if not void and not (info['state']=='post' and info['completed']):continue
                 # Ordinary goal markets settle at 90 minutes; do not count ET/penalty totals.
                 if info['period'] is not None and int(info['period'])>2:void=True
