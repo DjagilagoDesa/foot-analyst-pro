@@ -57,7 +57,8 @@ pari effectivement placé. Les cotes et la mise ne sont pas persistées.
 ## Vérification finale des rencontres
 
 Les trois parcours (guidé, personnel et tickets du jour) reconsultent le calendrier
-avant de présenter un ticket terminé. Les requêtes sont regroupées par compétition
+avant et après l’enregistrement dans le suivi, avant de présenter un ticket
+terminé. Les requêtes sont regroupées par compétition
 et date UTC, sans relancer les analyses ni consommer d’essai. L’événement, les
 équipes, le coup d’envoi et l’état avant-match doivent correspondre. Match absent,
 doublon source, changement d’équipe ou d’horaire, report, abandon, annulation ou
