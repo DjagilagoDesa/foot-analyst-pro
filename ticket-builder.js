@@ -51,7 +51,8 @@ function builderSelection(markets,risk,type,odds){
    if(run!==generation)return;
    const missed=await window.Tracking.record(results.map(r=>({analysis:r.analysis,market:r.market})));
    if(run!==generation)return;
-   ticketAssertFuture(results);
+   await ticketVerifyFixtures(results);
+   if(run!==generation)return;
    const joint=results.reduce((p,r)=>p*r.probability/100,1);
    target.innerHTML='<div class="panel premium"><h2>Ton ticket · '+count+' matchs</h2>'+results.map((r,i)=>'<div class="message"><strong>'+esc((i+1)+'. '+r.match.home.name+' – '+r.match.away.name)+'</strong><p class="gold">'+esc(label(r.market))+'</p><p>Probabilité du modèle : '+esc(r.probability)+' %</p><details><summary>Analyse, surprises et confrontations</summary>'+renderAnalysisReport(r.analysis)+'</details></div>').join('')+message('Estimation combinée : '+(joint*100).toFixed(2).replace('.',',')+' % · Cote théorique : '+(1/joint).toFixed(2).replace('.',',')+'.')+(missed?message(missed+' sélection(s) non enregistrée(s) dans le suivi : rencontre non vérifiable, ancienne analyse ou match commencé.'):'')+'</div>';
    window.OddsTicket?.mount(target,results);
