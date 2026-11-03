@@ -1,0 +1,16 @@
+{
+  "protocol_version": "opponent-confirmation-v1",
+  "frozen_before_collection": true,
+  "purpose": "Independent temporal confirmation of the unchanged v1 candidate; no tuning on the new evaluation period",
+  "archive_start": "2025-07-01",
+  "archive_end": "2026-02-28",
+  "validation_from": "2025-12-01T00:00:00Z",
+  "test_from": "2026-01-01T00:00:00Z",
+  "leagues": ["eng.1", "esp.1", "ita.1", "ger.1", "fra.1", "por.1", "ned.1", "uefa.champions"],
+  "candidate": "opponent-normalized-poisson-experiment-v1",
+  "parameters": {"rating_k": 20.0, "rating_scale": 400.0, "normalization_scale": 800.0},
+  "markets": ["over_1_5", "over_2_5", "under_1_5", "under_2_5", "btts", "btts_no", "home_or_draw", "away_or_draw"],
+  "uncertainty": {"method": "paired ISO week block bootstrap", "seed": 1729, "repetitions": 1000, "minimum_weeks": 8},
+  "decision": "No automatic promotion; report deterioration as well as gains; further prospective evidence required",
+  "availability": "Retrospective source; kickoff +24h is assumed, not verified vintage availability"
+}

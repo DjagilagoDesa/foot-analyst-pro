@@ -1,0 +1,2090 @@
+{
+  "version": "opponent-normalized-poisson-experiment-v1",
+  "parameters": {
+    "rating_k": 20.0,
+    "rating_scale": 400.0,
+    "normalization_scale": 800.0
+  },
+  "validation_from": "2025-12-01T00:00:00Z",
+  "test_from": "2026-01-01T00:00:00Z",
+  "validation": {
+    "count": 250,
+    "evidence": "requires_independent_review",
+    "baseline": {
+      "brier_1x2": 0.593116,
+      "log_loss_1x2": 0.995411,
+      "accuracy_1x2": 0.548,
+      "brier_markets": {
+        "over_2_5": 0.252734,
+        "btts": 0.252545
+      }
+    },
+    "candidate": {
+      "brier_1x2": 0.592469,
+      "log_loss_1x2": 0.994548,
+      "accuracy_1x2": 0.552,
+      "brier_markets": {
+        "over_2_5": 0.251846,
+        "btts": 0.251082
+      }
+    },
+    "brier_delta_candidate_minus_baseline": -0.000647
+  },
+  "test": {
+    "count": 605,
+    "evidence": "requires_independent_review",
+    "baseline": {
+      "brier_1x2": 0.603032,
+      "log_loss_1x2": 1.010019,
+      "accuracy_1x2": 0.502479,
+      "brier_markets": {
+        "over_2_5": 0.239378,
+        "btts": 0.239399
+      }
+    },
+    "candidate": {
+      "brier_1x2": 0.601932,
+      "log_loss_1x2": 1.008384,
+      "accuracy_1x2": 0.505785,
+      "brier_markets": {
+        "over_2_5": 0.239733,
+        "btts": 0.239398
+      }
+    },
+    "brier_delta_candidate_minus_baseline": -0.0011
+  },
+  "by_competition": {
+    "eng.1": {
+      "count": 91,
+      "evidence": "insufficient",
+      "baseline": {
+        "brier_1x2": 0.672974,
+        "log_loss_1x2": 1.106871,
+        "accuracy_1x2": 0.362637,
+        "brier_markets": {
+          "over_2_5": 0.257959,
+          "btts": 0.241288
+        }
+      },
+      "candidate": {
+        "brier_1x2": 0.673192,
+        "log_loss_1x2": 1.107595,
+        "accuracy_1x2": 0.373626,
+        "brier_markets": {
+          "over_2_5": 0.25749,
+          "btts": 0.241935
+        }
+      },
+      "brier_delta_candidate_minus_baseline": 0.000218
+    },
+    "esp.1": {
+      "count": 83,
+      "evidence": "insufficient",
+      "baseline": {
+        "brier_1x2": 0.618126,
+        "log_loss_1x2": 1.030739,
+        "accuracy_1x2": 0.421687,
+        "brier_markets": {
+          "over_2_5": 0.248445,
+          "btts": 0.255035
+        }
+      },
+      "candidate": {
+        "brier_1x2": 0.618876,
+        "log_loss_1x2": 1.031697,
+        "accuracy_1x2": 0.421687,
+        "brier_markets": {
+          "over_2_5": 0.249681,
+          "btts": 0.257052
+        }
+      },
+      "brier_delta_candidate_minus_baseline": 0.00075
+    },
+    "fra.1": {
+      "count": 67,
+      "evidence": "insufficient",
+      "baseline": {
+        "brier_1x2": 0.608796,
+        "log_loss_1x2": 1.020301,
+        "accuracy_1x2": 0.537313,
+        "brier_markets": {
+          "over_2_5": 0.245703,
+          "btts": 0.249489
+        }
+      },
+      "candidate": {
+        "brier_1x2": 0.60698,
+        "log_loss_1x2": 1.017911,
+        "accuracy_1x2": 0.507463,
+        "brier_markets": {
+          "over_2_5": 0.243141,
+          "btts": 0.248329
+        }
+      },
+      "brier_delta_candidate_minus_baseline": -0.001816
+    },
+    "ger.1": {
+      "count": 77,
+      "evidence": "insufficient",
+      "baseline": {
+        "brier_1x2": 0.577951,
+        "log_loss_1x2": 0.983529,
+        "accuracy_1x2": 0.636364,
+        "brier_markets": {
+          "over_2_5": 0.218168,
+          "btts": 0.225039
+        }
+      },
+      "candidate": {
+        "brier_1x2": 0.575934,
+        "log_loss_1x2": 0.980075,
+        "accuracy_1x2": 0.636364,
+        "brier_markets": {
+          "over_2_5": 0.217992,
+          "btts": 0.224779
+        }
+      },
+      "brier_delta_candidate_minus_baseline": -0.002017
+    },
+    "ita.1": {
+      "count": 98,
+      "evidence": "insufficient",
+      "baseline": {
+        "brier_1x2": 0.589627,
+        "log_loss_1x2": 0.988954,
+        "accuracy_1x2": 0.530612,
+        "brier_markets": {
+          "over_2_5": 0.252422,
+          "btts": 0.247253
+        }
+      },
+      "candidate": {
+        "brier_1x2": 0.589395,
+        "log_loss_1x2": 0.98815,
+        "accuracy_1x2": 0.540816,
+        "brier_markets": {
+          "over_2_5": 0.253357,
+          "btts": 0.246299
+        }
+      },
+      "brier_delta_candidate_minus_baseline": -0.000232
+    },
+    "ned.1": {
+      "count": 68,
+      "evidence": "insufficient",
+      "baseline": {
+        "brier_1x2": 0.634352,
+        "log_loss_1x2": 1.054715,
+        "accuracy_1x2": 0.455882,
+        "brier_markets": {
+          "over_2_5": 0.225783,
+          "btts": 0.207047
+        }
+      },
+      "candidate": {
+        "brier_1x2": 0.635094,
+        "log_loss_1x2": 1.055691,
+        "accuracy_1x2": 0.455882,
+        "brier_markets": {
+          "over_2_5": 0.225677,
+          "btts": 0.206809
+        }
+      },
+      "brier_delta_candidate_minus_baseline": 0.000742
+    },
+    "por.1": {
+      "count": 70,
+      "evidence": "insufficient",
+      "baseline": {
+        "brier_1x2": 0.506176,
+        "log_loss_1x2": 0.873881,
+        "accuracy_1x2": 0.628571,
+        "brier_markets": {
+          "over_2_5": 0.232438,
+          "btts": 0.247993
+        }
+      },
+      "candidate": {
+        "brier_1x2": 0.506388,
+        "log_loss_1x2": 0.874117,
+        "accuracy_1x2": 0.642857,
+        "brier_markets": {
+          "over_2_5": 0.234964,
+          "btts": 0.24745
+        }
+      },
+      "brier_delta_candidate_minus_baseline": 0.000212
+    },
+    "uefa.champions": {
+      "count": 51,
+      "evidence": "insufficient",
+      "baseline": {
+        "brier_1x2": 0.600899,
+        "log_loss_1x2": 0.997717,
+        "accuracy_1x2": 0.470588,
+        "brier_markets": {
+          "over_2_5": 0.217776,
+          "btts": 0.235253
+        }
+      },
+      "candidate": {
+        "brier_1x2": 0.590842,
+        "log_loss_1x2": 0.983736,
+        "accuracy_1x2": 0.490196,
+        "brier_markets": {
+          "over_2_5": 0.219318,
+          "btts": 0.235621
+        }
+      },
+      "brier_delta_candidate_minus_baseline": -0.010057
+    }
+  },
+  "scored_fixtures": 855,
+  "skipped": {},
+  "decision": "experimental_only_no_automatic_promotion",
+  "availability_assumed_count": 1809,
+  "limitations": [
+    "Retrospective archives may include later corrections; result availability must be audited.",
+    "Constants are unvalidated hypotheses; do not tune on held-out test.",
+    "Missing competitions and unobserved results limit opponent ratings.",
+    "Disconnected opponent graphs are excluded; compare coverage as well as scores.",
+    "Accuracy and Brier do not demonstrate profitability; no odds are recorded."
+  ],
+  "special_markets_review": {
+    "version": "paired-special-markets-review-v1",
+    "validation": {
+      "over_1_5": {
+        "count": 250,
+        "observed_pct": 73.6,
+        "baseline": {
+          "brier": 0.19165,
+          "predicted_pct": 76.236,
+          "calibration_gap_pp": -2.636
+        },
+        "candidate": {
+          "brier": 0.19067,
+          "predicted_pct": 75.822,
+          "calibration_gap_pp": -2.222
+        },
+        "delta_candidate_minus_baseline": -0.000979,
+        "uncertainty": {
+          "weeks": 5,
+          "interval_95": null,
+          "evidence": "insufficient_weeks"
+        }
+      },
+      "over_2_5": {
+        "count": 250,
+        "observed_pct": 52.0,
+        "baseline": {
+          "brier": 0.252734,
+          "predicted_pct": 52.929,
+          "calibration_gap_pp": -0.929
+        },
+        "candidate": {
+          "brier": 0.251846,
+          "predicted_pct": 52.368,
+          "calibration_gap_pp": -0.368
+        },
+        "delta_candidate_minus_baseline": -0.000888,
+        "uncertainty": {
+          "weeks": 5,
+          "interval_95": null,
+          "evidence": "insufficient_weeks"
+        }
+      },
+      "under_1_5": {
+        "count": 250,
+        "observed_pct": 26.4,
+        "baseline": {
+          "brier": 0.19165,
+          "predicted_pct": 23.764,
+          "calibration_gap_pp": 2.636
+        },
+        "candidate": {
+          "brier": 0.19067,
+          "predicted_pct": 24.178,
+          "calibration_gap_pp": 2.222
+        },
+        "delta_candidate_minus_baseline": -0.000979,
+        "uncertainty": {
+          "weeks": 5,
+          "interval_95": null,
+          "evidence": "insufficient_weeks"
+        }
+      },
+      "under_2_5": {
+        "count": 250,
+        "observed_pct": 48.0,
+        "baseline": {
+          "brier": 0.252734,
+          "predicted_pct": 47.071,
+          "calibration_gap_pp": 0.929
+        },
+        "candidate": {
+          "brier": 0.251846,
+          "predicted_pct": 47.632,
+          "calibration_gap_pp": 0.368
+        },
+        "delta_candidate_minus_baseline": -0.000888,
+        "uncertainty": {
+          "weeks": 5,
+          "interval_95": null,
+          "evidence": "insufficient_weeks"
+        }
+      },
+      "btts": {
+        "count": 250,
+        "observed_pct": 48.8,
+        "baseline": {
+          "brier": 0.252545,
+          "predicted_pct": 54.47,
+          "calibration_gap_pp": -5.67
+        },
+        "candidate": {
+          "brier": 0.251082,
+          "predicted_pct": 53.972,
+          "calibration_gap_pp": -5.172
+        },
+        "delta_candidate_minus_baseline": -0.001464,
+        "uncertainty": {
+          "weeks": 5,
+          "interval_95": null,
+          "evidence": "insufficient_weeks"
+        }
+      },
+      "btts_no": {
+        "count": 250,
+        "observed_pct": 51.2,
+        "baseline": {
+          "brier": 0.252542,
+          "predicted_pct": 45.53,
+          "calibration_gap_pp": 5.67
+        },
+        "candidate": {
+          "brier": 0.251082,
+          "predicted_pct": 46.028,
+          "calibration_gap_pp": 5.172
+        },
+        "delta_candidate_minus_baseline": -0.001461,
+        "uncertainty": {
+          "weeks": 5,
+          "interval_95": null,
+          "evidence": "insufficient_weeks"
+        }
+      },
+      "home_or_draw": {
+        "count": 250,
+        "observed_pct": 66.8,
+        "baseline": {
+          "brier": 0.192344,
+          "predicted_pct": 65.208,
+          "calibration_gap_pp": 1.592
+        },
+        "candidate": {
+          "brier": 0.192043,
+          "predicted_pct": 65.163,
+          "calibration_gap_pp": 1.637
+        },
+        "delta_candidate_minus_baseline": -0.000301,
+        "uncertainty": {
+          "weeks": 5,
+          "interval_95": null,
+          "evidence": "insufficient_weeks"
+        }
+      },
+      "away_or_draw": {
+        "count": 250,
+        "observed_pct": 57.2,
+        "baseline": {
+          "brier": 0.217374,
+          "predicted_pct": 59.128,
+          "calibration_gap_pp": -1.928
+        },
+        "candidate": {
+          "brier": 0.217022,
+          "predicted_pct": 59.281,
+          "calibration_gap_pp": -2.081
+        },
+        "delta_candidate_minus_baseline": -0.000352,
+        "uncertainty": {
+          "weeks": 5,
+          "interval_95": null,
+          "evidence": "insufficient_weeks"
+        }
+      }
+    },
+    "test": {
+      "over_1_5": {
+        "count": 605,
+        "observed_pct": 81.157,
+        "baseline": {
+          "brier": 0.151965,
+          "predicted_pct": 76.576,
+          "calibration_gap_pp": 4.581
+        },
+        "candidate": {
+          "brier": 0.15232,
+          "predicted_pct": 76.004,
+          "calibration_gap_pp": 5.153
+        },
+        "delta_candidate_minus_baseline": 0.000355,
+        "uncertainty": {
+          "weeks": 9,
+          "interval_95": [
+            -0.00021,
+            0.000854
+          ],
+          "evidence": "descriptive_week_block_bootstrap"
+        }
+      },
+      "over_2_5": {
+        "count": 605,
+        "observed_pct": 57.025,
+        "baseline": {
+          "brier": 0.239378,
+          "predicted_pct": 53.334,
+          "calibration_gap_pp": 3.691
+        },
+        "candidate": {
+          "brier": 0.239733,
+          "predicted_pct": 52.565,
+          "calibration_gap_pp": 4.46
+        },
+        "delta_candidate_minus_baseline": 0.000355,
+        "uncertainty": {
+          "weeks": 9,
+          "interval_95": [
+            -0.000801,
+            0.001354
+          ],
+          "evidence": "descriptive_week_block_bootstrap"
+        }
+      },
+      "under_1_5": {
+        "count": 605,
+        "observed_pct": 18.843,
+        "baseline": {
+          "brier": 0.151965,
+          "predicted_pct": 23.424,
+          "calibration_gap_pp": -4.581
+        },
+        "candidate": {
+          "brier": 0.15232,
+          "predicted_pct": 23.996,
+          "calibration_gap_pp": -5.153
+        },
+        "delta_candidate_minus_baseline": 0.000355,
+        "uncertainty": {
+          "weeks": 9,
+          "interval_95": [
+            -0.00021,
+            0.000854
+          ],
+          "evidence": "descriptive_week_block_bootstrap"
+        }
+      },
+      "under_2_5": {
+        "count": 605,
+        "observed_pct": 42.975,
+        "baseline": {
+          "brier": 0.239379,
+          "predicted_pct": 46.666,
+          "calibration_gap_pp": -3.691
+        },
+        "candidate": {
+          "brier": 0.239733,
+          "predicted_pct": 47.435,
+          "calibration_gap_pp": -4.46
+        },
+        "delta_candidate_minus_baseline": 0.000354,
+        "uncertainty": {
+          "weeks": 9,
+          "interval_95": [
+            -0.000799,
+            0.00135
+          ],
+          "evidence": "descriptive_week_block_bootstrap"
+        }
+      },
+      "btts": {
+        "count": 605,
+        "observed_pct": 57.686,
+        "baseline": {
+          "brier": 0.239399,
+          "predicted_pct": 54.846,
+          "calibration_gap_pp": 2.84
+        },
+        "candidate": {
+          "brier": 0.239398,
+          "predicted_pct": 54.23,
+          "calibration_gap_pp": 3.456
+        },
+        "delta_candidate_minus_baseline": -1e-06,
+        "uncertainty": {
+          "weeks": 9,
+          "interval_95": [
+            -0.00049,
+            0.000544
+          ],
+          "evidence": "descriptive_week_block_bootstrap"
+        }
+      },
+      "btts_no": {
+        "count": 605,
+        "observed_pct": 42.314,
+        "baseline": {
+          "brier": 0.239399,
+          "predicted_pct": 45.154,
+          "calibration_gap_pp": -2.84
+        },
+        "candidate": {
+          "brier": 0.239397,
+          "predicted_pct": 45.77,
+          "calibration_gap_pp": -3.456
+        },
+        "delta_candidate_minus_baseline": -2e-06,
+        "uncertainty": {
+          "weeks": 9,
+          "interval_95": [
+            -0.000492,
+            0.000544
+          ],
+          "evidence": "descriptive_week_block_bootstrap"
+        }
+      },
+      "home_or_draw": {
+        "count": 605,
+        "observed_pct": 69.256,
+        "baseline": {
+          "brier": 0.194273,
+          "predicted_pct": 66.238,
+          "calibration_gap_pp": 3.018
+        },
+        "candidate": {
+          "brier": 0.193618,
+          "predicted_pct": 66.281,
+          "calibration_gap_pp": 2.975
+        },
+        "delta_candidate_minus_baseline": -0.000655,
+        "uncertainty": {
+          "weeks": 9,
+          "interval_95": [
+            -0.001105,
+            -0.000176
+          ],
+          "evidence": "descriptive_week_block_bootstrap"
+        }
+      },
+      "away_or_draw": {
+        "count": 605,
+        "observed_pct": 56.529,
+        "baseline": {
+          "brier": 0.218969,
+          "predicted_pct": 57.995,
+          "calibration_gap_pp": -1.466
+        },
+        "candidate": {
+          "brier": 0.218527,
+          "predicted_pct": 58.131,
+          "calibration_gap_pp": -1.602
+        },
+        "delta_candidate_minus_baseline": -0.000442,
+        "uncertainty": {
+          "weeks": 9,
+          "interval_95": [
+            -0.000999,
+            0.000131
+          ],
+          "evidence": "descriptive_week_block_bootstrap"
+        }
+      }
+    },
+    "by_competition": {
+      "eng.1": {
+        "over_1_5": {
+          "count": 91,
+          "observed_pct": 79.121,
+          "baseline": {
+            "brier": 0.165271,
+            "predicted_pct": 76.704,
+            "calibration_gap_pp": 2.416
+          },
+          "candidate": {
+            "brier": 0.165681,
+            "predicted_pct": 76.345,
+            "calibration_gap_pp": 2.776
+          },
+          "delta_candidate_minus_baseline": 0.000411,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.000381,
+              0.001135
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "over_2_5": {
+          "count": 91,
+          "observed_pct": 47.253,
+          "baseline": {
+            "brier": 0.257959,
+            "predicted_pct": 53.049,
+            "calibration_gap_pp": -5.797
+          },
+          "candidate": {
+            "brier": 0.25749,
+            "predicted_pct": 52.575,
+            "calibration_gap_pp": -5.322
+          },
+          "delta_candidate_minus_baseline": -0.000469,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.001747,
+              0.000754
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "under_1_5": {
+          "count": 91,
+          "observed_pct": 20.879,
+          "baseline": {
+            "brier": 0.165271,
+            "predicted_pct": 23.296,
+            "calibration_gap_pp": -2.416
+          },
+          "candidate": {
+            "brier": 0.165681,
+            "predicted_pct": 23.655,
+            "calibration_gap_pp": -2.776
+          },
+          "delta_candidate_minus_baseline": 0.000411,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.000381,
+              0.001135
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "under_2_5": {
+          "count": 91,
+          "observed_pct": 52.747,
+          "baseline": {
+            "brier": 0.257959,
+            "predicted_pct": 46.951,
+            "calibration_gap_pp": 5.797
+          },
+          "candidate": {
+            "brier": 0.25749,
+            "predicted_pct": 47.425,
+            "calibration_gap_pp": 5.322
+          },
+          "delta_candidate_minus_baseline": -0.000469,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.001747,
+              0.000754
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "btts": {
+          "count": 91,
+          "observed_pct": 59.341,
+          "baseline": {
+            "brier": 0.241288,
+            "predicted_pct": 55.398,
+            "calibration_gap_pp": 3.943
+          },
+          "candidate": {
+            "brier": 0.241935,
+            "predicted_pct": 55.012,
+            "calibration_gap_pp": 4.329
+          },
+          "delta_candidate_minus_baseline": 0.000647,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -4.1e-05,
+              0.001299
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "btts_no": {
+          "count": 91,
+          "observed_pct": 40.659,
+          "baseline": {
+            "brier": 0.241288,
+            "predicted_pct": 44.602,
+            "calibration_gap_pp": -3.943
+          },
+          "candidate": {
+            "brier": 0.241935,
+            "predicted_pct": 44.988,
+            "calibration_gap_pp": -4.329
+          },
+          "delta_candidate_minus_baseline": 0.000647,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -4.1e-05,
+              0.001299
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "home_or_draw": {
+          "count": 91,
+          "observed_pct": 67.033,
+          "baseline": {
+            "brier": 0.216174,
+            "predicted_pct": 65.935,
+            "calibration_gap_pp": 1.098
+          },
+          "candidate": {
+            "brier": 0.216785,
+            "predicted_pct": 65.96,
+            "calibration_gap_pp": 1.073
+          },
+          "delta_candidate_minus_baseline": 0.000611,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.000316,
+              0.001588
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "away_or_draw": {
+          "count": 91,
+          "observed_pct": 68.132,
+          "baseline": {
+            "brier": 0.215715,
+            "predicted_pct": 58.642,
+            "calibration_gap_pp": 9.49
+          },
+          "candidate": {
+            "brier": 0.215686,
+            "predicted_pct": 58.732,
+            "calibration_gap_pp": 9.4
+          },
+          "delta_candidate_minus_baseline": -2.9e-05,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.001477,
+              0.001462
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        }
+      },
+      "esp.1": {
+        "over_1_5": {
+          "count": 83,
+          "observed_pct": 84.337,
+          "baseline": {
+            "brier": 0.146964,
+            "predicted_pct": 72.905,
+            "calibration_gap_pp": 11.433
+          },
+          "candidate": {
+            "brier": 0.148361,
+            "predicted_pct": 72.31,
+            "calibration_gap_pp": 12.028
+          },
+          "delta_candidate_minus_baseline": 0.001397,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              0.000209,
+              0.002414
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "over_2_5": {
+          "count": 83,
+          "observed_pct": 56.627,
+          "baseline": {
+            "brier": 0.248445,
+            "predicted_pct": 48.117,
+            "calibration_gap_pp": 8.51
+          },
+          "candidate": {
+            "brier": 0.249681,
+            "predicted_pct": 47.369,
+            "calibration_gap_pp": 9.258
+          },
+          "delta_candidate_minus_baseline": 0.001236,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.000929,
+              0.003202
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "under_1_5": {
+          "count": 83,
+          "observed_pct": 15.663,
+          "baseline": {
+            "brier": 0.146964,
+            "predicted_pct": 27.095,
+            "calibration_gap_pp": -11.433
+          },
+          "candidate": {
+            "brier": 0.148361,
+            "predicted_pct": 27.69,
+            "calibration_gap_pp": -12.028
+          },
+          "delta_candidate_minus_baseline": 0.001397,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              0.000209,
+              0.002414
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "under_2_5": {
+          "count": 83,
+          "observed_pct": 43.373,
+          "baseline": {
+            "brier": 0.248445,
+            "predicted_pct": 51.883,
+            "calibration_gap_pp": -8.51
+          },
+          "candidate": {
+            "brier": 0.249681,
+            "predicted_pct": 52.631,
+            "calibration_gap_pp": -9.258
+          },
+          "delta_candidate_minus_baseline": 0.001236,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.000929,
+              0.003202
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "btts": {
+          "count": 83,
+          "observed_pct": 63.855,
+          "baseline": {
+            "brier": 0.255035,
+            "predicted_pct": 51.092,
+            "calibration_gap_pp": 12.764
+          },
+          "candidate": {
+            "brier": 0.257052,
+            "predicted_pct": 50.405,
+            "calibration_gap_pp": 13.451
+          },
+          "delta_candidate_minus_baseline": 0.002017,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              0.000485,
+              0.003549
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "btts_no": {
+          "count": 83,
+          "observed_pct": 36.145,
+          "baseline": {
+            "brier": 0.255035,
+            "predicted_pct": 48.908,
+            "calibration_gap_pp": -12.764
+          },
+          "candidate": {
+            "brier": 0.257052,
+            "predicted_pct": 49.595,
+            "calibration_gap_pp": -13.451
+          },
+          "delta_candidate_minus_baseline": 0.002017,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              0.000485,
+              0.003549
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "home_or_draw": {
+          "count": 83,
+          "observed_pct": 72.289,
+          "baseline": {
+            "brier": 0.201326,
+            "predicted_pct": 66.475,
+            "calibration_gap_pp": 5.814
+          },
+          "candidate": {
+            "brier": 0.201782,
+            "predicted_pct": 66.406,
+            "calibration_gap_pp": 5.883
+          },
+          "delta_candidate_minus_baseline": 0.000456,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.000562,
+              0.001652
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "away_or_draw": {
+          "count": 83,
+          "observed_pct": 53.012,
+          "baseline": {
+            "brier": 0.233256,
+            "predicted_pct": 59.09,
+            "calibration_gap_pp": -6.078
+          },
+          "candidate": {
+            "brier": 0.233403,
+            "predicted_pct": 59.299,
+            "calibration_gap_pp": -6.287
+          },
+          "delta_candidate_minus_baseline": 0.000146,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.001719,
+              0.002125
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        }
+      },
+      "fra.1": {
+        "over_1_5": {
+          "count": 67,
+          "observed_pct": 76.119,
+          "baseline": {
+            "brier": 0.174294,
+            "predicted_pct": 77.385,
+            "calibration_gap_pp": -1.266
+          },
+          "candidate": {
+            "brier": 0.17343,
+            "predicted_pct": 76.954,
+            "calibration_gap_pp": -0.834
+          },
+          "delta_candidate_minus_baseline": -0.000864,
+          "uncertainty": {
+            "weeks": 8,
+            "interval_95": [
+              -0.003308,
+              0.001253
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "over_2_5": {
+          "count": 67,
+          "observed_pct": 50.746,
+          "baseline": {
+            "brier": 0.245703,
+            "predicted_pct": 54.03,
+            "calibration_gap_pp": -3.284
+          },
+          "candidate": {
+            "brier": 0.243141,
+            "predicted_pct": 53.452,
+            "calibration_gap_pp": -2.706
+          },
+          "delta_candidate_minus_baseline": -0.002562,
+          "uncertainty": {
+            "weeks": 8,
+            "interval_95": [
+              -0.004606,
+              -0.000647
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "under_1_5": {
+          "count": 67,
+          "observed_pct": 23.881,
+          "baseline": {
+            "brier": 0.174294,
+            "predicted_pct": 22.615,
+            "calibration_gap_pp": 1.266
+          },
+          "candidate": {
+            "brier": 0.17343,
+            "predicted_pct": 23.046,
+            "calibration_gap_pp": 0.834
+          },
+          "delta_candidate_minus_baseline": -0.000864,
+          "uncertainty": {
+            "weeks": 8,
+            "interval_95": [
+              -0.003308,
+              0.001253
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "under_2_5": {
+          "count": 67,
+          "observed_pct": 49.254,
+          "baseline": {
+            "brier": 0.245703,
+            "predicted_pct": 45.97,
+            "calibration_gap_pp": 3.284
+          },
+          "candidate": {
+            "brier": 0.243141,
+            "predicted_pct": 46.548,
+            "calibration_gap_pp": 2.706
+          },
+          "delta_candidate_minus_baseline": -0.002562,
+          "uncertainty": {
+            "weeks": 8,
+            "interval_95": [
+              -0.004606,
+              -0.000647
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "btts": {
+          "count": 67,
+          "observed_pct": 49.254,
+          "baseline": {
+            "brier": 0.249489,
+            "predicted_pct": 55.793,
+            "calibration_gap_pp": -6.539
+          },
+          "candidate": {
+            "brier": 0.248329,
+            "predicted_pct": 55.36,
+            "calibration_gap_pp": -6.106
+          },
+          "delta_candidate_minus_baseline": -0.00116,
+          "uncertainty": {
+            "weeks": 8,
+            "interval_95": [
+              -0.002942,
+              0.000729
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "btts_no": {
+          "count": 67,
+          "observed_pct": 50.746,
+          "baseline": {
+            "brier": 0.249489,
+            "predicted_pct": 44.207,
+            "calibration_gap_pp": 6.539
+          },
+          "candidate": {
+            "brier": 0.248329,
+            "predicted_pct": 44.64,
+            "calibration_gap_pp": 6.106
+          },
+          "delta_candidate_minus_baseline": -0.00116,
+          "uncertainty": {
+            "weeks": 8,
+            "interval_95": [
+              -0.002942,
+              0.000729
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "home_or_draw": {
+          "count": 67,
+          "observed_pct": 68.657,
+          "baseline": {
+            "brier": 0.198094,
+            "predicted_pct": 66.1,
+            "calibration_gap_pp": 2.557
+          },
+          "candidate": {
+            "brier": 0.197347,
+            "predicted_pct": 66.206,
+            "calibration_gap_pp": 2.451
+          },
+          "delta_candidate_minus_baseline": -0.000747,
+          "uncertainty": {
+            "weeks": 8,
+            "interval_95": [
+              -0.001857,
+              0.000111
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "away_or_draw": {
+          "count": 67,
+          "observed_pct": 55.224,
+          "baseline": {
+            "brier": 0.228068,
+            "predicted_pct": 58.087,
+            "calibration_gap_pp": -2.863
+          },
+          "candidate": {
+            "brier": 0.227199,
+            "predicted_pct": 58.125,
+            "calibration_gap_pp": -2.901
+          },
+          "delta_candidate_minus_baseline": -0.000868,
+          "uncertainty": {
+            "weeks": 8,
+            "interval_95": [
+              -0.002518,
+              0.000604
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        }
+      },
+      "ger.1": {
+        "over_1_5": {
+          "count": 77,
+          "observed_pct": 85.714,
+          "baseline": {
+            "brier": 0.123103,
+            "predicted_pct": 82.296,
+            "calibration_gap_pp": 3.418
+          },
+          "candidate": {
+            "brier": 0.123165,
+            "predicted_pct": 81.63,
+            "calibration_gap_pp": 4.084
+          },
+          "delta_candidate_minus_baseline": 6.2e-05,
+          "uncertainty": {
+            "weeks": 8,
+            "interval_95": [
+              -0.00072,
+              0.001033
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "over_2_5": {
+          "count": 77,
+          "observed_pct": 66.234,
+          "baseline": {
+            "brier": 0.218168,
+            "predicted_pct": 61.438,
+            "calibration_gap_pp": 4.796
+          },
+          "candidate": {
+            "brier": 0.217992,
+            "predicted_pct": 60.39,
+            "calibration_gap_pp": 5.844
+          },
+          "delta_candidate_minus_baseline": -0.000175,
+          "uncertainty": {
+            "weeks": 8,
+            "interval_95": [
+              -0.00439,
+              0.003994
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "under_1_5": {
+          "count": 77,
+          "observed_pct": 14.286,
+          "baseline": {
+            "brier": 0.123101,
+            "predicted_pct": 17.703,
+            "calibration_gap_pp": -3.417
+          },
+          "candidate": {
+            "brier": 0.123165,
+            "predicted_pct": 18.37,
+            "calibration_gap_pp": -4.084
+          },
+          "delta_candidate_minus_baseline": 6.4e-05,
+          "uncertainty": {
+            "weeks": 8,
+            "interval_95": [
+              -0.00072,
+              0.001039
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "under_2_5": {
+          "count": 77,
+          "observed_pct": 33.766,
+          "baseline": {
+            "brier": 0.218157,
+            "predicted_pct": 38.561,
+            "calibration_gap_pp": -4.795
+          },
+          "candidate": {
+            "brier": 0.217987,
+            "predicted_pct": 39.609,
+            "calibration_gap_pp": -5.843
+          },
+          "delta_candidate_minus_baseline": -0.00017,
+          "uncertainty": {
+            "weeks": 8,
+            "interval_95": [
+              -0.004368,
+              0.00399
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "btts": {
+          "count": 77,
+          "observed_pct": 64.935,
+          "baseline": {
+            "brier": 0.225039,
+            "predicted_pct": 60.816,
+            "calibration_gap_pp": 4.119
+          },
+          "candidate": {
+            "brier": 0.224779,
+            "predicted_pct": 59.973,
+            "calibration_gap_pp": 4.962
+          },
+          "delta_candidate_minus_baseline": -0.00026,
+          "uncertainty": {
+            "weeks": 8,
+            "interval_95": [
+              -0.002568,
+              0.002311
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "btts_no": {
+          "count": 77,
+          "observed_pct": 35.065,
+          "baseline": {
+            "brier": 0.225039,
+            "predicted_pct": 39.184,
+            "calibration_gap_pp": -4.119
+          },
+          "candidate": {
+            "brier": 0.22477,
+            "predicted_pct": 40.026,
+            "calibration_gap_pp": -4.961
+          },
+          "delta_candidate_minus_baseline": -0.000269,
+          "uncertainty": {
+            "weeks": 8,
+            "interval_95": [
+              -0.00259,
+              0.002277
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "home_or_draw": {
+          "count": 77,
+          "observed_pct": 76.623,
+          "baseline": {
+            "brier": 0.17078,
+            "predicted_pct": 65.761,
+            "calibration_gap_pp": 10.862
+          },
+          "candidate": {
+            "brier": 0.170071,
+            "predicted_pct": 65.871,
+            "calibration_gap_pp": 10.752
+          },
+          "delta_candidate_minus_baseline": -0.00071,
+          "uncertainty": {
+            "weeks": 8,
+            "interval_95": [
+              -0.001968,
+              0.000534
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "away_or_draw": {
+          "count": 77,
+          "observed_pct": 50.649,
+          "baseline": {
+            "brier": 0.209539,
+            "predicted_pct": 56.462,
+            "calibration_gap_pp": -5.813
+          },
+          "candidate": {
+            "brier": 0.208636,
+            "predicted_pct": 56.553,
+            "calibration_gap_pp": -5.904
+          },
+          "delta_candidate_minus_baseline": -0.000903,
+          "uncertainty": {
+            "weeks": 8,
+            "interval_95": [
+              -0.001844,
+              -7.1e-05
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        }
+      },
+      "ita.1": {
+        "over_1_5": {
+          "count": 98,
+          "observed_pct": 74.49,
+          "baseline": {
+            "brier": 0.199423,
+            "predicted_pct": 68.573,
+            "calibration_gap_pp": 5.916
+          },
+          "candidate": {
+            "brier": 0.200272,
+            "predicted_pct": 67.914,
+            "calibration_gap_pp": 6.576
+          },
+          "delta_candidate_minus_baseline": 0.00085,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.000455,
+              0.002043
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "over_2_5": {
+          "count": 98,
+          "observed_pct": 50.0,
+          "baseline": {
+            "brier": 0.252422,
+            "predicted_pct": 42.624,
+            "calibration_gap_pp": 7.376
+          },
+          "candidate": {
+            "brier": 0.253357,
+            "predicted_pct": 41.866,
+            "calibration_gap_pp": 8.134
+          },
+          "delta_candidate_minus_baseline": 0.000935,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.000459,
+              0.002641
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "under_1_5": {
+          "count": 98,
+          "observed_pct": 25.51,
+          "baseline": {
+            "brier": 0.199423,
+            "predicted_pct": 31.427,
+            "calibration_gap_pp": -5.916
+          },
+          "candidate": {
+            "brier": 0.200272,
+            "predicted_pct": 32.086,
+            "calibration_gap_pp": -6.576
+          },
+          "delta_candidate_minus_baseline": 0.00085,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.000455,
+              0.002043
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "under_2_5": {
+          "count": 98,
+          "observed_pct": 50.0,
+          "baseline": {
+            "brier": 0.252422,
+            "predicted_pct": 57.376,
+            "calibration_gap_pp": -7.376
+          },
+          "candidate": {
+            "brier": 0.253357,
+            "predicted_pct": 58.134,
+            "calibration_gap_pp": -8.134
+          },
+          "delta_candidate_minus_baseline": 0.000935,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.000459,
+              0.002641
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "btts": {
+          "count": 98,
+          "observed_pct": 44.898,
+          "baseline": {
+            "brier": 0.247253,
+            "predicted_pct": 46.562,
+            "calibration_gap_pp": -1.664
+          },
+          "candidate": {
+            "brier": 0.246299,
+            "predicted_pct": 45.917,
+            "calibration_gap_pp": -1.019
+          },
+          "delta_candidate_minus_baseline": -0.000955,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.00254,
+              0.000624
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "btts_no": {
+          "count": 98,
+          "observed_pct": 55.102,
+          "baseline": {
+            "brier": 0.247253,
+            "predicted_pct": 53.438,
+            "calibration_gap_pp": 1.664
+          },
+          "candidate": {
+            "brier": 0.246299,
+            "predicted_pct": 54.083,
+            "calibration_gap_pp": 1.019
+          },
+          "delta_candidate_minus_baseline": -0.000955,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.00254,
+              0.000624
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "home_or_draw": {
+          "count": 98,
+          "observed_pct": 63.265,
+          "baseline": {
+            "brier": 0.193907,
+            "predicted_pct": 67.806,
+            "calibration_gap_pp": -4.541
+          },
+          "candidate": {
+            "brier": 0.193231,
+            "predicted_pct": 67.885,
+            "calibration_gap_pp": -4.619
+          },
+          "delta_candidate_minus_baseline": -0.000676,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.001985,
+              0.000822
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "away_or_draw": {
+          "count": 98,
+          "observed_pct": 63.265,
+          "baseline": {
+            "brier": 0.20261,
+            "predicted_pct": 59.031,
+            "calibration_gap_pp": 4.235
+          },
+          "candidate": {
+            "brier": 0.202967,
+            "predicted_pct": 59.141,
+            "calibration_gap_pp": 4.124
+          },
+          "delta_candidate_minus_baseline": 0.000357,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.001322,
+              0.001992
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        }
+      },
+      "ned.1": {
+        "over_1_5": {
+          "count": 68,
+          "observed_pct": 86.765,
+          "baseline": {
+            "brier": 0.114379,
+            "predicted_pct": 82.856,
+            "calibration_gap_pp": 3.909
+          },
+          "candidate": {
+            "brier": 0.114105,
+            "predicted_pct": 82.613,
+            "calibration_gap_pp": 4.151
+          },
+          "delta_candidate_minus_baseline": -0.000275,
+          "uncertainty": {
+            "weeks": 8,
+            "interval_95": [
+              -0.001019,
+              0.000388
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "over_2_5": {
+          "count": 68,
+          "observed_pct": 63.235,
+          "baseline": {
+            "brier": 0.225783,
+            "predicted_pct": 62.416,
+            "calibration_gap_pp": 0.819
+          },
+          "candidate": {
+            "brier": 0.225677,
+            "predicted_pct": 62.046,
+            "calibration_gap_pp": 1.19
+          },
+          "delta_candidate_minus_baseline": -0.000106,
+          "uncertainty": {
+            "weeks": 8,
+            "interval_95": [
+              -0.001319,
+              0.001185
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "under_1_5": {
+          "count": 68,
+          "observed_pct": 13.235,
+          "baseline": {
+            "brier": 0.114379,
+            "predicted_pct": 17.144,
+            "calibration_gap_pp": -3.909
+          },
+          "candidate": {
+            "brier": 0.114101,
+            "predicted_pct": 17.385,
+            "calibration_gap_pp": -4.15
+          },
+          "delta_candidate_minus_baseline": -0.000278,
+          "uncertainty": {
+            "weeks": 8,
+            "interval_95": [
+              -0.001026,
+              0.000388
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "under_2_5": {
+          "count": 68,
+          "observed_pct": 36.765,
+          "baseline": {
+            "brier": 0.225799,
+            "predicted_pct": 37.582,
+            "calibration_gap_pp": -0.818
+          },
+          "candidate": {
+            "brier": 0.225677,
+            "predicted_pct": 37.954,
+            "calibration_gap_pp": -1.19
+          },
+          "delta_candidate_minus_baseline": -0.000122,
+          "uncertainty": {
+            "weeks": 8,
+            "interval_95": [
+              -0.001319,
+              0.001162
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "btts": {
+          "count": 68,
+          "observed_pct": 72.059,
+          "baseline": {
+            "brier": 0.207047,
+            "predicted_pct": 62.36,
+            "calibration_gap_pp": 9.699
+          },
+          "candidate": {
+            "brier": 0.206809,
+            "predicted_pct": 62.099,
+            "calibration_gap_pp": 9.96
+          },
+          "delta_candidate_minus_baseline": -0.000238,
+          "uncertainty": {
+            "weeks": 8,
+            "interval_95": [
+              -0.000945,
+              0.000414
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "btts_no": {
+          "count": 68,
+          "observed_pct": 27.941,
+          "baseline": {
+            "brier": 0.207047,
+            "predicted_pct": 37.64,
+            "calibration_gap_pp": -9.699
+          },
+          "candidate": {
+            "brier": 0.206809,
+            "predicted_pct": 37.901,
+            "calibration_gap_pp": -9.96
+          },
+          "delta_candidate_minus_baseline": -0.000238,
+          "uncertainty": {
+            "weeks": 8,
+            "interval_95": [
+              -0.000945,
+              0.000414
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "home_or_draw": {
+          "count": 68,
+          "observed_pct": 69.118,
+          "baseline": {
+            "brier": 0.199158,
+            "predicted_pct": 66.662,
+            "calibration_gap_pp": 2.456
+          },
+          "candidate": {
+            "brier": 0.198494,
+            "predicted_pct": 66.675,
+            "calibration_gap_pp": 2.443
+          },
+          "delta_candidate_minus_baseline": -0.000664,
+          "uncertainty": {
+            "weeks": 8,
+            "interval_95": [
+              -0.002065,
+              0.000983
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "away_or_draw": {
+          "count": 68,
+          "observed_pct": 60.294,
+          "baseline": {
+            "brier": 0.225184,
+            "predicted_pct": 55.765,
+            "calibration_gap_pp": 4.529
+          },
+          "candidate": {
+            "brier": 0.226238,
+            "predicted_pct": 55.86,
+            "calibration_gap_pp": 4.434
+          },
+          "delta_candidate_minus_baseline": 0.001054,
+          "uncertainty": {
+            "weeks": 8,
+            "interval_95": [
+              -0.000497,
+              0.002705
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        }
+      },
+      "por.1": {
+        "over_1_5": {
+          "count": 70,
+          "observed_pct": 77.143,
+          "baseline": {
+            "brier": 0.165843,
+            "predicted_pct": 75.263,
+            "calibration_gap_pp": 1.88
+          },
+          "candidate": {
+            "brier": 0.166213,
+            "predicted_pct": 74.16,
+            "calibration_gap_pp": 2.983
+          },
+          "delta_candidate_minus_baseline": 0.00037,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.001315,
+              0.00182
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "over_2_5": {
+          "count": 70,
+          "observed_pct": 62.857,
+          "baseline": {
+            "brier": 0.232438,
+            "predicted_pct": 51.321,
+            "calibration_gap_pp": 11.536
+          },
+          "candidate": {
+            "brier": 0.234964,
+            "predicted_pct": 49.859,
+            "calibration_gap_pp": 12.999
+          },
+          "delta_candidate_minus_baseline": 0.002526,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.000618,
+              0.00584
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "under_1_5": {
+          "count": 70,
+          "observed_pct": 22.857,
+          "baseline": {
+            "brier": 0.165843,
+            "predicted_pct": 24.737,
+            "calibration_gap_pp": -1.88
+          },
+          "candidate": {
+            "brier": 0.166213,
+            "predicted_pct": 25.84,
+            "calibration_gap_pp": -2.983
+          },
+          "delta_candidate_minus_baseline": 0.00037,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.001315,
+              0.00182
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "under_2_5": {
+          "count": 70,
+          "observed_pct": 37.143,
+          "baseline": {
+            "brier": 0.232438,
+            "predicted_pct": 48.679,
+            "calibration_gap_pp": -11.536
+          },
+          "candidate": {
+            "brier": 0.234964,
+            "predicted_pct": 50.141,
+            "calibration_gap_pp": -12.999
+          },
+          "delta_candidate_minus_baseline": 0.002526,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.000618,
+              0.00584
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "btts": {
+          "count": 70,
+          "observed_pct": 48.571,
+          "baseline": {
+            "brier": 0.247993,
+            "predicted_pct": 51.676,
+            "calibration_gap_pp": -3.104
+          },
+          "candidate": {
+            "brier": 0.24745,
+            "predicted_pct": 50.399,
+            "calibration_gap_pp": -1.827
+          },
+          "delta_candidate_minus_baseline": -0.000543,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.003318,
+              0.002017
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "btts_no": {
+          "count": 70,
+          "observed_pct": 51.429,
+          "baseline": {
+            "brier": 0.247993,
+            "predicted_pct": 48.324,
+            "calibration_gap_pp": 3.104
+          },
+          "candidate": {
+            "brier": 0.24745,
+            "predicted_pct": 49.601,
+            "calibration_gap_pp": 1.827
+          },
+          "delta_candidate_minus_baseline": -0.000543,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.003318,
+              0.002017
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "home_or_draw": {
+          "count": 70,
+          "observed_pct": 72.857,
+          "baseline": {
+            "brier": 0.152862,
+            "predicted_pct": 65.343,
+            "calibration_gap_pp": 7.514
+          },
+          "candidate": {
+            "brier": 0.15304,
+            "predicted_pct": 65.417,
+            "calibration_gap_pp": 7.44
+          },
+          "delta_candidate_minus_baseline": 0.000178,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.000763,
+              0.001311
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        },
+        "away_or_draw": {
+          "count": 70,
+          "observed_pct": 45.714,
+          "baseline": {
+            "brier": 0.202277,
+            "predicted_pct": 58.506,
+            "calibration_gap_pp": -12.791
+          },
+          "candidate": {
+            "brier": 0.202182,
+            "predicted_pct": 58.714,
+            "calibration_gap_pp": -13.0
+          },
+          "delta_candidate_minus_baseline": -9.6e-05,
+          "uncertainty": {
+            "weeks": 9,
+            "interval_95": [
+              -0.001843,
+              0.001364
+            ],
+            "evidence": "descriptive_week_block_bootstrap"
+          }
+        }
+      },
+      "uefa.champions": {
+        "over_1_5": {
+          "count": 51,
+          "observed_pct": 90.196,
+          "baseline": {
+            "brier": 0.090482,
+            "predicted_pct": 81.424,
+            "calibration_gap_pp": 8.773
+          },
+          "candidate": {
+            "brier": 0.090951,
+            "predicted_pct": 80.925,
+            "calibration_gap_pp": 9.271
+          },
+          "delta_candidate_minus_baseline": 0.000469,
+          "uncertainty": {
+            "weeks": 4,
+            "interval_95": null,
+            "evidence": "insufficient_weeks"
+          }
+        },
+        "over_2_5": {
+          "count": 51,
+          "observed_pct": 66.667,
+          "baseline": {
+            "brier": 0.217776,
+            "predicted_pct": 60.41,
+            "calibration_gap_pp": 6.257
+          },
+          "candidate": {
+            "brier": 0.219318,
+            "predicted_pct": 59.653,
+            "calibration_gap_pp": 7.014
+          },
+          "delta_candidate_minus_baseline": 0.001543,
+          "uncertainty": {
+            "weeks": 4,
+            "interval_95": null,
+            "evidence": "insufficient_weeks"
+          }
+        },
+        "under_1_5": {
+          "count": 51,
+          "observed_pct": 9.804,
+          "baseline": {
+            "brier": 0.090479,
+            "predicted_pct": 18.575,
+            "calibration_gap_pp": -8.771
+          },
+          "candidate": {
+            "brier": 0.090951,
+            "predicted_pct": 19.075,
+            "calibration_gap_pp": -9.271
+          },
+          "delta_candidate_minus_baseline": 0.000472,
+          "uncertainty": {
+            "weeks": 4,
+            "interval_95": null,
+            "evidence": "insufficient_weeks"
+          }
+        },
+        "under_2_5": {
+          "count": 51,
+          "observed_pct": 33.333,
+          "baseline": {
+            "brier": 0.217776,
+            "predicted_pct": 39.59,
+            "calibration_gap_pp": -6.257
+          },
+          "candidate": {
+            "brier": 0.219318,
+            "predicted_pct": 40.347,
+            "calibration_gap_pp": -7.014
+          },
+          "delta_candidate_minus_baseline": 0.001543,
+          "uncertainty": {
+            "weeks": 4,
+            "interval_95": null,
+            "evidence": "insufficient_weeks"
+          }
+        },
+        "btts": {
+          "count": 51,
+          "observed_pct": 62.745,
+          "baseline": {
+            "brier": 0.235253,
+            "predicted_pct": 59.961,
+            "calibration_gap_pp": 2.784
+          },
+          "candidate": {
+            "brier": 0.235621,
+            "predicted_pct": 59.645,
+            "calibration_gap_pp": 3.1
+          },
+          "delta_candidate_minus_baseline": 0.000369,
+          "uncertainty": {
+            "weeks": 4,
+            "interval_95": null,
+            "evidence": "insufficient_weeks"
+          }
+        },
+        "btts_no": {
+          "count": 51,
+          "observed_pct": 37.255,
+          "baseline": {
+            "brier": 0.235253,
+            "predicted_pct": 40.039,
+            "calibration_gap_pp": -2.784
+          },
+          "candidate": {
+            "brier": 0.235621,
+            "predicted_pct": 40.355,
+            "calibration_gap_pp": -3.1
+          },
+          "delta_candidate_minus_baseline": 0.000369,
+          "uncertainty": {
+            "weeks": 4,
+            "interval_95": null,
+            "evidence": "insufficient_weeks"
+          }
+        },
+        "home_or_draw": {
+          "count": 51,
+          "observed_pct": 64.706,
+          "baseline": {
+            "brier": 0.225196,
+            "predicted_pct": 64.943,
+            "calibration_gap_pp": -0.237
+          },
+          "candidate": {
+            "brier": 0.219585,
+            "predicted_pct": 64.951,
+            "calibration_gap_pp": -0.245
+          },
+          "delta_candidate_minus_baseline": -0.005611,
+          "uncertainty": {
+            "weeks": 4,
+            "interval_95": null,
+            "evidence": "insufficient_weeks"
+          }
+        },
+        "away_or_draw": {
+          "count": 51,
+          "observed_pct": 49.02,
+          "baseline": {
+            "brier": 0.249866,
+            "predicted_pct": 57.535,
+            "calibration_gap_pp": -8.516
+          },
+          "candidate": {
+            "brier": 0.244976,
+            "predicted_pct": 57.835,
+            "calibration_gap_pp": -8.816
+          },
+          "delta_candidate_minus_baseline": -0.004891,
+          "uncertainty": {
+            "weeks": 4,
+            "interval_95": null,
+            "evidence": "insufficient_weeks"
+          }
+        }
+      }
+    },
+    "uncertainty_method": {
+      "block": "ISO calendar week across all competitions",
+      "repetitions": 1000,
+      "seed": 1729,
+      "minimum_weeks": 8
+    },
+    "decision": "experimental_only_no_automatic_promotion",
+    "limitations": [
+      "Intervals are descriptive, not proof of generalization or profitability.",
+      "Teams also recur across weeks; week blocks do not remove all dependence.",
+      "Eight correlated markets are examined; intervals are not multiplicity-adjusted.",
+      "Retrospective availability is assumed; no prospective validation is claimed.",
+      "The historical replay reference is not every live production collection path."
+    ]
+  },
+  "dataset_sha256": "fcd3c865c1ff84dd9781c5e6abad3d165e6ddf409ee4c38afe0006ac44064a93",
+  "protocol_commit": "43977f9a00f63b841ed62ab7b585aea9295f5790",
+  "source_commit": "409a514e8cd0a110edc49388015f64c301489211",
+  "interpretation": "Small mixed retrospective differences: no production promotion. Goal markets deteriorate, BTTS essentially unchanged, double-chance gains require prospective confirmation.",
+  "fixtures_collected": 1809,
+  "remaining_source_failures": 1
+}

@@ -1,0 +1,138 @@
+{
+  "leagues": [
+    "eng.1",
+    "esp.1",
+    "ita.1",
+    "ger.1",
+    "fra.1",
+    "por.1",
+    "ned.1",
+    "uefa.champions"
+  ],
+  "start": "2025-07-01",
+  "end": "2026-02-28",
+  "requests": 1944,
+  "completed_requests": 1944,
+  "stopped_early": false,
+  "errors": [
+    {
+      "league": "eng.1",
+      "date": "2025-07-01",
+      "error": "ReadTimeout"
+    }
+  ],
+  "incomplete": [],
+  "limitation": "Retrospective provider archive, not a vintage snapshot. Result availability is assumed kickoff + 24h. Coverage and later corrections are not guaranteed.",
+  "dataset_sha256": "fcd3c865c1ff84dd9781c5e6abad3d165e6ddf409ee4c38afe0006ac44064a93",
+  "initial_errors": [
+    {
+      "league": "eng.1",
+      "date": "2025-07-01",
+      "error": "ReadTimeout"
+    },
+    {
+      "league": "eng.1",
+      "date": "2025-07-06",
+      "error": "ReadTimeout"
+    },
+    {
+      "league": "eng.1",
+      "date": "2025-07-03",
+      "error": "ReadTimeout"
+    },
+    {
+      "league": "eng.1",
+      "date": "2025-07-04",
+      "error": "ReadTimeout"
+    },
+    {
+      "league": "eng.1",
+      "date": "2025-07-02",
+      "error": "ReadTimeout"
+    },
+    {
+      "league": "eng.1",
+      "date": "2025-07-05",
+      "error": "ReadTimeout"
+    }
+  ],
+  "retries": [
+    {
+      "original_failure": {
+        "league": "eng.1",
+        "date": "2025-07-01",
+        "error": "ReadTimeout"
+      },
+      "fixtures": 0,
+      "errors": [
+        {
+          "league": "eng.1",
+          "date": "2025-07-01",
+          "error": "ReadTimeout"
+        }
+      ]
+    },
+    {
+      "original_failure": {
+        "league": "eng.1",
+        "date": "2025-07-06",
+        "error": "ReadTimeout"
+      },
+      "fixtures": 0,
+      "errors": []
+    },
+    {
+      "original_failure": {
+        "league": "eng.1",
+        "date": "2025-07-03",
+        "error": "ReadTimeout"
+      },
+      "fixtures": 0,
+      "errors": []
+    },
+    {
+      "original_failure": {
+        "league": "eng.1",
+        "date": "2025-07-04",
+        "error": "ReadTimeout"
+      },
+      "fixtures": 0,
+      "errors": []
+    },
+    {
+      "original_failure": {
+        "league": "eng.1",
+        "date": "2025-07-02",
+        "error": "ReadTimeout"
+      },
+      "fixtures": 0,
+      "errors": []
+    },
+    {
+      "original_failure": {
+        "league": "eng.1",
+        "date": "2025-07-05",
+        "error": "ReadTimeout"
+      },
+      "fixtures": 0,
+      "errors": []
+    }
+  ],
+  "second_retries": [
+    {
+      "original_failure": {
+        "league": "eng.1",
+        "date": "2025-07-01",
+        "error": "ReadTimeout"
+      },
+      "fixtures": 0,
+      "errors": [
+        {
+          "league": "eng.1",
+          "date": "2025-07-01",
+          "error": "ReadTimeout"
+        }
+      ]
+    }
+  ]
+}

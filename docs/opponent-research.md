@@ -97,3 +97,61 @@ rétrospectives à +24h ; aucune validation prospective réelle n’est revendiq
 Résumé durable : `research/opponent-benchmark-2026-11-02.json`. Les exécutions suivantes
 conservent aussi le jeu de données et son SHA-256 avec les rapports ; une réexécution
 identique est un contrôle de reproductibilité, pas un nouvel échantillon indépendant.
+
+## Confirmation temporelle du 3 novembre 2026
+
+Protocole et comparateur enregistrés **avant la collecte**, commit
+`43977f9a00f63b841ed62ab7b585aea9295f5790`. Le candidat v1 et ses constantes
+sont inchangés. Archive du 1er juillet 2025 au 28 février 2026 : initialisation
+jusqu'à novembre, validation décembre, test final janvier–février 2026.
+Cette période finale ne recoupe pas le test de novembre 2025.
+
+Collecte : 1 809 rencontres sur huit compétitions ; 1 944 requêtes initiales.
+Six erreurs initiales ont été retentées, puis une seconde fois pour la dernière.
+Une requête anglaise de juillet reste en échec : consulter l'audit pour la date
+et l'erreur exactes. Aucune exhaustivité historique n'est revendiquée.
+Les heures de disponibilité des résultats restent supposées à +24 h.
+
+Test final : 605 matchs appariés, 250 en validation. Les deux méthodes désignent
+correctement l'issue 1X2 sur 304 et 306 matchs, respectivement. Cela n'est ni un taux
+de tickets gagnants ni la performance des « Avis du jour ».
+
+| Marché | Brier référence | Brier candidat | Écart candidat − référence |
+| --- | ---: | ---: | ---: |
+| Plus de 1,5 but | 0,151965 | 0,152320 | +0,000355 |
+| Plus de 2,5 buts | 0,239378 | 0,239733 | +0,000355 |
+| BTTS | 0,239399 | 0,239398 | −0,000001 |
+| Double chance 1X | 0,194273 | 0,193618 | −0,000655 |
+| Double chance X2 | 0,218969 | 0,218527 | −0,000442 |
+
+Un Brier plus bas est meilleur. Les marchés inverses sont aussi dans le JSON :
+ils restent corrélés et ne constituent pas des confirmations indépendantes.
+Intervalles descriptifs par rééchantillonnage de semaines ISO, 1 000 répétitions,
+graine 1729. Neuf semaines seulement ; les clubs se répètent aussi entre semaines.
+Le gain 1X a un intervalle entièrement négatif sur cet échantillon, mais les marchés
+sont multiples et les intervalles non ajustés pour ces comparaisons. Aucun de ces
+résultats ne prouve une amélioration future ou une rentabilité.
+
+Ligue des champions : 51 matchs, 24 contre 25 issues 1X2 correctement désignées.
+Brier 1X2 : 0,600899 contre 0,590842, mais les scores BTTS et plus de 2,5 buts
+y régressent légèrement. Pas de validation spécifique UCL.
+
+**Décision : garder le candidat expérimental.** Les différences sont faibles et
+mixtes sur les marchés réellement visés. Aucun changement de calcul en production.
+Ne pas sélectionner une variante ou une compétition après lecture de ces résultats
+puis présenter ce même jeu comme une nouvelle preuve indépendante.
+
+Les archives et prédictions intégrales sont conservées en gzip dans `research/`,
+avec résumé JSON, audit de couverture et SHA-256 du jeu décompressé.
+Pour reproduire :
+
+```sh
+gzip -dc research/opponent-confirmation-archive-2026-11-03.json.gz > /tmp/confirmation.json
+python tools/benchmark_opponents.py --input /tmp/confirmation.json \
+  --validation-from 2025-12-01T00:00:00Z --test-from 2026-01-01T00:00:00Z \
+  --output /tmp/confirmation-report.json
+```
+
+Le prochain test d'efficacité doit utiliser une nouvelle période préfixée et,
+idéalement, des probabilités réellement figées avant match. Les 91 tests unitaires
+valident le fonctionnement du logiciel, pas l'efficacité des paris.
