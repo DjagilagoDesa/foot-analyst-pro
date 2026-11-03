@@ -135,7 +135,7 @@ def choose(results, existing, now, day):
                               rationale=rationale, expected_goals=r['prediction']['expected_goals'],
                               selection_basis=copy.deepcopy(dict(home=home, away=away,
                                   markets=r['prediction']['markets'],
-                                  source_errors=r.get('source_errors'),
+                                  source_errors=r.get('source_errors'), history=r.get('history'),
                                   captured_at=now.isoformat())),
                               model_version='poisson-ucl-540d-v1' if m['league']=='uefa.champions' else MODEL_VERSION, published_at=now.isoformat(), status='pending', home_score=None, away_score=None))
             used_events.add(m['id'])
@@ -290,7 +290,8 @@ class DailyOpinion:
             return None
         home = self.server.summary(home_games, match['home']['id'])
         away = self.server.summary(away_games, match['away']['id'])
-        return dict(match=match, home=home, away=away, source_errors=dict(home=he, away=ae),
+        return dict(match=match, home=home, away=away, history=dict(home=home_games, away=away_games),
+                    source_errors=dict(home=he, away=ae),
                     prediction=self.server.probabilities(home, away))
 
     def settle(self, board, recover_odds=True):
