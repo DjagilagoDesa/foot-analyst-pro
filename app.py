@@ -155,6 +155,13 @@ def probabilities(home,away):
     outcomes['away_or_draw']=outcomes['away']+outcomes['draw']
     return {'expected_goals':{'home':round(lh,2),'away':round(la,2)},'markets':{k:round(v*100,1) for k,v in outcomes.items()}}
 
+@app.after_request
+def fresh_browser_code(response):
+    # Installed Android windows must revalidate UI code across releases.
+    if request.path in ('/', '/index.html') or request.path.endswith('.js'):
+        response.headers['Cache-Control'] = 'no-store, max-age=0'
+    return response
+
 @app.get('/')
 def frontend():
     return send_from_directory('.', 'index.html')

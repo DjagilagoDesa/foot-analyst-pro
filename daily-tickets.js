@@ -22,6 +22,19 @@ function mixedDailySelections(results){
  }
  return selected.length===3?selected:[];
 }
+function dailyProfilesReady(results){
+ if(longDailySelections(results).length<5||mixedDailySelections(results).length<3)return false;
+ return [['prudent',2],['balanced',3],['offensive',3]].every(([profile,count])=>{
+  const teams=new Set();let found=0;
+  for(const r of results){
+   if(!ticketSelection(r.analysis.prediction?.markets||{},profile,r.analysis.market_odds))continue;
+   const ids=[String(r.match.home.id),String(r.match.away.id)];
+   if(ids.some(id=>teams.has(id)))continue;
+   ids.forEach(id=>teams.add(id));found++;
+  }
+  return found>=count;
+ });
+}
 /* An unavailable candidate must not discard the other daily proposals. */
 async function dailyVerifiedSelections(results){
  const checked=new Array(results.length);let cursor=0;
@@ -40,16 +53,16 @@ async function dailyVerifiedSelections(results){
  const message=(t,error=false)=>'<div class="message '+(error?'error':'')+'">'+esc(t)+'</div>';
  function renderLongTicket(results,locked){
   const selected=longDailySelections(results),title='Ticket 4 · Grand combiné · 5 à 8 matchs';
-  if(selected.length<5)return '<div class="panel"><h2>'+title+'</h2>'+message('Ticket non proposé : '+selected.length+' sélection(s) admissible(s), minimum 5. Chaque choix doit atteindre 75 % dans le modèle et disposer de 10 matchs par équipe. Aucun ajout forcé.')+(locked?message('Ton accès gratuit est terminé. Premium est nécessaire pour poursuivre l’étude des autres rencontres.'):'')+'</div>';
+  if(selected.length<5){unavailable.push('Grand combiné');return '';}
   simulations.push({selected,title});
   toTrack.push(...selected.map(r=>({analysis:r.analysis,market:r.choice.market})));
   const joint=selected.reduce((p,r)=>p*r.choice.probability/100,1);
   return '<div class="panel premium"><h2>'+title+'</h2><p>'+selected.length+' matchs retenus · seuil de 75 % par sélection dans le modèle.</p>'+selected.map((r,i)=>'<div class="message"><strong>'+esc((i+1)+'. '+r.match.home.name+' – '+r.match.away.name)+'</strong><p class="gold">'+esc(ticketLabel(r.choice.market,r.match,labels))+'</p><p>Probabilité modèle de ce choix : '+esc(r.choice.probability)+' %</p><details><summary>Voir les arguments et les surprises possibles</summary>'+renderAnalysisReport(r.analysis)+'</details></div>').join('')+message('Estimation combinée : '+(joint*100).toFixed(2).replace('.',',')+' % · Cote théorique : '+(1/joint).toFixed(2).replace('.',',')+'.')+'</div>';
  }
- let toTrack=[],simulations=[];
+ let toTrack=[],simulations=[],unavailable=[];
  let busy=false;
  get('generateDailyTickets').onclick=async()=>{
-  if(busy)return;toTrack=[];simulations=[];busy=true;get('generateDailyTickets').disabled=true;
+  if(busy)return;toTrack=[];simulations=[];unavailable=[];busy=true;get('generateDailyTickets').disabled=true;
   const out=get('automaticTicketsResult'),notice=get('automaticTicketsNotice');notice.innerHTML='';
   const day=new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Paris'}),skipped=[];let results=[],locked=false;
   out.innerHTML=message('Recherche des rencontres à venir du '+day+'…');
@@ -63,9 +76,10 @@ async function dailyVerifiedSelections(results){
    if(!fixtures.length){out.innerHTML=message('Aucun match encore à venir retrouvé aujourd’hui dans les compétitions couvertes. Les tickets personnalisés restent disponibles ci-dessous.');return;}
    await window.Accounts.refresh(false);
    for(const m of fixtures){
-    if(results.length>=8)break;
-    out.innerHTML=message('Préparation des tickets : '+results.length+' / 8 matchs analysés. Étude de '+m.home.name+' – '+m.away.name+'…');
+    if(dailyProfilesReady(results))break;
+    out.innerHTML=message('Préparation des tickets : '+results.length+' matchs analysés. Étude de '+m.home.name+' – '+m.away.name+'…');
     if(new Date(m.date)<=new Date()){skipped.push(m.home.name+' – '+m.away.name+' : déjà commencé');continue;}
+    try{await ticketVerifyFixtures([{match:m}]);}catch{skipped.push(m.home.name+' – '+m.away.name+' : rencontre non confirmée');continue;}
     const d=await window.Accounts.request('/api/analyze',{league:m.league,home_id:m.home.id,away_id:m.away.id,event_id:m.id,label:m.home.name+' – '+m.away.name});
     if(d.status==='locked'){locked=true;break;}
     if(d.status!=='ok'||!d.prediction?.markets){skipped.push(m.home.name+' – '+m.away.name+' : '+(d.message||'données insuffisantes'));continue;}
@@ -84,18 +98,20 @@ async function dailyVerifiedSelections(results){
     const choices=(profile==='mixed'?mixedDailySelections(results):results.map(r=>({...r,choice:ticketSelection(r.analysis.prediction.markets,profile,r.analysis.market_odds)})).filter(r=>r.choice).sort((a,b)=>b.choice.probability-a.choice.probability));
     const selected=[],teams=new Set();
     for(const r of choices){if(teams.has(String(r.match.home.id))||teams.has(String(r.match.away.id)))continue;selected.push(r);teams.add(String(r.match.home.id));teams.add(String(r.match.away.id));if(selected.length===count)break;}
-    if(selected.length<count)return '<div class="panel"><h2>'+title+'</h2>'+message('Pas assez de matchs distincts disposant de données suffisantes pour ce profil. Aucun ticket artificiellement complété.')+'</div>';
+    if(selected.length<count){unavailable.push(title.replace(/^Ticket \d+ · /,''));return '';}
     simulations.push({selected,title});
   toTrack.push(...selected.map(r=>({analysis:r.analysis,market:r.choice.market})));
     const joint=selected.reduce((p,r)=>p*r.choice.probability/100,1);
     return '<div class="panel premium"><h2>'+title+'</h2>'+selected.map((r,i)=>'<div class="message"><strong>'+esc((i+1)+'. '+r.match.home.name+' – '+r.match.away.name)+'</strong><p class="gold">'+esc(ticketLabel(r.choice.market,r.match,labels))+'</p><p>Probabilité du modèle : '+esc(r.choice.probability)+' %</p><details><summary>Lire l’analyse détaillée</summary>'+renderAnalysisReport(r.analysis)+'</details></div>').join('')+
      message('Estimation combinée : '+(joint*100).toFixed(2).replace('.',',')+' % · Cote théorique : '+(1/joint).toFixed(2).replace('.',',')+'.')+'</div>';
-   }).join('')+skipped.map(t=>message(t)).join('');
+   }).join('');
+   const unavailableHtml=unavailable.length?message(simulations.length?'Profils indisponibles : '+unavailable.join(', ')+'.':'Pas assez de matchs à venir vérifiés pour composer un ticket aujourd’hui.')+(!simulations.length?'<button type="button" class="day" data-next-day>CHOISIR LES MATCHS DE DEMAIN</button>':''):'';
    const missed=await window.Tracking.record(toTrack);
    ticketAssertFuture(simulations.flatMap(s=>s.selected));
    for(const {selected,title} of simulations)await window.Tracking.saveTicket?.(title,selected.map(r=>({analysis:r.analysis,market:r.choice.market})));
    ticketAssertFuture(simulations.flatMap(s=>s.selected));
-   out.innerHTML=ticketsHtml;
+   out.innerHTML=ticketsHtml+unavailableHtml;
+   const nextDay=out.querySelector('[data-next-day]');if(nextDay)nextDay.onclick=()=>{show('tickets');document.querySelector('[aria-controls="tickets-group-1"]')?.click();get('builderSource').value='auto';const tomorrow=new Date();tomorrow.setDate(tomorrow.getDate()+1);get('builderDate').value=tomorrow.toLocaleDateString('en-CA',{timeZone:'Europe/Paris'});window.TicketBuilder?.refresh();};
    out.querySelectorAll('.panel.premium').forEach(panel=>{
     const group=simulations.shift();if(group)window.OddsTicket?.mount(panel,group.selected);
    });
