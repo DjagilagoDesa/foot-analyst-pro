@@ -94,7 +94,7 @@ def init_app(app, fetch, base, leagues):
             raise AccountError('Un ticket doit contenir de 2 à 8 matchs.')
         normalized=[]
         for pick in picks:
-            if not isinstance(pick,dict) or pick.get('market') not in MARKETS or not isinstance(pick.get('analysis_id'),str):
+            if not isinstance(pick,dict) or not isinstance(pick.get('market'),str) or pick['market'] not in MARKETS or not isinstance(pick.get('analysis_id'),str):
                 raise AccountError('Sélection non valide.')
             normalized.append((pick['analysis_id'],pick['market']))
         now=int(time.time())
