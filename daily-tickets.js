@@ -22,6 +22,18 @@ function mixedDailySelections(results){
  }
  return selected.length===3?selected:[];
 }
+/* An unavailable candidate must not discard the other daily proposals. */
+async function dailyVerifiedSelections(results){
+ const checked=new Array(results.length);let cursor=0;
+ async function worker(){
+  while(cursor<results.length){
+   const i=cursor++,row=results[i];
+   try{await ticketVerifyFixtures([row]);checked[i]=row;}catch{checked[i]=null;}
+  }
+ }
+ await Promise.all(Array.from({length:Math.min(3,results.length)},worker));
+ return checked.filter(Boolean).filter(row=>{try{ticketAssertFuture([row]);return true;}catch{return false;}});
+}
 (()=>{
  const get=id=>document.getElementById(id),esc=escapeHtml;
  const labels={home_or_draw_and_btts:"1X + les deux équipes marquent",home_or_draw_and_btts_no:"1X + les deux équipes marquent : non",home_or_draw_and_over_1_5:"1X + plus de 1,5 but",home_or_draw_and_over_2_5:"1X + plus de 2,5 buts",home_or_draw_and_under_1_5:"1X + moins de 1,5 but",home_or_draw_and_under_2_5:"1X + moins de 2,5 buts",away_or_draw_and_btts:"X2 + les deux équipes marquent",away_or_draw_and_btts_no:"X2 + les deux équipes marquent : non",away_or_draw_and_over_1_5:"X2 + plus de 1,5 but",away_or_draw_and_over_2_5:"X2 + plus de 2,5 buts",away_or_draw_and_under_1_5:"X2 + moins de 1,5 but",away_or_draw_and_under_2_5:"X2 + moins de 2,5 buts",home:'Victoire domicile',away:'Victoire extérieur',home_or_draw:'Double chance 1X',away_or_draw:'Double chance X2',over_1_5:'Plus de 1,5 but',over_2_5:'Plus de 2,5 buts',under_1_5:'Moins de 1,5 but',under_2_5:'Moins de 2,5 buts',btts_no:'Les deux équipes marquent : non',btts:'Les deux équipes marquent'};
@@ -39,7 +51,7 @@ function mixedDailySelections(results){
  get('generateDailyTickets').onclick=async()=>{
   if(busy)return;toTrack=[];simulations=[];busy=true;get('generateDailyTickets').disabled=true;
   const out=get('automaticTicketsResult'),notice=get('automaticTicketsNotice');notice.innerHTML='';
-  const day=new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Paris'}),results=[],skipped=[];let locked=false;
+  const day=new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Paris'}),skipped=[];let results=[],locked=false;
   out.innerHTML=message('Recherche des rencontres à venir du '+day+'…');
   try{
    const feed=await api('/api/fixtures?date='+encodeURIComponent(day),45000);
@@ -63,7 +75,9 @@ function mixedDailySelections(results){
    notice.innerHTML=feed.partial?message('Calendrier incomplet.'):'';
    if(locked&&results.length===0){renderLockedAnalysis(out);return;}
    out.innerHTML=message('Vérification des matchs…');
-   await ticketVerifyFixtures(results);
+   const analyzedCount=results.length;results=await dailyVerifiedSelections(results);
+   if(!results.length){out.innerHTML=message('Aucune rencontre encore à venir n’a pu être confirmée. Choisis une autre date dans « Crée mon ticket ».');return;}
+   if(results.length<analyzedCount)notice.innerHTML+=message((analyzedCount-results.length)+' rencontre(s) écartée(s) après actualisation.');
    const profiles=[['prudent','Ticket 1 · Prudent',2],['balanced','Ticket 2 · Équilibré',3],['offensive','Ticket 3 · Offensif',3],['long','Ticket 4 · Grand combiné',0],['mixed','Ticket 5 · Double chance + buts sur chaque match',3]];
    const ticketsHtml=profiles.map(([profile,title,count])=>{
     if(profile==='long')return renderLongTicket(results,locked);
@@ -78,15 +92,15 @@ function mixedDailySelections(results){
      message('Estimation combinée : '+(joint*100).toFixed(2).replace('.',',')+' % · Cote théorique : '+(1/joint).toFixed(2).replace('.',',')+'.')+'</div>';
    }).join('')+skipped.map(t=>message(t)).join('');
    const missed=await window.Tracking.record(toTrack);
-   await ticketVerifyFixtures(results);
+   ticketAssertFuture(simulations.flatMap(s=>s.selected));
    for(const {selected,title} of simulations)await window.Tracking.saveTicket?.(title,selected.map(r=>({analysis:r.analysis,market:r.choice.market})));
-   await ticketVerifyFixtures(results);
+   ticketAssertFuture(simulations.flatMap(s=>s.selected));
    out.innerHTML=ticketsHtml;
    out.querySelectorAll('.panel.premium').forEach(panel=>{
     const group=simulations.shift();if(group)window.OddsTicket?.mount(panel,group.selected);
    });
    if(missed)notice.innerHTML+=message(missed+' sélection(s) non enregistrée(s) dans le suivi : rencontre non vérifiable, déjà commencée ou ancienne analyse.');
-  }catch(e){out.innerHTML=message('Tickets non finalisés : '+e.message,true);if(e.code==='login_required')window.Accounts.needsLogin(out);}
+  }catch(e){out.innerHTML=message(e.message.startsWith('Ticket')?e.message:'Préparation interrompue : '+e.message,true);if(e.code==='login_required')window.Accounts.needsLogin(out);}
   finally{busy=false;get('generateDailyTickets').disabled=false;await window.Accounts.afterAnalysis();}
  };
 })();
