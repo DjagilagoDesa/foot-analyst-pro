@@ -14,6 +14,20 @@
   const cls=p.status==='won'?'result-won':'result-lost';
   return '<footer class="opinion-team-odds '+cls+'" style="text-align:right;margin-top:12px;font-size:13px;font-weight:800" data-odds-outcome="'+side+'">'+value.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+'</footer>';
  }
+ function scorerHtml(board){
+  const p=board.scorer;
+  let html='<div class="opinion-group"><h3>⚽ Buteur du jour</h3>';
+  if(!p)return html+message('Aucun buteur sélectionné pour le moment.')+'</div>';
+  const state={won:'✓ Gagné',lost:'✗ Perdu',void:'Annulé',pending:new Date(p.match.date)>new Date()?'À venir':'Résultat à vérifier'}[p.status];
+  const lineup={reported_starter:'Titulaire indiqué par la source',unconfirmed:'Titularisation à confirmer',bench:'Remplaçant indiqué par la source',not_listed:'Présence à revérifier',unavailable:'Disponibilité à revérifier'}[p.availability]||'Titularisation à confirmer';
+  const perf=board.scorer_performance;
+  html+='<article class="opinion-pick"><h3>'+esc(p.player.name)+'</h3><p class="gold">'+esc(p.player.team_name)+' · Buteur</p><p>'+esc(p.match.home.name)+' – '+esc(p.match.away.name)+' · '+esc(new Date(p.match.date).toLocaleTimeString('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'}))+'</p><p><span class="'+({won:'result-won',lost:'result-lost'}[p.status]||'')+'">'+esc(state)+'</span></p>';
+  if(p.status==='pending')html+='<p>'+esc(lineup)+'</p>';
+  html+='<p><strong>'+esc(p.basis.goals)+' buts · '+esc(p.basis.appearances)+' apparitions</strong></p><details><summary>Pourquoi ce buteur ?</summary><p>'+esc(p.rationale)+'</p>';
+  if(perf)html+='<p>Suivi buteurs : '+esc(perf.won)+' gagnés · '+esc(perf.lost)+' perdus'+(perf.success_pct==null?'':' · '+esc(perf.success_pct)+' %')+'</p>';
+  html+='<p><a href="'+esc(p.source_url)+'" target="_blank" rel="noopener noreferrer">Voir les données du match</a></p></details><button type="button" class="day" data-scorer-match>OUVRIR LE MATCH</button></article></div>';
+  return html;
+ }
  function render(board){
   lastDay=board.day;lastBoard=board;
   const date=new Date(board.day+'T12:00:00+01:00').toLocaleDateString('fr-FR',{timeZone:'Europe/Paris',day:'numeric',month:'long'});
@@ -26,9 +40,11 @@
    const m=p.match, state={won:'✓ Gagné',lost:'✗ Perdu',void:'Annulé / non réglable',pending:new Date(m.date)>new Date()?'À venir':'Résultat à vérifier'}[p.status];
    return '<article class="opinion-pick"><div class="row"><strong>'+esc(m.home.name)+' – '+esc(m.away.name)+'</strong><span class="opinion-prob">'+esc(p.probability)+' %</span></div><p class="gold">'+esc(p.market==='home'?'Victoire '+m.home.name:p.market==='away'?'Victoire '+m.away.name:p.market_label)+'</p><p class="opinion-state">'+esc(new Date(m.date).toLocaleTimeString('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'}))+' · <span class="'+({won:'result-won',lost:'result-lost'}[p.status]||'')+'">'+esc(state)+'</span>'+(p.home_score!==null?' · '+esc(p.home_score)+' – '+esc(p.away_score):'')+'</p><details><summary>Pourquoi ce choix ?</summary><p>'+esc(p.rationale)+'</p><button type="button" class="day" data-opinion-match="'+esc(m.id)+'">OUVRIR LE MATCH</button></details>'+teamOdds(p)+'</article>';
   }).join('')+(!group.picks.length?message('Aucun choix admissible pour le moment.'):'')+'</div>').join('');
+  html+=scorerHtml(board);
   if(board.source_errors||board.result_source_errors)html+=message('Données partiellement indisponibles.');
   for(const id of targets){
    const target=document.getElementById(id);if(!target)continue;target.innerHTML=html;
+   const scorerButton=target.querySelector('[data-scorer-match]');if(scorerButton)scorerButton.onclick=()=>openMatch(board.scorer.match,'home');
    target.querySelectorAll('[data-opinion-match]').forEach(button=>button.onclick=()=>{
     const pick=board.groups.flatMap(g=>g.picks).find(p=>p.match.id===button.dataset.opinionMatch);
     if(pick)openMatch(pick.match,id==='homeDailyOpinion'?'home':'dailyTickets');

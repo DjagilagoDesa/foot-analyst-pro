@@ -1,0 +1,115 @@
+import copy,json,unittest
+from datetime import datetime,timedelta,timezone
+from unittest.mock import patch
+import daily_scorer as scorer
+from accounts import database
+import test_daily_opinion as dailytests
+
+NOW=dailytests.NOW;DAY=dailytests.DAY
+
+
+def payload():
+ m=dailytests.result(1)['match'];home=m['home']['id'];away=m['away']['id']
+ def team(tid,pid,name,goals):
+  return dict(team={'id':tid},leaders=[dict(name='goalsLeaders',leaders=[dict(athlete=dict(id=pid,displayName=name,status={'type':'active'}),statistics=[dict(name='totalGoals',value=goals),dict(name='appearances',value=9)])])])
+ def games(tid,other):
+  return dict(team={'id':tid},events=[dict(id=tid+'past'+str(i),gameDate=(NOW-timedelta(days=i+1)).isoformat(),homeTeamId=tid,awayTeamId=other,homeTeamScore='2',awayTeamScore='1',gameResult='W') for i in range(5)])
+ def roster(tid,pid):return dict(team={'id':tid},roster=[dict(athlete=dict(id=pid,displayName='Player '+pid),starter=True,active=True)])
+ data=dict(header=dict(season=dict(name='Test season'),competitions=[dict(id=m['id'],date=m['date'],status=dict(type=dict(state='pre',completed=False,name='STATUS_SCHEDULED'),period=0),competitors=[dict(homeAway='home',team={'id':home}),dict(homeAway='away',team={'id':away})])]),leaders=[team(home,'11','Alpha scorer',4),team(away,'22','Beta scorer',2)],lastFiveGames=[games(home,away),games(away,home)],rosters=[roster(home,'11'),roster(away,'22')])
+ return m,data
+
+
+class ScorerModel(unittest.TestCase):
+ def setUp(self):self.match,self.data=payload()
+ def choices(self):return scorer.candidates(self.data,self.match,NOW)
+ def pick(self):return self.choices()[0]
+ def final(self,goals=1,apps=1,period=2):
+  c=self.data['header']['competitions'][0];c['status']=dict(type=dict(state='post',completed=True,name='STATUS_FULL_TIME'),period=period)
+  self.data['rosters'][0]['roster'][0]['stats']=[dict(name='totalGoals',value=goals),dict(name='appearances',value=apps),dict(name='ownGoals',value=0)]
+ def settle(self,pick):
+  from types import SimpleNamespace
+  scorer.settle(SimpleNamespace(ESPN='source',fetch=lambda *a,**k:self.data),pick,NOW+timedelta(hours=5))
+ def test_observed_stats_match_context_and_no_fake_probability(self):
+  pick=self.pick();self.assertEqual(pick['player']['id'],'11');self.assertEqual(pick['basis']['goals'],4)
+  self.assertIn('4 buts en 9 apparitions',pick['rationale']);self.assertIn(self.match['away']['name'],pick['rationale']);self.assertNotIn('probability',pick)
+ def test_missing_invalid_and_small_statistics_not_selected(self):
+  for value in (None,True,'bad',float('nan'),float('inf'),-2):
+   m,data=payload();data['leaders'][0]['leaders'][0]['leaders'][0]['statistics'][0]['value']=value
+   self.assertEqual([p['player']['id'] for p in scorer.candidates(data,m,NOW)],['22'])
+  self.data['leaders'][0]['leaders'][0]['leaders'][0]['statistics'][1]['value']=2
+  self.assertEqual([p['player']['id'] for p in self.choices()],['22'])
+ def test_injury_bench_and_missing_roster_excluded(self):
+  for mode in ('bench','not_listed','injury','inactive'):
+   m,data=payload()
+   if mode=='bench':data['rosters'][0]['roster'][0]['starter']=False
+   if mode=='not_listed':data['rosters'][0]['roster'][0]['athlete']['id']='999'
+   if mode=='injury':data['injuries']=[dict(team={'id':m['home']['id']},injuries=[dict(athlete={'id':'11'},status='Out')])]
+   if mode=='inactive':data['leaders'][0]['leaders'][0]['leaders'][0]['athlete']['status']['type']='inactive'
+   self.assertNotIn('11',[p['player']['id'] for p in scorer.candidates(data,m,NOW)],mode)
+ def test_unknown_lineup_is_not_called_confirmed(self):
+  self.data['rosters']=[];pick=self.pick();self.assertEqual(pick['availability'],'unconfirmed');self.assertIn('reste à confirmer',pick['rationale'])
+ def test_wrong_event_team_kickoff_or_started_cannot_publish(self):
+  for mode in ('id','team','date','started'):
+   m,data=payload();c=data['header']['competitions'][0]
+   if mode=='id':c['id']='999'
+   if mode=='team':c['competitors'][0]['team']['id']='999'
+   if mode=='date':c['date']=(NOW+timedelta(days=1)).isoformat()
+   if mode=='started':c['status']['type']['state']='in'
+   try:rows=scorer.candidates(data,m,NOW)
+   except ValueError:rows=[]
+   self.assertEqual(rows,[],mode)
+ def test_future_or_missing_team_form_is_not_invented(self):
+  self.data['lastFiveGames'][0]['events'][0]['gameDate']=(NOW+timedelta(days=1)).isoformat()
+  self.assertEqual(len(self.pick()['basis']['team_form']),4)
+  self.data['lastFiveGames']=[];self.assertEqual(self.choices(),[])
+ def test_goals_win_no_goals_lose_and_own_goals_do_not_win(self):
+  for goals,outcome in [(1,'won'),(0,'lost')]:
+   self.match,self.data=payload();pick=self.pick();self.final(goals);self.data['rosters'][0]['roster'][0]['stats'].append(dict(name='ownGoals',value=1))
+   self.settle(pick);self.assertEqual(pick['status'],outcome)
+ def test_did_not_play_void_and_missing_stats_remain_pending(self):
+  pick=self.pick();self.final(0,0);self.settle(pick);self.assertEqual(pick['status'],'void')
+  self.match,self.data=payload();pick=self.pick();self.final();self.data['rosters'][0]['roster'][0]['stats']=[]
+  self.settle(pick);self.assertEqual(pick['status'],'pending')
+ def test_extra_time_and_rescheduled_void(self):
+  pick=self.pick();self.final(2,1,4);self.settle(pick);self.assertEqual(pick['status'],'void')
+  self.match,self.data=payload();pick=self.pick();self.data['header']['competitions'][0]['date']=(NOW+timedelta(days=1)).isoformat();self.settle(pick);self.assertEqual(pick['status'],'void')
+ def test_matching_identity_required_before_settlement(self):
+  pick=self.pick();self.final();self.data['header']['competitions'][0]['id']='999'
+  with self.assertRaises(ValueError):self.settle(pick)
+  self.assertEqual(pick['status'],'pending')
+
+
+class ScorerPersistence(unittest.TestCase):
+ setUp=dailytests.PersistenceTests.setUp
+ tearDown=dailytests.PersistenceTests.tearDown
+ def refresh(self,now=NOW):
+  match,data=payload();self.server.fetch.return_value=data
+  with patch.object(self.service,'fixtures',return_value=([match],0)),patch.object(self.service,'analyze',return_value=dailytests.result(1)),patch.object(self.service,'settle_previous'):
+   self.service.refresh(now)
+ def test_one_scorer_frozen_and_separate_performance(self):
+  self.refresh();first=self.service.read(DAY)[0];self.assertEqual(first['scorer']['player']['id'],'11');self.assertEqual(first['scorer']['published_at'],NOW.isoformat())
+  with patch('daily_scorer.select',side_effect=AssertionError('Already selected')):self.refresh(NOW+timedelta(minutes=20))
+  second=self.service.read(DAY)[0];self.assertEqual(first['scorer'],second['scorer']);self.assertEqual(self.service.performance(DAY)['pending'],1);self.assertEqual(self.service.scorer_performance(DAY)['pending'],1)
+  second['scorer']['status']='won'
+  with database() as db:db.execute('UPDATE daily_opinion_boards SET payload=? WHERE day=?',(json.dumps(second),DAY))
+  self.assertIsNone(self.service.performance(DAY)['success_pct']);self.assertEqual(self.service.scorer_performance(DAY)['success_pct'],100)
+ def test_existing_board_enriched_immediately_without_changing_six_picks(self):
+  picks=dailytests.choose(dailytests.results(),[],NOW,DAY)
+  with database() as db:db.execute('INSERT INTO daily_opinion_boards(day,payload,checked_at) VALUES(?,?,?)',(DAY,json.dumps(dict(picks=picks)),int(NOW.timestamp())))
+  self.refresh();board=self.service.read(DAY)[0];self.assertEqual(board['picks'],picks);self.assertIsNotNone(board['scorer'])
+ def test_no_retroactive_choice_after_network_delay(self):
+  match,data=payload();candidate=scorer.candidates(data,match,NOW)[0]
+  with patch('daily_scorer.select',return_value=([candidate],{})),patch.object(self.service,'fixtures',return_value=([match],0)),patch.object(self.service,'analyze',return_value=None),patch.object(self.service,'settle_previous'):
+   self.service.refresh(NOW+timedelta(hours=4))
+  self.assertIsNone(self.service.read(DAY)[0]['scorer'])
+ def test_endpoint_and_day_reset(self):
+  self.refresh()
+  with patch('daily_opinion.today',return_value=DAY):response=self.app.test_client().get('/api/daily-opinion')
+  self.assertEqual(response.json['scorer']['player']['id'],'11');self.assertEqual(response.json['scorer_performance']['scope'],'daily_scorer_only')
+  self.assertEqual(self.service.read('2026-11-02')[0],{})
+ def test_old_scorer_only_board_settles_even_without_six_picks(self):
+  self.refresh();board=self.service.read(DAY)[0];board['picks']=[]
+  with database() as db:db.execute('UPDATE daily_opinion_boards SET payload=? WHERE day=?',(json.dumps(board),DAY))
+  def settle(board,recover_odds=True):board['scorer']['status']='won'
+  with patch.object(self.service,'settle',side_effect=settle):self.service.settle_previous('2026-11-20')
+  self.assertEqual(self.service.read(DAY)[0]['scorer']['status'],'won')
