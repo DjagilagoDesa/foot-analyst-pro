@@ -19,7 +19,8 @@ SESSION.headers.update({'User-Agent': 'FootAnalystPro/22 (football statistics)'}
 CACHE = {}
 LOCK = threading.Lock()
 ESPN = 'https://site.api.espn.com/apis/site/v2/sports/soccer'
-LEAGUES = ['eng.1','esp.1','ita.1','ger.1','fra.1','bra.1','por.1','ned.1','usa.1','arg.1','mex.1','uefa.champions','uefa.europa']
+LEAGUES = ['eng.1','esp.1','ita.1','ger.1','fra.1','bra.1','por.1','ned.1','usa.1','arg.1','mex.1','uefa.champions','uefa.europa',
+           'eng.2','eng.3','eng.4','eng.fa','eng.league_cup','eng.trophy']
 
 def fetch(url, params=None, ttl=900):
     key = (url, tuple(sorted((params or {}).items())))

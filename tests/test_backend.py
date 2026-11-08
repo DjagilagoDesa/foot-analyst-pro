@@ -40,6 +40,14 @@ class BackendTests(unittest.TestCase):
             self.assertEqual(len(matches),1)
             self.assertEqual(errors,[])
 
+    def test_english_trophy_and_lower_divisions_are_covered(self):
+        for league in ('eng.2','eng.3','eng.4','eng.fa','eng.league_cup','eng.trophy'):
+            self.assertIn(league, self.client.get('/api/leagues').json['leagues'])
+        with patch.object(server, 'fetch', return_value={'events':[event(completed=False,future=True)]}):
+            response=self.client.get('/api/fixtures?league=eng.trophy')
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.json['events'][0]['league'],'eng.trophy')
+
     def test_low_sample_never_generates_probabilities(self):
         with patch.object(server,'history',return_value=([],[])), patch.object(server,'head_to_head',return_value={'matches':[]}), server.app.test_request_context('/api/analyze',method='POST',json={'league':'fra.1','home_id':'1','away_id':'2'}):
             data=server.analyze().get_json()

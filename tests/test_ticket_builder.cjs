@@ -17,7 +17,7 @@ async function run(mode){
  await ids.builderForm.onsubmit({preventDefault(){}});
  if(mode==='ok'){assert.equal(calls,3);assert(ids.builderResult.innerHTML.includes('1X + Les deux'));}
  if(mode==='personal'){assert.equal(calls,2);assert(ids.builderResult.innerHTML.includes('2 matchs'));assert(ids.builderCount.disabled);}
- if(mode==='empty'){assert.equal(calls,0);assert(ids.builderResult.innerHTML.includes('Pas assez'));}
+ if(mode==='empty'){assert.equal(calls,0);assert(ids.builderResult.innerHTML.includes('0 rencontre(s)'));}
  if(mode==='locked'){assert.equal(calls,1);assert.equal(ids.builderResult.innerHTML,'LOCKED');}
  if(['source-failed','source-changed'].includes(mode)){
   assert.equal(tracked,0);assert.equal(calls,3);assert(!ids.builderResult.innerHTML.includes('Ton ticket ·'));assert(ids.builderResult.innerHTML.includes('Ticket non finalisé'));

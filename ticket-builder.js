@@ -22,10 +22,10 @@ function builderSelection(markets,risk,type,odds){
   const target=get('builderResult'),button=get('builderSubmit');button.disabled=true;refresh();
   const personal=get('builderSource').value==='personal',risk=get('builderRisk').value,type=get('builderMarket').value,skipped=[],results=[];
   try{
-   let matches=personal?(window.PersonalTicket?.getMatches()||[]):[],count=personal?matches.length:Number(get('builderCount').value),available=0;
+   let matches=personal?(window.PersonalTicket?.getMatches()||[]):[],count=personal?matches.length:Number(get('builderCount').value),available=0,feedPartial=false;
    if(count<2||count>8){target.innerHTML=message('Sélectionne de 2 à 8 matchs dans ton ticket personnalisé avant de composer.',true);return;}
-   if(!personal){target.innerHTML=message('Recherche des rencontres à venir…');const feed=await api('/api/fixtures?date='+encodeURIComponent(get('builderDate').value),45000);matches=(feed.events||[]).filter(upcoming).sort((a,b)=>a.date.localeCompare(b.date));available=matches.length;matches=matches.slice(0,16);}
-   if(matches.length<count){target.innerHTML=message('Pas assez de rencontres à venir retrouvées pour '+count+' matchs. Choisis une autre date ou un ticket plus court.',true);return;}
+   if(!personal){target.innerHTML=message('Recherche des rencontres à venir…');const feed=await api('/api/fixtures?date='+encodeURIComponent(get('builderDate').value),45000);feedPartial=!!feed.partial;matches=(feed.events||[]).filter(upcoming).sort((a,b)=>a.date.localeCompare(b.date));available=matches.length;matches=matches.slice(0,16);}
+   if(matches.length<count){target.innerHTML=message('Calendrier du '+get('builderDate').value.split('-').reverse().join('/')+' : '+matches.length+' rencontre(s) à venir retrouvée(s)'+(feedPartial?' (calendrier partiel)':'')+'. Il en faut '+count+' pour ce ticket.',true);return;}
    await window.Accounts.refresh(false);
    const teams=new Set(),events=new Set();
    for(const match of matches){
