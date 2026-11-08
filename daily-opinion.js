@@ -22,19 +22,35 @@
   const label=price.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2});
   return '<strong class="'+({won:'result-won',lost:'result-lost'}[p.status]||'gold')+'" title="'+esc(q.bookmaker+' · '+new Date(q.observed_at).toLocaleString('fr-FR',{timeZone:'Europe/Paris'}))+'" aria-label="'+esc('Cote buteur '+q.bookmaker+' '+label)+'">'+label+'</strong>';
  }
+ function scorerTracking(perf){
+  let html='<section><h3>Suivi des buteurs</h3>';
+  if(perf)html+='<div class="analysis"><div class="stat"><span>Réussite buteurs</span><b>'+(perf.success_pct==null?'—':esc(perf.success_pct)+' %')+'</b></div><div class="stat result-won"><span>Gagnés</span><b>'+esc(perf.won)+'</b></div><div class="stat result-lost"><span>Perdus</span><b>'+esc(perf.lost)+'</b></div></div>';
+  return html+'<details data-scorer-history><summary>Historique des buteurs</summary><div data-scorer-history-content></div></details></section>';
+ }
+ async function historyPage(details,page){
+  const content=details.querySelector('[data-scorer-history-content]');
+  content.innerHTML=message('Chargement…');
+  try{
+   const data=await api('/api/daily-opinion/scorer-history?page='+page,15000);
+   content.innerHTML=(data.items||[]).map(p=>'<article class="opinion-pick"><div class="row"><strong>'+esc(p.player.name)+'</strong>'+scorerPrice(p)+'</div><p>'+esc(p.match.home.name)+' – '+esc(p.match.away.name)+'</p><div class="row"><span>'+esc(new Date(p.day+'T12:00:00Z').toLocaleDateString('fr-FR',{timeZone:'Europe/Paris'}))+'</span><strong class="'+({won:'result-won',lost:'result-lost'}[p.status]||'')+'">'+esc({won:'✓ Gagné',lost:'✗ Perdu',void:'Annulé',pending:'En attente'}[p.status]||'En attente')+'</strong></div></article>').join('')||message('Aucun buteur enregistré.');
+   if(page>1||data.has_more)content.innerHTML+='<div class="row">'+(page>1?'<button type="button" class="day" data-history-prev>Précédent</button>':'')+'<span>Page '+esc(page)+'</span>'+(data.has_more?'<button type="button" class="day" data-history-next>Suivant</button>':'')+'</div>';
+   const prev=content.querySelector('[data-history-prev]'),next=content.querySelector('[data-history-next]');
+   if(prev)prev.onclick=()=>historyPage(details,page-1);if(next)next.onclick=()=>historyPage(details,page+1);
+  }catch{content.innerHTML=message('Historique indisponible.')+'<button type="button" class="day" data-history-retry>Réessayer</button>';content.querySelector('button').onclick=()=>historyPage(details,page);}
+ }
  function scorerHtml(board){
   const p=board.scorer;
   let html='<div class="opinion-group"><h3>⚽ Buteur du jour</h3>';
-  if(!p)return html+message('Aucun buteur sélectionné pour le moment.')+'</div>';
+  if(!p)return html+message('Aucun buteur sélectionné pour le moment.')+'</div>'+scorerTracking(board.scorer_performance);
   const state={won:'✓ Gagné',lost:'✗ Perdu',void:'Annulé',pending:new Date(p.match.date)>new Date()?'À venir':'Résultat à vérifier'}[p.status];
   const lineup={reported_starter:'Titulaire indiqué par la source',unconfirmed:'Titularisation à confirmer',bench:'Remplaçant indiqué par la source',not_listed:'Présence à revérifier',unavailable:'Disponibilité à revérifier'}[p.availability]||'Titularisation à confirmer';
   const perf=board.scorer_performance;
   html+='<article class="opinion-pick"><div class="row"><h3>'+esc(p.player.name)+'</h3><span data-scorer-odds>'+scorerPrice(p)+'</span></div><p class="gold">'+esc(p.player.team_name)+' · Buteur</p><p>'+esc(p.match.home.name)+' – '+esc(p.match.away.name)+' · '+esc(new Date(p.match.date).toLocaleTimeString('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'}))+'</p><p><span class="'+({won:'result-won',lost:'result-lost'}[p.status]||'')+'">'+esc(state)+'</span></p>';
   if(p.status==='pending')html+='<p>'+esc(lineup)+'</p>';
   html+='<p><strong>'+esc(p.basis.goals)+' buts · '+esc(p.basis.appearances)+' apparitions</strong></p><details><summary>Pourquoi ce buteur ?</summary><p>'+esc(p.rationale)+'</p>';
-  if(perf)html+='<p>Suivi buteurs : '+esc(perf.won)+' gagnés · '+esc(perf.lost)+' perdus'+(perf.success_pct==null?'':' · '+esc(perf.success_pct)+' %')+'</p>';
+
   html+='<p><a href="'+esc(p.source_url)+'" target="_blank" rel="noopener noreferrer">Voir les données du match</a></p></details><button type="button" class="day" data-scorer-match>OUVRIR LE MATCH</button></article></div>';
-  return html;
+  return html+scorerTracking(perf);
  }
  function render(board){
   const signature=JSON.stringify(board);if(signature===lastSignature)return;lastSignature=signature;
@@ -53,6 +69,7 @@
   if(board.source_errors||board.result_source_errors)html+=message('Données partiellement indisponibles.');
   for(const id of targets){
    const target=document.getElementById(id);if(!target)continue;target.innerHTML=html;
+   const history=target.querySelector('[data-scorer-history]');if(history)history.ontoggle=()=>{if(history.open&&!history.querySelector('[data-scorer-history-content]').innerHTML)historyPage(history,1);};
    const scorerButton=target.querySelector('[data-scorer-match]');if(scorerButton)scorerButton.onclick=()=>openMatch(board.scorer.match,'home');
    target.querySelectorAll('[data-opinion-match]').forEach(button=>button.onclick=()=>{
     const pick=board.groups.flatMap(g=>g.picks).find(p=>p.match.id===button.dataset.opinionMatch);

@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from flask import jsonify
+from flask import jsonify, request
 from accounts import database, configured, DAILY_OPINION_SCHEMA
 from tracking import fixture_info, score, resolve
 from evaluation import evaluate, MODEL_VERSION
@@ -217,6 +217,18 @@ class DailyOpinion:
             if pick.get('status') in counts:counts[pick['status']]+=1
         settled=counts['won']+counts['lost']
         return dict(**counts,success_pct=round(100*counts['won']/settled,1) if settled else None,scope='daily_scorer_only')
+
+    def scorer_history(self, day, page=1):
+        with database() as db:
+            rows = db.execute('SELECT day,payload FROM daily_opinion_boards WHERE day<=? ORDER BY day DESC', (day,)).fetchall()
+        items = []
+        for row in rows:
+            pick = json.loads(row['payload']).get('scorer')
+            if pick:
+                items.append(dict(day=row['day'], **pick))
+        start = (page - 1) * 5
+        return dict(items=items[start:start + 5], page=page, has_more=len(items)>start+5,
+                    performance=self.scorer_performance(day))
 
     def refresh(self, now=None):
         now = now or datetime.now(timezone.utc)
@@ -432,6 +444,15 @@ def init_app(app, server):
             method='Modèle statistique Poisson, 10 matchs terminés par équipe. Pas de cotes bookmaker, compositions ou absences vérifiées. Probabilités non calibrées.',
             scope=f'Compétitions couvertes : {len(server.LEAGUES)}. Au maximum {LIMIT} rencontres étudiées, réparties sur la journée. Ce n’est pas une sélection exhaustive du football mondial.',
             update_note='Nouvelle journée à minuit, heure de Paris. Vérification environ toutes les 15 minutes lorsque le serveur est actif ; reprise à son réveil. Les choix publiés restent figés, les places manquantes peuvent être complétées avant le coup d’envoi.')
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+
+    @app.get('/api/daily-opinion/scorer-history')
+    def scorer_history():
+        if not configured():return jsonify(status='unavailable'),503
+        try:page = max(1, min(10000, int(request.args.get('page', '1'))))
+        except ValueError:return jsonify(error='invalid_page'),400
+        response = jsonify(**service.scorer_history(today(), page))
         response.headers['Cache-Control'] = 'no-store'
         return response
 

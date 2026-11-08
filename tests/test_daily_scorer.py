@@ -113,3 +113,22 @@ class ScorerPersistence(unittest.TestCase):
   def settle(board,recover_odds=True):board['scorer']['status']='won'
   with patch.object(self.service,'settle',side_effect=settle):self.service.settle_previous('2026-11-20')
   self.assertEqual(self.service.read(DAY)[0]['scorer']['status'],'won')
+
+ def test_history_pagination_and_independent_rate(self):
+  self.refresh();board=self.service.read(DAY)[0]
+  statuses=['won','lost','void','pending','won','lost','won']
+  with database() as db:
+   db.execute('DELETE FROM daily_opinion_boards')
+   for i,status in enumerate(statuses):
+    board['scorer']['status']=status
+    db.execute('INSERT INTO daily_opinion_boards(day,payload,checked_at) VALUES(?,?,?)',
+      (f'2026-10-{20+i}',json.dumps(board),0))
+  with patch('daily_opinion.today',return_value=DAY):
+   client=self.app.test_client();first=client.get('/api/daily-opinion/scorer-history').json
+   second=client.get('/api/daily-opinion/scorer-history?page=2').json
+   self.assertEqual(client.get('/api/daily-opinion/scorer-history?page=bad').status_code,400)
+  self.assertEqual(len(first['items']),5);self.assertTrue(first['has_more'])
+  self.assertEqual(len(second['items']),2);self.assertFalse(second['has_more'])
+  self.assertEqual(first['items'][0]['day'],'2026-10-26')
+  self.assertEqual(first['performance']['success_pct'],60)
+  self.assertEqual(first['performance']['scope'],'daily_scorer_only')
