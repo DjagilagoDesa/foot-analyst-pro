@@ -23,7 +23,7 @@
   }catch(e){if(requestEpoch===epoch&&requestView===view){const error=document.createElement('div');error.className='message';error.textContent=e.message;target.appendChild(error);}}
  }
  window.Tracking={
- clear:()=>{epoch++;view++;const target=get('trackingResult');if(target)target.textContent='';},
+ clear:()=>{epoch++;view++;const target=get('trackingResult');if(target)target.textContent='';const summary=get('ticketPerformance');if(summary)summary.textContent='';},
  saveTicket:async(title,picks)=>{
   const selections=picks.map(p=>({analysis_id:p.analysis.tracking_id,market:p.market}));
   if(selections.some(p=>!p.analysis_id))throw Error('Ticket non archivé : sélection non enregistrée.');
@@ -38,18 +38,20 @@
   return missed;
  },load:async()=>{
   const target=get('trackingResult'),button=get('refreshTracking');if(button.disabled)return;
+  const summary=get('ticketPerformance');if(summary)summary.innerHTML='<h2>Mes résultats</h2><div class="message">Chargement…</div>';
   const requestEpoch=++epoch;button.disabled=true;button.textContent='↻ VÉRIFICATION…';target.innerHTML='<div class="message">Vérification des résultats…</div>';
   try{
    const r=await fetch('/api/tracking/performance',{credentials:'same-origin',headers:{Accept:'application/json'}}),d=await r.json();
    if(requestEpoch!==epoch)return;
    if(!r.ok)throw Error(d.message||'Suivi indisponible');
-   target.innerHTML='<div class="section-tabs" aria-label="Mes tickets"><button type="button" data-status="pending" aria-pressed="true">En cours</button><button type="button" data-status="past" aria-pressed="false">Passés</button></div><div id="ticketArchive" aria-live="polite"></div><details><summary>Statistiques et paris individuels</summary><div class="analysis"><div class="stat"><span>Ma réussite</span><b>'+(d.success_pct===null?'—':esc(d.success_pct)+' %')+'</b></div><div class="stat"><span>Paris gagnés</span><b>'+esc(d.won)+'</b></div><div class="stat"><span>Paris perdus</span><b>'+esc(d.lost)+'</b></div><div class="stat"><span>En attente</span><b>'+esc(d.pending)+'</b></div></div><div id="trackedSelections"></div></details>'+(d.source_errors?'<div class="message">Certains résultats restent à vérifier.</div>':'');
+   if(summary)summary.innerHTML='<h2>Mes résultats</h2><div class="analysis"><div class="stat"><span>Réussite</span><b>'+(d.success_pct===null?'—':esc(d.success_pct)+' %')+'</b></div><div class="stat result-won"><span>Paris gagnés</span><b>'+esc(d.won)+'</b></div><div class="stat result-lost"><span>Paris perdus</span><b>'+esc(d.lost)+'</b></div><div class="stat"><span>En attente</span><b>'+esc(d.pending)+'</b></div></div>';
+   target.innerHTML='<div class="section-tabs" aria-label="Mes tickets"><button type="button" data-status="pending" aria-pressed="true">En cours</button><button type="button" data-status="past" aria-pressed="false">Passés</button></div><div id="ticketArchive" aria-live="polite"></div><details><summary>Paris individuels</summary><div id="trackedSelections"></div></details>'+(d.source_errors?'<div class="message">Certains résultats restent à vérifier.</div>':'');
    const list=get('trackedSelections'),rows=d.recent||[];let limit=0;
    const more=document.createElement('button');more.type='button';more.className='day list-more';more.textContent='VOIR PLUS';
    const append=()=>{rows.slice(limit,limit+5).forEach(p=>{const node=document.createElement('div');node.innerHTML=renderPick(p);list.insertBefore(node,more);});limit+=5;more.hidden=limit>=rows.length;};list.appendChild(more);more.onclick=append;append();
    target.querySelectorAll('[data-status]').forEach(b=>b.onclick=()=>{target.querySelectorAll('[data-status]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));get('ticketArchive').innerHTML='<div class="message">Chargement…</div>';archive(b.dataset.status,0,requestEpoch,++view);});
    await archive('pending',0,requestEpoch,++view);
-  }catch(e){if(requestEpoch===epoch){target.innerHTML='<div class="message">'+esc(e.message)+'</div>';if(/Connecte|connecte|connexion/i.test(e.message))window.Accounts.needsLogin(target);}}
+  }catch(e){if(requestEpoch===epoch){if(summary)summary.innerHTML='<h2>Mes résultats</h2><div class="message">'+esc(e.message)+'</div>';target.innerHTML='<div class="message">'+esc(e.message)+'</div>';if(/Connecte|connecte|connexion/i.test(e.message))window.Accounts.needsLogin(target);}}
   finally{button.disabled=false;button.textContent='↻ ACTUALISER';}
  }};
  get('refreshTracking').onclick=window.Tracking.load;

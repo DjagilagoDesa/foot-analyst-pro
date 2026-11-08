@@ -11,7 +11,10 @@
   });section.insertBefore(nav,section.children[1]);
  }
  const daily=document.getElementById('dailyTickets');
- if(daily){const n=[...daily.children].slice(1);tabs(daily,[['Du jour',n.slice(1,3)],['En cours / Passés',n.slice(0,1)],['Personnalisé',n.slice(3)]]);}
+ if(daily){const n=[...daily.children].slice(1);tabs(daily,[['Du jour',n.slice(1,3)],['En cours / Passés',n.slice(0,1)],['Personnalisé',n.slice(3)]]);
+  const summary=document.createElement('div');summary.id='ticketPerformance';summary.className='panel';summary.setAttribute('aria-live','polite');
+  daily.insertBefore(summary,document.getElementById('dailyTickets-group-0'));
+ }
  const analyses=document.getElementById('tickets');
  if(analyses)tabs(analyses,[['Mes analyses',[analyses.children[1]]],['Créer un ticket',[analyses.children[2]]]]);
  function compact(target){
