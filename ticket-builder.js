@@ -16,7 +16,7 @@ function builderSelection(markets,risk,type,odds){
  get('builderDate').value=new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Paris'});
  function refresh(){const personal=get('builderSource').value==='personal';get('builderCount').disabled=personal||busy;get('builderDate').disabled=personal||busy;get('builderChoose').hidden=!personal;const n=window.PersonalTicket?.getMatches().length||0;get('builderSourceInfo').textContent=personal?n+' matchs sélectionnés':'';get('builderSourceInfo').hidden=!personal;}
  get('builderSource').onchange=refresh;
- get('builderChoose').onclick=()=>{show('dailyTickets');get('customDate').scrollIntoView({behavior:'smooth',block:'center'});};
+ get('builderChoose').onclick=()=>{show('dailyTickets');document.querySelector('[aria-controls="dailyTickets-group-2"]')?.click();get('customDate').scrollIntoView({behavior:'smooth',block:'center'});};
  get('builderForm').onsubmit=async e=>{
   e.preventDefault();if(busy)return;busy=true;const run=++generation;
   const target=get('builderResult'),button=get('builderSubmit');button.disabled=true;refresh();
