@@ -23,10 +23,19 @@
   });target.classList.add('compact-list');
  }
  for(const id of ['automaticTicketsResult']){const target=document.getElementById(id);if(target)new MutationObserver(()=>{if([...target.children].some(n=>n.classList.contains('panel')))compact(target);}).observe(target,{childList:true});}
- window.CompactLists={paginate(target,size=5){
+ const opinions=document.getElementById('homeDailyOpinion');
+ if(opinions)new MutationObserver(()=>{
+  for(const group of [...opinions.children].filter(n=>n.classList.contains('opinion-group'))){
+   const heading=group.querySelector('h3');if(!heading)continue;
+   const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent=heading.textContent;
+   group.replaceWith(details);details.append(summary,group);heading.hidden=true;
+  }
+ }).observe(opinions,{childList:true});
+ window.CompactLists={paginate(target,size=5,key=''){
+
   const rows=[...target.querySelectorAll(':scope > .match')];if(rows.length<=size)return;
-  let count=size;rows.forEach((row,i)=>row.hidden=i>=count);
+  let count=target.dataset.listKey===key?Number(target.dataset.listCount)||size:size;target.dataset.listKey=key;target.dataset.listCount=String(count);rows.forEach((row,i)=>row.hidden=i>=count);
   const more=document.createElement('button');more.type='button';more.className='day list-more';more.textContent='VOIR PLUS';
-  more.onclick=()=>{count+=size;rows.forEach((row,i)=>row.hidden=i>=count);more.hidden=count>=rows.length;};target.appendChild(more);
+  more.onclick=()=>{count+=size;target.dataset.listCount=String(count);rows.forEach((row,i)=>row.hidden=i>=count);more.hidden=count>=rows.length;};target.appendChild(more);
  }};
 })();
