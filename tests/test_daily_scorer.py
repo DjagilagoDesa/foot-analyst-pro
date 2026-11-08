@@ -152,3 +152,39 @@ class ScorerPersistence(unittest.TestCase):
   perf=self.service.scorer_performance(DAY);self.assertEqual(perf['success_pct'],50)
   self.assertEqual(len(self.service.scorer_history(DAY)['items']),3)
   with patch('daily_scorer.select',side_effect=AssertionError('Already three')):self.refresh(NOW+timedelta(minutes=40))
+
+
+class RecentPlayerEvidence(unittest.TestCase):
+ def test_short_usage_reduces_ranking_and_missing_minutes_are_not_invented(self):
+  match,data=payload();original=scorer.candidates(data,match,NOW)[0]
+  def rows(minutes,goals=0):
+   return [dict(event_id=str(i),appearances=1,goals=goals,starter=False,minutes=minutes,shots_on_target=1,penalty_goals=None) for i in range(3)]
+  short=copy.deepcopy(original);full=copy.deepcopy(original)
+  scorer.apply_recent(short,rows(20),NOW)
+  scorer.apply_recent(full,rows(90),NOW)
+  self.assertLess(short['ranking'],full['ranking'])
+  self.assertIn('20 minutes',short['rationale'])
+  missing=copy.deepcopy(original);scorer.apply_recent(missing,rows(None),NOW)
+  self.assertIn('minutes non documentées',missing['rationale'])
+  self.assertEqual(missing['basis']['penalty_role'],'unconfirmed')
+  self.assertNotIn('probability',missing)
+ def test_recent_goals_change_ranking_but_tiny_samples_do_not(self):
+  match,data=payload();original=scorer.candidates(data,match,NOW)[0]
+  def records(goals):return [dict(appearances=1,goals=goals,starter=True,minutes=None,shots_on_target=None,penalty_goals=None) for _ in range(3)]
+  hot=copy.deepcopy(original);cold=copy.deepcopy(original)
+  scorer.apply_recent(hot,records(1),NOW);scorer.apply_recent(cold,records(0),NOW)
+  self.assertGreater(hot['ranking'],cold['ranking'])
+  small=copy.deepcopy(original);scorer.apply_recent(small,records(3)[:1],NOW)
+  self.assertEqual(small['ranking'],original['ranking'])
+ def test_historical_identity_and_completed_state_required(self):
+  match,data=payload();pid='11';tid=match['home']['id'];game=dict(id=match['id'],home_id=tid,away_id=match['away']['id'])
+  c=data['header']['competitions'][0];c['date']=(NOW-timedelta(days=1)).isoformat();c['status']=dict(type=dict(state='post',completed=True,name='STATUS_FULL_TIME'),period=2)
+  data['rosters'][0]['roster'][0]['stats']=[dict(name='appearances',value=1),dict(name='totalGoals',value=1),dict(name='minutesPlayed',value=75)]
+  row=scorer.recent_player_match(data,game,tid,pid,NOW);self.assertEqual(row['minutes'],75)
+  for mode in ('wrong_id','future','live','extra_time'):
+   altered=copy.deepcopy(data);comp=altered['header']['competitions'][0]
+   if mode=='wrong_id':comp['id']='999'
+   if mode=='future':comp['date']=(NOW+timedelta(days=1)).isoformat()
+   if mode=='live':comp['status']['type']['state']='in'
+   if mode=='extra_time':comp['status']['period']=4
+   self.assertIsNone(scorer.recent_player_match(altered,game,tid,pid,NOW),mode)

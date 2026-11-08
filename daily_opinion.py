@@ -451,7 +451,7 @@ def init_app(app, server):
         groups = [dict(id=key, title=title, target=count,
                        picks=[p for p in board.get('picks', []) if p['group'] == key]) for key, count, title in GROUPS]
         response = jsonify(**{k: v for k, v in board.items() if k not in ('day', 'picks', 'scorers')},
-            day=day, status=status, stale=stale, groups=groups,scorers=scorer_picks(board),scorer_target=3,
+            day=day, status=status, stale=stale, groups=groups,scorers=scorer_picks(board),scorer_target=3,scorer_model_version=daily_scorer.MODEL,
             performance=service.performance(day),scorer_performance=service.scorer_performance(day),
             refresh_seconds=30 if status == 'preparing' else 120,
             method='Modèle statistique Poisson, 10 matchs terminés par équipe. Pas de cotes bookmaker, compositions ou absences vérifiées. Probabilités non calibrées.',

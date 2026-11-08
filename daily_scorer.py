@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from tracking import fixture_info
 
-MODEL = 'scorer-season-form-v1'
+MODEL = 'scorer-recent-usage-v2'
 MAX_FIXTURES = 12
 
 
@@ -51,7 +51,7 @@ def form(data,team_id,now):
                 hg,ag=number(game.get('homeTeamScore')),number(game.get('awayTeamScore'))
                 if team_id not in (home,away) or not 3*3600<=age<=90*86400 or game.get('gameResult') not in ('W','L','D'):continue
                 if hg is None or ag is None or not hg.is_integer() or not ag.is_integer():continue
-                games.append(dict(id=str(game['id']),date=game['gameDate'],scored=int(hg if home==team_id else ag),conceded=int(ag if home==team_id else hg)))
+                games.append(dict(id=str(game['id']),date=game['gameDate'],scored=int(hg if home==team_id else ag),conceded=int(ag if home==team_id else hg),home_id=home,away_id=away))
             except (KeyError,ValueError,TypeError,AttributeError):continue
     games=list({g['id']:g for g in games}.values())
     games.sort(key=lambda g:instant(g['date']),reverse=True)
@@ -112,7 +112,7 @@ def candidates(data,match,now):
                         f"{team['name']} a marqué {sum(g['scored'] for g in own_games)} buts sur ses {len(own_games)} derniers matchs exploitables, "
                         f"et {opponent['name']} en a encaissé {conceded} sur {len(other_games)}. "
                         f"{lineup} Je privilégie son rendement individuel, ajusté au contexte offensif de cette rencontre. "
-                        "Ces chiffres ne mesurent pas ses minutes attendues ni son rôle sur penalties : un temps de jeu réduit ou une défense plus efficace peut faire échouer ce choix.")
+                        "Le temps de jeu futur et le rôle sur penalties restent à confirmer : une rotation ou une défense plus efficace peut faire échouer ce choix.")
                     output.append(dict(player=dict(id=pid,name=name,team_id=team_id,team_name=team['name']),
                         match=copy.deepcopy(match),market='anytime_scorer',market_label='Marque au moins un but',
                         availability=ready,status='pending',home_score=None,away_score=None,
@@ -121,6 +121,81 @@ def candidates(data,match,now):
                             season=(data.get('header') or {}).get('season'),observed_at=now.isoformat()),
                         source_url='https://www.espn.com/soccer/match/_/gameId/'+str(match['id'])))
     return output
+
+
+def recent_player_match(data, game, team_id, player_id, now):
+    """Accept only completed, matching fixtures and explicit player match stats."""
+    competition=(data.get('header',{}).get('competitions') or [{}])[0]
+    info=fixture_info(data)
+    if str(competition.get('id',''))!=str(game['id']):return None
+    if (info['home_id'],info['away_id'])!=(game.get('home_id'),game.get('away_id')):return None
+    if not info['completed'] or info['state']!='post' or not 3*3600<=(now-info['date']).total_seconds()<=90*86400:return None
+    if (info['period'] is not None and int(info['period'])>2) or any(s in info['name'] for s in ('PENALT','EXTRA','ABANDON','CANCEL')):return None
+    player=next((r for r in roster(data,team_id) if str(r.get('athlete',{}).get('id'))==player_id),None)
+    if not player:return None
+    values=stats(player.get('stats'));apps=values.get('appearances');goals=values.get('totalGoals')
+    if apps not in (0,1) or goals is None or not goals.is_integer() or goals>6:return None
+    if apps==0 and goals!=0:return None
+    minutes=values.get('minutesPlayed')
+    if minutes is not None and (minutes>100 or (apps==0 and minutes!=0)):minutes=None
+    shots=values.get('shotsOnTarget')
+    if shots is not None and (not shots.is_integer() or shots>30):shots=None
+    penalties=values.get('penaltyGoals')
+    if penalties is not None and (not penalties.is_integer() or penalties>goals):penalties=None
+    return dict(event_id=str(game['id']),date=info['date'].isoformat(),appearances=int(apps),goals=int(goals),
+                starter=player.get('starter') if isinstance(player.get('starter'),bool) else None,
+                minutes=minutes,shots_on_target=shots,penalty_goals=penalties,
+                source_url='https://www.espn.com/soccer/match/_/gameId/'+str(game['id']))
+
+
+def apply_recent(pick, records, now):
+    basis=pick['basis'];basis['recent_player_matches']=records
+    basis['recent_observed_at']=now.isoformat()
+    basis['penalty_role']='unconfirmed'
+    if len(records)<3:
+        pick['rationale']+=' Forme individuelle récente insuffisamment documentée ; aucun ajustement sur des statistiques manquantes.'
+        return
+    apps=sum(r['appearances'] for r in records);goals=sum(r['goals'] for r in records)
+    season_rate=(basis['goals']+1)/(basis['appearances']+5)
+    recent_rate=(goals+season_rate*5)/(apps+5)
+    factor=max(.8,min(1.2,recent_rate/season_rate))
+    starts=[r for r in records if r['starter'] is not None]
+    if len(starts)>=3:factor*=.75+.25*sum(r['starter'] for r in starts)/len(starts)
+    minutes=[r['minutes'] for r in records if r['minutes'] is not None]
+    if len(minutes)>=3:factor*=max(.65,min(1.05,sum(minutes)/len(minutes)/75))
+    pick['ranking']=round(pick['ranking']*factor,6)
+    detail=f" Sur {len(records)} matchs récents vérifiés : {goals} but(s), {apps} apparition(s)"
+    if len(starts)>=3:detail+=f", {sum(r['starter'] for r in starts)} titularisation(s)"
+    if len(minutes)>=3:detail+=f", {round(sum(minutes)/len(minutes))} minutes jouées en moyenne"
+    else:detail+=", minutes non documentées"
+    shots=[r['shots_on_target'] for r in records if r['shots_on_target'] is not None]
+    if len(shots)==len(records):detail+=f", {int(sum(shots))} tir(s) cadré(s)"
+    penalties=[r['penalty_goals'] for r in records if r['penalty_goals'] is not None]
+    if len(penalties)==len(records):detail+=f", {int(sum(penalties))} penalty(s) marqué(s)"
+    pick['rationale']+=detail+'. Le tireur de penalty désigné pour le prochain match reste non confirmé. Ces observations ne garantissent pas son temps de jeu futur.'
+
+
+def enrich_recent(server, pool, now):
+    # Bound additional work and share each historical summary between candidates.
+    selected=pool[:12];jobs={}
+    for pick in selected:
+        for game in pick['basis']['team_form'][:3]:jobs[(pick['match']['league'],game['id'])]=game
+    summaries={}
+    def load(key):return server.fetch(f"{server.ESPN}/{key[0]}/summary",{'event':key[1]},ttl=1800)
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        pending={executor.submit(load,key):key for key in jobs}
+        for future in as_completed(pending):
+            try:summaries[pending[future]]=future.result()
+            except Exception:pass
+    for pick in selected:
+        records=[]
+        for game in pick['basis']['team_form'][:3]:
+            try:
+                record=recent_player_match(summaries.get((pick['match']['league'],game['id']),{}),game,pick['player']['team_id'],pick['player']['id'],now)
+                if record:records.append(record)
+            except (KeyError,ValueError,TypeError,AttributeError):pass
+        apply_recent(pick,records,now)
+    return selected
 
 
 def select(server,matches,now,day):
@@ -137,6 +212,8 @@ def select(server,matches,now,day):
             try:pool.extend(job.result())
             except Exception:errors+=1
     # Real time is checked again by the caller before persisting the choice.
+    pool.sort(key=lambda p:(-p['ranking'],p['match']['date'],str(p['match']['id']),p['player']['id']))
+    pool=enrich_recent(server,pool,now)
     pool.sort(key=lambda p:(-p['ranking'],p['match']['date'],str(p['match']['id']),p['player']['id']))
     return pool,dict(fixtures_examined=len(eligible),source_errors=errors)
 
