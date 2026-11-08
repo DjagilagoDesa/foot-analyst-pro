@@ -14,6 +14,7 @@ from accounts import database, configured, DAILY_OPINION_SCHEMA
 from tracking import fixture_info, score, resolve
 from evaluation import evaluate, MODEL_VERSION
 from selection_test import decision as selection_decision, report as selection_report
+import daily_scorer
 from venue_test import build as build_venue, freeze as freeze_venue, report as venue_report
 
 PARIS = ZoneInfo('Europe/Paris')
@@ -201,6 +202,16 @@ class DailyOpinion:
         return dict(**counts, success_pct=round(100 * counts['won'] / settled, 1) if settled else None,
                     scope='daily_opinion_only', period='since_first_publication')
 
+    def scorer_performance(self, day):
+        with database() as db:
+            rows=db.execute('SELECT payload FROM daily_opinion_boards WHERE day<=?',(day,)).fetchall()
+        counts={k:0 for k in ('won','lost','pending','void')}
+        for row in rows:
+            pick=json.loads(row['payload']).get('scorer') or {}
+            if pick.get('status') in counts:counts[pick['status']]+=1
+        settled=counts['won']+counts['lost']
+        return dict(**counts,success_pct=round(100*counts['won']/settled,1) if settled else None,scope='daily_scorer_only')
+
     def refresh(self, now=None):
         now = now or datetime.now(timezone.utc)
         day, epoch = today(now), int(now.timestamp())
@@ -209,8 +220,8 @@ class DailyOpinion:
             db.execute(SCHEMA)
             db.execute("INSERT INTO daily_opinion_boards(day,payload) VALUES(?,'{}') ON CONFLICT(day) DO NOTHING", (day,))
             row = db.execute('''UPDATE daily_opinion_boards SET lease_until=?,lease_token=?
-                WHERE day=? AND checked_at<=? AND lease_until<=? RETURNING payload''',
-                (epoch + 300, token, day, epoch - INTERVAL, epoch)).fetchone()
+                WHERE day=? AND (checked_at<=? OR payload NOT LIKE ?) AND lease_until<=? RETURNING payload''',
+                (epoch + 300, token, day, epoch - INTERVAL, '%"scorer":%', epoch)).fetchone()
         if not row:
             return
         board = json.loads(row['payload'])
@@ -238,11 +249,22 @@ class DailyOpinion:
                                 results.append(result)
                         except Exception:
                             failures += 1
+            scorer=copy.deepcopy(board.get('scorer'))
+            scorer_meta=copy.deepcopy(board.get('scorer_selection') or {})
+            scorer_pool=[]
+            if scorer is None:
+                try:scorer_pool,scorer_meta=daily_scorer.select(self.server,matches,now,day)
+                except Exception:
+                    self.app.logger.warning('Daily scorer selection unavailable')
+                    scorer_meta=dict(source_errors=1,fixtures_examined=0)
             # Re-check the real clock after network calls: never publish a started match.
             publication = datetime.now(timezone.utc) if self.app.testing is False else now
+            if scorer is None:
+                scorer=next((p for p in scorer_pool if upcoming(p['match'],publication,day)),None)
+                if scorer:scorer['published_at']=publication.isoformat()
             picks = choose(results, existing, publication, day)
             retain_team_odds(picks, matches, publication)
-            updated = dict(day=day, picks=picks, generated_at=board.get('generated_at') or publication.isoformat(),
+            updated = dict(day=day, picks=picks, scorer=scorer, scorer_selection=scorer_meta, generated_at=board.get('generated_at') or publication.isoformat(),
                            checked_at=publication.isoformat(), source_errors=failures,
                            fixtures_found=len(matches), candidates_examined=len(eligible))
             self.settle(updated)
@@ -253,10 +275,10 @@ class DailyOpinion:
         except Exception:
             # Keep published choices and their original freshness timestamp, but
             # still settle today's known events independently of the fixture feed.
-            if board.get('picks'):
+            if board.get('picks') or board.get('scorer'):
                 settled = copy.deepcopy(board)
                 self.settle(settled)
-                if settled['picks'] != board['picks']:
+                if settled.get('picks') != board.get('picks') or settled.get('scorer') != board.get('scorer'):
                     board = settled
             with database() as db:
                 db.execute("UPDATE daily_opinion_boards SET payload=?,lease_until=?,lease_token='' WHERE day=? AND lease_token=?",
@@ -341,6 +363,8 @@ class DailyOpinion:
                             pass
             except Exception:
                 if not missing_odds:errors += 1
+        try:daily_scorer.settle(self.server,board.get('scorer'),datetime.now(timezone.utc))
+        except Exception:errors+=1
         board['result_source_errors'] = errors
 
     def settle_previous(self, day):
@@ -349,7 +373,7 @@ class DailyOpinion:
         for row in rows:
             board = json.loads(row['payload'])
             recent=(datetime.fromisoformat(day)-datetime.fromisoformat(row['day'])).days<=7
-            if not any(p['status']=='pending' or (recent and p['status'] in ('won','lost') and not p.get('team_odds')) for p in board.get('picks',[])):
+            if not any(p['status']=='pending' or (recent and p['status'] in ('won','lost') and not p.get('team_odds')) for p in board.get('picks',[])) and (board.get('scorer') or {}).get('status')!='pending':
                 continue
             if recent:self.settle(board)
             else:self.settle(board,recover_odds=False)
@@ -397,7 +421,7 @@ def init_app(app, server):
                        picks=[p for p in board.get('picks', []) if p['group'] == key]) for key, count, title in GROUPS]
         response = jsonify(**{k: v for k, v in board.items() if k not in ('day', 'picks')},
             day=day, status=status, stale=stale, groups=groups,
-            performance=service.performance(day),
+            performance=service.performance(day),scorer_performance=service.scorer_performance(day),
             refresh_seconds=30 if status == 'preparing' else 120,
             method='Modèle statistique Poisson, 10 matchs terminés par équipe. Pas de cotes bookmaker, compositions ou absences vérifiées. Probabilités non calibrées.',
             scope=f'Compétitions couvertes : {len(server.LEAGUES)}. Au maximum {LIMIT} rencontres étudiées, réparties sur la journée. Ce n’est pas une sélection exhaustive du football mondial.',
