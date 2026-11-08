@@ -14,6 +14,14 @@
   const cls=p.status==='won'?'result-won':'result-lost';
   return '<footer class="opinion-team-odds '+cls+'" style="text-align:right;margin-top:12px;font-size:13px;font-weight:800" data-odds-outcome="'+side+'">'+value.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+'</footer>';
  }
+ function scorerPrice(p){
+  const q=p.odds,price=q?.price;
+  const pre=p.status==='pending'&&new Date(p.match.date)>new Date();
+  const valid=q?.market==='anytime_scorer'&&q.player_id===p.player.id&&q.event_id===String(p.match.id)&&q.kind==='prematch_quote'&&Number.isFinite(price)&&price>1&&(!pre||new Date(q.expires_at)>new Date());
+  if(!valid)return '<span aria-label="Cote buteur indisponible">—</span>';
+  const label=price.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  return '<strong class="'+({won:'result-won',lost:'result-lost'}[p.status]||'gold')+'" title="'+esc(q.bookmaker+' · '+new Date(q.observed_at).toLocaleString('fr-FR',{timeZone:'Europe/Paris'}))+'" aria-label="'+esc('Cote buteur '+q.bookmaker+' '+label)+'">'+label+'</strong>';
+ }
  function scorerHtml(board){
   const p=board.scorer;
   let html='<div class="opinion-group"><h3>⚽ Buteur du jour</h3>';
@@ -21,7 +29,7 @@
   const state={won:'✓ Gagné',lost:'✗ Perdu',void:'Annulé',pending:new Date(p.match.date)>new Date()?'À venir':'Résultat à vérifier'}[p.status];
   const lineup={reported_starter:'Titulaire indiqué par la source',unconfirmed:'Titularisation à confirmer',bench:'Remplaçant indiqué par la source',not_listed:'Présence à revérifier',unavailable:'Disponibilité à revérifier'}[p.availability]||'Titularisation à confirmer';
   const perf=board.scorer_performance;
-  html+='<article class="opinion-pick"><h3>'+esc(p.player.name)+'</h3><p class="gold">'+esc(p.player.team_name)+' · Buteur</p><p>'+esc(p.match.home.name)+' – '+esc(p.match.away.name)+' · '+esc(new Date(p.match.date).toLocaleTimeString('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'}))+'</p><p><span class="'+({won:'result-won',lost:'result-lost'}[p.status]||'')+'">'+esc(state)+'</span></p>';
+  html+='<article class="opinion-pick"><div class="row"><h3>'+esc(p.player.name)+'</h3><span data-scorer-odds>'+scorerPrice(p)+'</span></div><p class="gold">'+esc(p.player.team_name)+' · Buteur</p><p>'+esc(p.match.home.name)+' – '+esc(p.match.away.name)+' · '+esc(new Date(p.match.date).toLocaleTimeString('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'}))+'</p><p><span class="'+({won:'result-won',lost:'result-lost'}[p.status]||'')+'">'+esc(state)+'</span></p>';
   if(p.status==='pending')html+='<p>'+esc(lineup)+'</p>';
   html+='<p><strong>'+esc(p.basis.goals)+' buts · '+esc(p.basis.appearances)+' apparitions</strong></p><details><summary>Pourquoi ce buteur ?</summary><p>'+esc(p.rationale)+'</p>';
   if(perf)html+='<p>Suivi buteurs : '+esc(perf.won)+' gagnés · '+esc(perf.lost)+' perdus'+(perf.success_pct==null?'':' · '+esc(perf.success_pct)+' %')+'</p>';
@@ -59,7 +67,17 @@
    for(const id of targets){const target=document.getElementById(id);if(target)target.innerHTML=message('Préparation de mon avis du jour…');}
   }
   busy=true;
-  try{render(await api('/api/daily-opinion',15000));}
+  try{
+   const board=await api('/api/daily-opinion',15000);render(board);
+   if(board.scorer?.status==='pending'&&new Date(board.scorer.match.date)>new Date()){
+    let quote=null;try{quote=(await api('/api/daily-opinion/scorer-odds',15000)).odds;}catch{}
+    if(lastBoard?.day===board.day&&lastBoard.scorer?.player.id===board.scorer.player.id){
+     if(quote)lastBoard.scorer.odds=quote;
+     for(const id of targets){const badge=document.getElementById(id)?.querySelector('[data-scorer-odds]');if(badge)badge.innerHTML=scorerPrice(lastBoard.scorer);}
+     lastSignature=JSON.stringify(lastBoard);
+    }
+   }
+  }
   catch(error){for(const id of targets){const target=document.getElementById(id);if(!target)continue;
    if(lastBoard){render({...lastBoard,stale:true});break;}
    target.innerHTML=message('Avis du jour temporairement indisponible. Nouvelle tentative automatique.');
