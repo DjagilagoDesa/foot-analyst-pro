@@ -90,8 +90,8 @@ def init_app(app, fetch, base, leagues):
         data=body();picks=data.get('selections');title=data.get('title','Ticket personnalisé')
         if not isinstance(title,str) or not title.strip() or len(title)>100:
             raise AccountError('Nom du ticket non valide.')
-        if not isinstance(picks,list) or not 2<=len(picks)<=8:
-            raise AccountError('Un ticket doit contenir de 2 à 8 matchs.')
+        if not isinstance(picks,list) or not 2<=len(picks)<=10:
+            raise AccountError('Un ticket doit contenir de 2 à 10 matchs.')
         normalized=[]
         for pick in picks:
             if not isinstance(pick,dict) or not isinstance(pick.get('market'),str) or pick['market'] not in MARKETS or not isinstance(pick.get('analysis_id'),str):
