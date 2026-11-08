@@ -61,3 +61,36 @@ montré avant le résultat, sur un nul, un avis annulé ou sans cote disponible.
 Les titres, liens source et messages d’absence de cote sont retirés de ce pied ;
 la provenance et les contrôles de récupération restent conservés dans les données.
 Cette présentation remplace les règles d’affichage décrites plus haut.
+
+## Buteur du jour
+
+Une quatrième rubrique repliable publie un seul buteur par date de Paris. Le choix
+est conservé dans `scorer`, dans le tableau persistant partagé. Il ne consomme
+aucun essai et ne remplace aucun des six avis de matchs. Son bilan cumulé
+`scorer_performance` est séparé du taux des six avis et des paris personnels.
+
+La sélection examine au maximum douze rencontres à venir, réparties sur les
+horaires de la journée. La fiche ESPN doit confirmer l’événement, les équipes
+et le coup d’envoi. Les candidats viennent des leaders en buts de la compétition,
+avec au moins deux buts et cinq apparitions documentés. Le classement compare
+le rendement buts/apparitions, lissé par un a priori d’un but sur cinq matchs,
+et le contexte offensif des équipes sur trois à cinq résultats observés dans
+les 90 derniers jours. Aucun taux de réussite individuel ni rôle sur penalty
+n’est inventé. Le score de classement interne n’est pas une probabilité calibrée.
+
+Un joueur explicitement remplaçant, non listé dans une composition disponible,
+inactif ou signalé incertain/absent est écarté. Sans composition, sa titularisation
+est affichée à confirmer. Une indication de titulaire par ESPN n’est pas présentée
+comme une confirmation officielle du club. Le choix et sa base statistique restent
+figés après publication ; son indication de disponibilité peut être actualisée.
+Après les appels réseau, une dernière vérification du temps empêche de publier
+une rencontre commencée. En l’absence de données admissibles, la rubrique reste
+présente avec un état vide ; elle ne nomme pas un joueur par défaut.
+
+Le résultat utilise uniquement les buts et apparitions individuels de la fiche
+du match terminé à 90 minutes. Un but contre son camp ne constitue pas un but
+marqué par le joueur. Aucune déduction n’est faite depuis le score d’équipe ou
+les statistiques cumulées de saison. Les données manquantes restent en attente ;
+une non-participation explicitement documentée, une rencontre annulée/reportée
+ou des prolongations non prises en charge donnent un avis annulé. Un avis de
+buteur ne matérialise aucune mise ou transaction chez un bookmaker.
