@@ -94,3 +94,31 @@ les statistiques cumulées de saison. Les données manquantes restent en attente
 une non-participation explicitement documentée, une rencontre annulée/reportée
 ou des prolongations non prises en charge donnent un avis annulé. Un avis de
 buteur ne matérialise aucune mise ou transaction chez un bookmaker.
+
+## Cote du buteur
+
+Le chiffre affiché à côté du joueur est une cote observée sur le marché Unibet
+« Buteur — 90 Mins ». Il ne s’agit ni de la cote de victoire de son équipe, ni
+d’un premier buteur, buteur/passeur, pari boosté ou pari portant sur le remplaçant.
+La collecte utilise les pages football publiques, sans compte ni clé payante.
+L’événement est identifié par ses deux clubs, leur ordre domicile/extérieur et
+l’heure exacte, puis le joueur par son nom complet normalisé et unique dans
+le marché. Les variantes de noms de clubs reconnues sont explicites ; les
+équipes féminines, jeunes ou réserves ne sont pas rapprochées par approximation.
+
+Le point `/api/daily-opinion/scorer-odds` utilise uniquement le buteur déjà publié,
+et n’accepte aucun événement ou joueur arbitraire du client. L’index et la fiche
+sont mis en cache pendant deux minutes, erreurs incluses. Les données de session
+présentes dans le HTML du fournisseur ne sont pas conservées dans ce cache.
+Les marchés masqués/suspendus et les prix invalides ou périmés sont écartés.
+L’interface affiche un tiret en l’absence d’une cote admissible. Elle interroge
+le point après le tableau, sans bloquer l’affichage initial de l’avis.
+
+Une cote observée avant le coup d’envoi est enregistrée avec le bookmaker,
+les identifiants source, l’heure et l’URL de consultation. Cette mise à jour
+conditionnelle ne peut écraser ni le règlement des résultats, ni un verrou de
+génération entre workers. Après le coup d’envoi, la dernière cote avant match
+reste consultable ; aucune cote en direct n’est présentée comme une cote initiale.
+Le montant ne modifie jamais la sélection du joueur ou son classement statistique.
+La valeur reste indicative et peut différer de celle disponible chez un autre
+bookmaker ou au moment où l’utilisateur le consulte.
