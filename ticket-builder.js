@@ -16,7 +16,7 @@ function builderSelection(markets,risk,type,odds){
  get('builderDate').value=new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Paris'});
  function refresh(){const personal=get('builderSource').value==='personal';get('builderCount').disabled=personal||busy;get('builderDate').disabled=personal||busy;get('builderChoose').hidden=!personal;const n=window.PersonalTicket?.getMatches().length||0;get('builderSourceInfo').textContent=personal?n+' matchs sélectionnés':'';get('builderSourceInfo').hidden=!personal;}
  get('builderSource').onchange=refresh;
- get('builderChoose').onclick=()=>{show('dailyTickets');get('customDate').scrollIntoView({behavior:'smooth',block:'center'});};
+ get('builderChoose').onclick=()=>{show('dailyTickets');document.querySelector('[aria-controls="dailyTickets-group-2"]')?.click();get('customDate').scrollIntoView({behavior:'smooth',block:'center'});};
  get('builderForm').onsubmit=async e=>{
   e.preventDefault();if(busy)return;busy=true;const run=++generation;
   const target=get('builderResult'),button=get('builderSubmit');button.disabled=true;refresh();
@@ -53,6 +53,9 @@ function builderSelection(markets,risk,type,odds){
    if(run!==generation)return;
    await ticketVerifyFixtures(results);
    if(run!==generation)return;
+   if(!missed)await window.Tracking.saveTicket?.('Ticket '+risk+' · '+count+' matchs',results.map(r=>({analysis:r.analysis,market:r.market})));
+   if(run!==generation)return;
+   await ticketVerifyFixtures(results);
    const joint=results.reduce((p,r)=>p*r.probability/100,1);
    target.innerHTML='<div class="panel premium"><h2>Ton ticket · '+count+' matchs</h2>'+results.map((r,i)=>'<div class="message"><strong>'+esc((i+1)+'. '+r.match.home.name+' – '+r.match.away.name)+'</strong><p class="gold">'+esc(ticketLabel(r.market,r.match,labels))+'</p><p>Probabilité du modèle : '+esc(r.probability)+' %</p><details><summary>Analyse, surprises et confrontations</summary>'+renderAnalysisReport(r.analysis)+'</details></div>').join('')+message('Estimation combinée : '+(joint*100).toFixed(2).replace('.',',')+' % · Cote théorique : '+(1/joint).toFixed(2).replace('.',',')+'.')+(missed?message(missed+' sélection(s) non enregistrée(s) dans le suivi : rencontre non vérifiable, ancienne analyse ou match commencé.'):'')+'</div>';
    window.OddsTicket?.mount(target,results);
