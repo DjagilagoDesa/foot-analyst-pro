@@ -1,4 +1,6 @@
 """Private persistent pre-match selections; scores verified from the sports source."""
+import hashlib
+import uuid
 import json
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -81,6 +83,69 @@ def init_app(app, fetch, base, leagues):
               VALUES(?,?,?,?,?,?,?,?,?,?,'pending') ON CONFLICT(user_id,event_id,market) DO NOTHING''',
               (user['id'],event,league,market,probability,result.get('home_name','Domicile')+' – '+result.get('away_name','Extérieur'),info['home_id'],info['away_id'],int(info['date'].timestamp()),now))
         return jsonify(status='recorded')
+
+    @bp.post('/api/tracking/tickets')
+    def save_ticket():
+        write_guard();user=current_user(csrf=True);rate_limit('ticket-write',30,900,user['id'])
+        data=body();picks=data.get('selections');title=data.get('title','Ticket personnalisé')
+        if not isinstance(title,str) or not title.strip() or len(title)>100:
+            raise AccountError('Nom du ticket non valide.')
+        if not isinstance(picks,list) or not 2<=len(picks)<=8:
+            raise AccountError('Un ticket doit contenir de 2 à 8 matchs.')
+        normalized=[]
+        for pick in picks:
+            if not isinstance(pick,dict) or pick.get('market') not in MARKETS or not isinstance(pick.get('analysis_id'),str):
+                raise AccountError('Sélection non valide.')
+            normalized.append((pick['analysis_id'],pick['market']))
+        now=int(time.time())
+        with database() as db:
+            legs=[]
+            for aid,market in normalized:
+                row=db.execute("SELECT result FROM account_analyses WHERE id=? AND user_id=? AND status='complete'",(aid,user['id'])).fetchone()
+                if not row:raise AccountError('Analyse enregistrée introuvable.',404)
+                result=json.loads(row['result']);event=str(result.get('event_id',''))
+                prediction=db.execute('SELECT * FROM account_predictions WHERE user_id=? AND event_id=? AND market=?',(user['id'],event,market)).fetchone()
+                if not prediction or prediction['league']!=result.get('league'):
+                    raise AccountError('Toutes les sélections doivent être enregistrées avant le ticket.',409)
+                legs.append((event,market,prediction))
+            if len({event for event,_,_ in legs})!=len(legs):raise AccountError('Chaque match doit apparaître une seule fois.')
+            fingerprint=hashlib.sha256(json.dumps(sorted((e,m) for e,m,_ in legs)).encode()).hexdigest()
+            existing=db.execute('SELECT id FROM account_tickets WHERE user_id=? AND fingerprint=?',(user['id'],fingerprint)).fetchone()
+            if existing:return jsonify(status='saved',id=existing['id'])
+            now=int(time.time())
+            if any(p['starts_at']<=now or p['status']!='pending' for _,_,p in legs):
+                raise AccountError('Un match a commencé : le ticket ne peut plus être archivé.',409)
+            tid=uuid.uuid4().hex
+            db.execute('INSERT INTO account_tickets(id,user_id,fingerprint,title,created_at) VALUES(?,?,?,?,?) ON CONFLICT(user_id,fingerprint) DO NOTHING',(tid,user['id'],fingerprint,title.strip(),now))
+            saved=db.execute('SELECT id FROM account_tickets WHERE user_id=? AND fingerprint=?',(user['id'],fingerprint)).fetchone()['id']
+            if saved==tid:
+                for position,(event,market,_) in enumerate(legs):
+                    db.execute('INSERT INTO account_ticket_legs(ticket_id,position,event_id,market) VALUES(?,?,?,?)',(tid,position,event,market))
+        return jsonify(status='saved',id=saved)
+
+    @bp.get('/api/tracking/tickets')
+    def tickets():
+        user=current_user();rate_limit('ticket-read',60,900,user['id'])
+        status=request.args.get('status','pending')
+        try:offset=int(request.args.get('offset','0'))
+        except ValueError:raise AccountError('Page non valide.')
+        if status not in ('pending','past') or offset<0 or offset>100000:raise AccountError('Page non valide.')
+        # A lost leg closes the combined ticket even while other games are pending.
+        query="""SELECT t.id,t.title,t.created_at,
+          CASE WHEN SUM(CASE WHEN p.status='lost' THEN 1 ELSE 0 END)>0 THEN 'lost'
+          WHEN SUM(CASE WHEN p.status='pending' THEN 1 ELSE 0 END)>0 THEN 'pending'
+          WHEN SUM(CASE WHEN p.status='won' THEN 1 ELSE 0 END)>0 THEN 'won' ELSE 'void' END AS status
+          FROM account_tickets t JOIN account_ticket_legs l ON l.ticket_id=t.id
+          JOIN account_predictions p ON p.user_id=t.user_id AND p.event_id=l.event_id AND p.market=l.market
+          WHERE t.user_id=? GROUP BY t.id,t.title,t.created_at"""
+        with database() as db:
+            rows=db.execute("SELECT * FROM ("+query+") q WHERE status "+("= 'pending'" if status=='pending' else "<> 'pending'")+" ORDER BY created_at DESC,id DESC LIMIT 6 OFFSET ?",(user['id'],offset)).fetchall()
+            result=[dict(r) for r in rows[:5]]
+            for ticket in result:
+                ticket['selections']=[dict(r) for r in db.execute('''SELECT p.event_id,p.label,p.market,p.probability,p.status,p.home_score,p.away_score,p.starts_at
+                  FROM account_ticket_legs l JOIN account_predictions p ON p.event_id=l.event_id AND p.market=l.market AND p.user_id=?
+                  WHERE l.ticket_id=? ORDER BY l.position''',(user['id'],ticket['id'])).fetchall()]
+        return jsonify(tickets=result,next_offset=offset+5 if len(rows)>5 else None)
 
     @bp.get('/api/tracking/performance')
     def performance():
