@@ -182,6 +182,12 @@ class DailyOpinion:
         self.app, self.server = app, server
         self.lock = threading.Lock()
         self.started = False
+        from scorer_odds import ScorerOdds
+        def download(url):
+            response=self.server.SESSION.get(url,timeout=(3,5))
+            response.raise_for_status()
+            return response.text
+        self.scorer_odds=ScorerOdds(download)
 
     def read(self, day):
         with database() as db:
@@ -427,6 +433,27 @@ def init_app(app, server):
             scope=f'Compétitions couvertes : {len(server.LEAGUES)}. Au maximum {LIMIT} rencontres étudiées, réparties sur la journée. Ce n’est pas une sélection exhaustive du football mondial.',
             update_note='Nouvelle journée à minuit, heure de Paris. Vérification environ toutes les 15 minutes lorsque le serveur est actif ; reprise à son réveil. Les choix publiés restent figés, les places manquantes peuvent être complétées avant le coup d’envoi.')
         response.headers['Cache-Control'] = 'no-store'
+        return response
+
+    @app.get('/api/daily-opinion/scorer-odds')
+    def scorer_quote():
+        if not configured():return jsonify(odds=None),503
+        day=today()
+        with database() as db:
+            db.execute(SCHEMA)
+            row=db.execute('SELECT payload FROM daily_opinion_boards WHERE day=?',(day,)).fetchone()
+        board=json.loads(row['payload']) if row else {}
+        pick=board.get('scorer')
+        quote=service.scorer_odds.quote(pick) if pick else None
+        now=datetime.now(timezone.utc)
+        if quote and pick.get('status')=='pending' and daily_scorer.instant(pick['match']['date'])>now:
+            pick['odds']=quote
+            with database() as db:
+                # Never overwrite settlement or a concurrent daily-generation lease.
+                db.execute('UPDATE daily_opinion_boards SET payload=? WHERE day=? AND payload=? AND lease_until<=?',
+                    (json.dumps(board,ensure_ascii=False),day,row['payload'],int(now.timestamp())))
+        response=jsonify(odds=quote)
+        response.headers['Cache-Control']='no-store'
         return response
 
     @app.get('/api/daily-opinion/evaluation')
