@@ -17,6 +17,7 @@ const tick=()=>new Promise(r=>setTimeout(r,0));
  click('[aria-controls="tickets-group-1"]');assert(d.getElementById('tickets-group-1').contains(d.getElementById('builderForm')));
  d.getElementById('automaticTicketsResult').innerHTML='<div class="panel premium"><h2>Ticket 1</h2><p>Choix</p></div><div class="panel"><h2>Ticket 2</h2></div>';
  await tick();assert.equal(d.querySelectorAll('#automaticTicketsResult > details').length,2);assert.equal(d.querySelector('#automaticTicketsResult > details').open,false);
+ d.getElementById('homeDailyOpinion').innerHTML='<div class="opinion-group"><h3>Choix prudents</h3><article>Match test</article></div>';await tick();assert.equal(d.querySelector('#homeDailyOpinion > details').open,false);
  await w.Tracking.load();assert.equal(d.querySelectorAll('#ticketArchive > details').length,5);
  click('#ticketArchive button');await tick();assert.equal(d.querySelectorAll('#ticketArchive > details').length,6);
  click('[data-status="past"]');await tick();assert(d.getElementById('ticketArchive').textContent.includes('Perdu'));assert(!d.getElementById('ticketArchive').textContent.includes('Ticket 0'));
