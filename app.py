@@ -341,6 +341,10 @@ def ticket():
 def billing_catalog():
     return jsonify({'product_id':'foot_analyst_pro_premium_monthly','price_eur':'29.90','period':'month','trial_analyses':3,'purchase_available':False,'provider':'google_play','reason':'play_billing_setup_required'})
 
+@app.get('/organization.js')
+def organization_script():
+    return send_from_directory('.', 'organization.js', mimetype='application/javascript')
+
 @app.get('/tracking.js')
 def tracking_script():
     return send_from_directory('.', 'tracking.js', mimetype='application/javascript')
