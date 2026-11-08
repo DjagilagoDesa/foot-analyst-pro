@@ -48,6 +48,7 @@ class TicketArchive(Tracking):
   self.prepare()
   self.assertEqual(self.make(picks=[{'analysis_id':'a','market':'home'}]*2).status_code,400)
   self.assertEqual(self.make(title='x'*101).status_code,400)
+  self.assertEqual(self.make(picks=[{'analysis_id':'a','market':[]},{'analysis_id':'b','market':'home'}]).status_code,400)
   self.assertEqual(self.client.post('/api/tracking/tickets',json={}).status_code,403)
   self.assertEqual(self.client.get('/api/tracking/tickets?offset=bad').status_code,400)
  def test_pagination_no_missing_tickets(self):
