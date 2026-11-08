@@ -2,7 +2,7 @@
 (()=>{
  const targets=['homeDailyOpinion'];
  const esc=escapeHtml;
- let busy=false,lastDay='',lastBoard=null;
+ let busy=false,lastDay='',lastBoard=null,lastSignature='';
  const day=()=>new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Paris'});
  const visible=()=>!document.hidden&&!document.getElementById('home').classList.contains('hidden');
  const message=s=>'<p class="opinion-state">'+esc(s)+'</p>';
@@ -29,6 +29,7 @@
   return html;
  }
  function render(board){
+  const signature=JSON.stringify(board);if(signature===lastSignature)return;lastSignature=signature;
   lastDay=board.day;lastBoard=board;
   const date=new Date(board.day+'T12:00:00+01:00').toLocaleDateString('fr-FR',{timeZone:'Europe/Paris',day:'numeric',month:'long'});
   let html='<div class="row"><strong class="gold">Avis du '+esc(date)+'</strong></div>';
@@ -54,7 +55,7 @@
  async function load(){
   if(busy)return;
   if(lastDay!==day()){
-   lastBoard=null;lastDay=day();
+   lastBoard=null;lastDay=day();lastSignature='';
    for(const id of targets){const target=document.getElementById(id);if(target)target.innerHTML=message('Préparation de mon avis du jour…');}
   }
   busy=true;
