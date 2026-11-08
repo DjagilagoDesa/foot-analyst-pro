@@ -23,7 +23,7 @@ const tick=()=>new Promise(r=>setTimeout(r,0));
  click('[data-status="past"]');await tick();assert(d.getElementById('ticketArchive').textContent.includes('Perdu'));assert(!d.getElementById('ticketArchive').textContent.includes('Ticket 0'));
  assert.equal(d.querySelectorAll('#trackedSelections > div').length,5);click('#trackedSelections button');assert.equal(d.querySelectorAll('#trackedSelections > div').length,8);
  const target=d.getElementById('analysisHistory');target.innerHTML=Array.from({length:12},(_,i)=>'<button class="match">'+i+'</button>').join('');w.CompactLists.paginate(target);
- assert.equal([...target.querySelectorAll('.match')].filter(n=>!n.hidden).length,5);target.lastChild.click();assert.equal([...target.querySelectorAll('.match')].filter(n=>!n.hidden).length,10);
+ assert.equal([...target.querySelectorAll('.match')].filter(n=>!n.hidden).length,5);assert.equal(w.getComputedStyle(target.querySelectorAll('.match')[5]).display,'none');target.lastChild.click();assert.equal([...target.querySelectorAll('.match')].filter(n=>!n.hidden).length,10);
  // Late responses from an earlier tab or account may never replace the current view.
  w.fetch=async url=>url.includes('status=pending')?new Promise(resolve=>pendingResolve=resolve):{ok:true,json:async()=>({tickets:[ticket('new','lost')],next_offset:null})};
  click('[data-status="pending"]');click('[data-status="past"]');await tick();pendingResolve({ok:true,json:async()=>({tickets:[ticket('stale')],next_offset:null})});await tick();assert(!d.getElementById('ticketArchive').textContent.includes('stale'));
