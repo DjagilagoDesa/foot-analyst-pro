@@ -67,3 +67,16 @@ class TicketArchive(Tracking):
    db.execute("DELETE FROM account_users WHERE id='u'")
    self.assertEqual(db.execute('SELECT count(*) n FROM account_tickets').fetchone()['n'],0)
    self.assertEqual(db.execute('SELECT count(*) n FROM account_ticket_legs').fetchone()['n'],0)
+
+ def test_ten_match_personal_ticket(self):
+  picks=[]
+  with self.app.app_context(),accounts.database() as db:
+   template=json.loads(db.execute("SELECT result FROM account_analyses WHERE id='a'").fetchone()['result'])
+   for i in range(10):
+    aid='ten-'+str(i);event=str(1000+i);template['event_id']=event
+    db.execute('INSERT INTO account_analyses VALUES(?,?,?,?,?,?,?,?)',(aid,'u',aid,'A-B','complete',0,1,json.dumps(template)))
+    db.execute("INSERT INTO account_predictions(user_id,event_id,league,market,probability,label,home_id,away_id,starts_at,created_at,status) VALUES(?,?,?,?,?,?,?,?,?,?,?)",('u',event,'fra.1','home',70,'A – B','1','2',int(time.time())+86400,1,'pending'))
+    picks.append({'analysis_id':aid,'market':'home'})
+  self.assertEqual(self.make(picks=picks).status_code,200)
+  self.assertEqual(len(self.archive()['tickets'][0]['selections']),10)
+  self.assertEqual(self.make(picks=picks+[picks[0]]).status_code,400)
