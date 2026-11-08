@@ -127,6 +127,8 @@ async function ticketVerifyFixtures(results){
    await ticketVerifyFixtures(results);
    const untracked=await window.Tracking.record(results.map(r=>({analysis:r.analysis,market:r.market})));
    await ticketVerifyFixtures(results);
+   if(!untracked)await window.Tracking.saveTicket?.('Ticket personnalisé',results.map(r=>({analysis:r.analysis,market:r.market})));
+   await ticketVerifyFixtures(results);
    if(untracked)el('customNotice').innerHTML=message(untracked+' sélection(s) non enregistrée(s) dans le suivi : rencontre non vérifiable, déjà commencée ou ancienne analyse.');
    let joint=results.reduce((v,r)=>v*r.probability/100,1);
    const repeated=new Set(),teams=new Set();for(const r of results){for(const id of [r.match.home.id,r.match.away.id]){if(teams.has(String(id)))repeated.add(String(id));teams.add(String(id));}}
@@ -141,7 +143,7 @@ async function ticketVerifyFixtures(results){
  };
  window.PersonalTicket={getMatches:()=>chosen.slice()};
  const originalOpen=openMatch;
- openMatch=function(m,from){originalOpen(m,from);const button=document.createElement('button');button.type='button';button.className='day';button.textContent='＋ AJOUTER À MON TICKET';button.style.cssText='width:100%;max-width:none;margin:12px 0';button.onclick=()=>{show('dailyTickets');add(m);};el('detailContent').prepend(button);};
+ openMatch=function(m,from){originalOpen(m,from);const button=document.createElement('button');button.type='button';button.className='day';button.textContent='＋ AJOUTER À MON TICKET';button.style.cssText='width:100%;max-width:none;margin:12px 0';button.onclick=()=>{show('dailyTickets');document.querySelector('[aria-controls="dailyTickets-group-2"]')?.click();add(m);};el('detailContent').prepend(button);};
  draw();
 })();
 
