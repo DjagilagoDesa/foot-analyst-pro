@@ -37,6 +37,14 @@ SCHEMA = (
       starts_at BIGINT NOT NULL, created_at BIGINT NOT NULL, status TEXT NOT NULL,
       home_score INTEGER, away_score INTEGER, settled_at BIGINT,
       PRIMARY KEY(user_id,event_id,market))""",
+    '''CREATE TABLE IF NOT EXISTS account_tickets (
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES account_users(id) ON DELETE CASCADE,
+      fingerprint TEXT NOT NULL, title TEXT NOT NULL, created_at BIGINT NOT NULL,
+      UNIQUE(user_id,fingerprint))''',
+    '''CREATE TABLE IF NOT EXISTS account_ticket_legs (
+      ticket_id TEXT NOT NULL REFERENCES account_tickets(id) ON DELETE CASCADE,
+      position INTEGER NOT NULL, event_id TEXT NOT NULL, market TEXT NOT NULL,
+      PRIMARY KEY(ticket_id,position))''',
     '''CREATE TABLE IF NOT EXISTS account_sessions (
       token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES account_users(id) ON DELETE CASCADE,
       csrf_hash TEXT NOT NULL, expires_at BIGINT NOT NULL)''',
@@ -412,7 +420,11 @@ def export_data():
         rows=db.execute("SELECT label,created_at,result FROM account_analyses WHERE user_id=? AND status='complete' ORDER BY created_at",(user['id'],)).fetchall()
     with database() as db:
         selections=[dict(r) for r in db.execute('SELECT event_id,league,market,probability,label,home_id,away_id,starts_at,created_at,status,home_score,away_score,settled_at FROM account_predictions WHERE user_id=? ORDER BY created_at',(user['id'],)).fetchall()]
-    response=jsonify(profile=public_user(user),analyses=[dict(label=r['label'],created_at=r['created_at'],result=json.loads(r['result'])) for r in rows],selections=selections)
+    with database() as db:
+        tickets=[dict(r) for r in db.execute('SELECT id,title,created_at FROM account_tickets WHERE user_id=? ORDER BY created_at',(user['id'],)).fetchall()]
+        for ticket in tickets:
+            ticket['selections']=[dict(r) for r in db.execute('SELECT event_id,market FROM account_ticket_legs WHERE ticket_id=? ORDER BY position',(ticket['id'],)).fetchall()]
+    response=jsonify(tickets=tickets,profile=public_user(user),analyses=[dict(label=r['label'],created_at=r['created_at'],result=json.loads(r['result'])) for r in rows],selections=selections)
     response.headers['Content-Disposition']='attachment; filename=foot-analyst-pro-mes-donnees.json'
     return response
 
