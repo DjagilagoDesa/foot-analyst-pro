@@ -38,19 +38,22 @@
    if(prev)prev.onclick=()=>historyPage(details,page-1);if(next)next.onclick=()=>historyPage(details,page+1);
   }catch{content.innerHTML=message('Historique indisponible.')+'<button type="button" class="day" data-history-retry>Réessayer</button>';content.querySelector('button').onclick=()=>historyPage(details,page);}
  }
+ const scorerPicks=board=>Array.isArray(board.scorers)?board.scorers:(board.scorer?[board.scorer]:[]);
  function scorerHtml(board){
-  const p=board.scorer;
-  let html='<div class="opinion-group"><h3>⚽ Buteur du jour</h3>';
-  if(!p)return html+message('Aucun buteur sélectionné pour le moment.')+'</div>'+scorerTracking(board.scorer_performance);
+  const picks=scorerPicks(board);
+  return '<div class="opinion-group"><h3>⚽ Les 3 buteurs du jour</h3>'+picks.map(scorerCard).join('')+(picks.length<3?message(picks.length+'/3 buteurs sélectionnés. Recherche des choix restants…'):'')+'</div>'+scorerTracking(board.scorer_performance);
+ }
+ function scorerCard(p){
+  let html='';
   const state={won:'✓ Gagné',lost:'✗ Perdu',void:'Annulé',pending:new Date(p.match.date)>new Date()?'À venir':'Résultat à vérifier'}[p.status];
   const lineup={reported_starter:'Titulaire indiqué par la source',unconfirmed:'Titularisation à confirmer',bench:'Remplaçant indiqué par la source',not_listed:'Présence à revérifier',unavailable:'Disponibilité à revérifier'}[p.availability]||'Titularisation à confirmer';
-  const perf=board.scorer_performance;
-  html+='<article class="opinion-pick"><div class="row"><h3>'+esc(p.player.name)+'</h3><span data-scorer-odds>'+scorerPrice(p)+'</span></div><p class="gold">'+esc(p.player.team_name)+' · Buteur</p><p>'+esc(p.match.home.name)+' – '+esc(p.match.away.name)+' · '+esc(new Date(p.match.date).toLocaleTimeString('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'}))+'</p><p><span class="'+({won:'result-won',lost:'result-lost'}[p.status]||'')+'">'+esc(state)+'</span></p>';
+
+  html+='<article class="opinion-pick"><div class="row"><h3>'+esc(p.player.name)+'</h3><span data-scorer-odds="'+esc(p.player.id)+'">'+scorerPrice(p)+'</span></div><p class="gold">'+esc(p.player.team_name)+' · Buteur</p><p>'+esc(p.match.home.name)+' – '+esc(p.match.away.name)+' · '+esc(new Date(p.match.date).toLocaleTimeString('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'}))+'</p><p><span class="'+({won:'result-won',lost:'result-lost'}[p.status]||'')+'">'+esc(state)+'</span></p>';
   if(p.status==='pending')html+='<p>'+esc(lineup)+'</p>';
   html+='<p><strong>'+esc(p.basis.goals)+' buts · '+esc(p.basis.appearances)+' apparitions</strong></p><details><summary>Pourquoi ce buteur ?</summary><p>'+esc(p.rationale)+'</p>';
 
-  html+='<p><a href="'+esc(p.source_url)+'" target="_blank" rel="noopener noreferrer">Voir les données du match</a></p></details><button type="button" class="day" data-scorer-match>OUVRIR LE MATCH</button></article></div>';
-  return html+scorerTracking(perf);
+  html+='<p><a href="'+esc(p.source_url)+'" target="_blank" rel="noopener noreferrer">Voir les données du match</a></p></details><button type="button" class="day" data-scorer-match="'+esc(p.player.id)+'">OUVRIR LE MATCH</button></article>';
+  return html;
  }
  function render(board){
   const signature=JSON.stringify(board);if(signature===lastSignature)return;lastSignature=signature;
@@ -70,7 +73,7 @@
   for(const id of targets){
    const target=document.getElementById(id);if(!target)continue;target.innerHTML=html;
    const history=target.querySelector('[data-scorer-history]');if(history)history.ontoggle=()=>{if(history.open&&!history.querySelector('[data-scorer-history-content]').innerHTML)historyPage(history,1);};
-   const scorerButton=target.querySelector('[data-scorer-match]');if(scorerButton)scorerButton.onclick=()=>openMatch(board.scorer.match,'home');
+   target.querySelectorAll('[data-scorer-match]').forEach(button=>button.onclick=()=>{const pick=scorerPicks(board).find(p=>String(p.player.id)===button.dataset.scorerMatch);if(pick)openMatch(pick.match,'home');});
    target.querySelectorAll('[data-opinion-match]').forEach(button=>button.onclick=()=>{
     const pick=board.groups.flatMap(g=>g.picks).find(p=>p.match.id===button.dataset.opinionMatch);
     if(pick)openMatch(pick.match,id==='homeDailyOpinion'?'home':'dailyTickets');
@@ -86,11 +89,13 @@
   busy=true;
   try{
    const board=await api('/api/daily-opinion',15000);render(board);
-   if(board.scorer?.status==='pending'&&new Date(board.scorer.match.date)>new Date()){
-    let quote=null;try{quote=(await api('/api/daily-opinion/scorer-odds',15000)).odds;}catch{}
-    if(lastBoard?.day===board.day&&lastBoard.scorer?.player.id===board.scorer.player.id){
-     if(quote)lastBoard.scorer.odds=quote;
-     for(const id of targets){const badge=document.getElementById(id)?.querySelector('[data-scorer-odds]');if(badge)badge.innerHTML=scorerPrice(lastBoard.scorer);}
+   for(const pick of scorerPicks(board)){
+    if(pick.status!=='pending'||new Date(pick.match.date)<=new Date())continue;
+    let quote=null;try{quote=(await api('/api/daily-opinion/scorer-odds?player_id='+encodeURIComponent(pick.player.id)+'&event_id='+encodeURIComponent(pick.match.id),15000)).odds;}catch{}
+    const current=lastBoard?.day===board.day?scorerPicks(lastBoard).find(p=>p.player.id===pick.player.id&&String(p.match.id)===String(pick.match.id)):null;
+    if(current){
+     if(quote)current.odds=quote;
+     for(const id of targets){const badges=document.getElementById(id)?.querySelectorAll('[data-scorer-odds]')||[];for(const badge of badges)if(badge.dataset.scorerOdds===String(current.player.id))badge.innerHTML=scorerPrice(current);}
      lastSignature=JSON.stringify(lastBoard);
     }
    }

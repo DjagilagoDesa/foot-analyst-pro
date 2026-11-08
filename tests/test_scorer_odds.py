@@ -87,3 +87,13 @@ class QuotePersistence(unittest.TestCase):
   q=self.seed(int(NOW.timestamp())+300);self.request(q);self.assertNotIn('odds',self.service.read(DAY)[0]['scorer'])
  def test_missing_price_is_never_replaced_by_team_odds(self):
   self.seed();r=self.request(None);self.assertIsNone(r.json['odds']);self.assertNotIn('odds',self.service.read(DAY)[0]['scorer'])
+
+ def test_quote_targets_second_scorer_without_changing_first(self):
+  self.seed();board=self.service.read(DAY)[0]
+  second=copy.deepcopy(board['scorer']);second['player']['id']='222';second['match']['id']='999'
+  board['scorers']=[board['scorer'],second]
+  with database() as db:db.execute('UPDATE daily_opinion_boards SET payload=? WHERE day=?',(json.dumps(board),DAY))
+  with patch('daily_opinion.today',return_value=DAY),patch.object(self.service.scorer_odds,'quote',return_value=None) as quote:
+   r=self.app.test_client().get('/api/daily-opinion/scorer-odds?player_id=222&event_id=999')
+   self.assertEqual(r.status_code,200);self.assertEqual(quote.call_args.args[0]['player']['id'],'222')
+  self.assertNotEqual(self.service.read(DAY)[0]['scorer']['player']['id'],'222')

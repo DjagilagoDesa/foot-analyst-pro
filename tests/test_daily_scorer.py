@@ -90,7 +90,7 @@ class ScorerPersistence(unittest.TestCase):
   self.refresh();first=self.service.read(DAY)[0];self.assertEqual(first['scorer']['player']['id'],'11');self.assertEqual(first['scorer']['published_at'],NOW.isoformat())
   with patch('daily_scorer.select',side_effect=AssertionError('Already selected')):self.refresh(NOW+timedelta(minutes=20))
   second=self.service.read(DAY)[0];self.assertEqual(first['scorer'],second['scorer']);self.assertEqual(self.service.performance(DAY)['pending'],1);self.assertEqual(self.service.scorer_performance(DAY)['pending'],1)
-  second['scorer']['status']='won'
+  second['scorer']['status']='won';second['scorers'][0]['status']='won'
   with database() as db:db.execute('UPDATE daily_opinion_boards SET payload=? WHERE day=?',(json.dumps(second),DAY))
   self.assertIsNone(self.service.performance(DAY)['success_pct']);self.assertEqual(self.service.scorer_performance(DAY)['success_pct'],100)
  def test_existing_board_enriched_immediately_without_changing_six_picks(self):
@@ -120,7 +120,7 @@ class ScorerPersistence(unittest.TestCase):
   with database() as db:
    db.execute('DELETE FROM daily_opinion_boards')
    for i,status in enumerate(statuses):
-    board['scorer']['status']=status
+    board['scorer']['status']=status;board['scorers'][0]['status']=status
     db.execute('INSERT INTO daily_opinion_boards(day,payload,checked_at) VALUES(?,?,?)',
       (f'2026-10-{20+i}',json.dumps(board),0))
   with patch('daily_opinion.today',return_value=DAY):
@@ -132,3 +132,23 @@ class ScorerPersistence(unittest.TestCase):
   self.assertEqual(first['items'][0]['day'],'2026-10-26')
   self.assertEqual(first['performance']['success_pct'],60)
   self.assertEqual(first['performance']['scope'],'daily_scorer_only')
+
+ def test_three_distinct_frozen_scorers_and_legacy_migration(self):
+  import copy
+  self.refresh();old=self.service.read(DAY)[0]
+  legacy=copy.deepcopy(old);legacy.pop('scorers')
+  with database() as db:db.execute('UPDATE daily_opinion_boards SET payload=?,checked_at=0 WHERE day=?',(json.dumps(legacy),DAY))
+  pool=[]
+  for pid,event in [('11','1'),('22','2'),('33','2'),('44','3'),('55','4')]:
+   p=copy.deepcopy(old['scorer']);p['player']['id']=pid;p['match']['id']=event;pool.append(p)
+  with patch('daily_scorer.select',return_value=(pool,{})):self.refresh(NOW+timedelta(minutes=20))
+  board=self.service.read(DAY)[0]
+  self.assertEqual(len(board['scorers']),3)
+  self.assertEqual(board['scorers'][0],old['scorer'])
+  self.assertEqual(len({p['player']['id'] for p in board['scorers']}),3)
+  self.assertEqual(len({p['match']['id'] for p in board['scorers']}),3)
+  for p,status in zip(board['scorers'],['won','lost','void']):p['status']=status
+  with database() as db:db.execute('UPDATE daily_opinion_boards SET payload=? WHERE day=?',(json.dumps(board),DAY))
+  perf=self.service.scorer_performance(DAY);self.assertEqual(perf['success_pct'],50)
+  self.assertEqual(len(self.service.scorer_history(DAY)['items']),3)
+  with patch('daily_scorer.select',side_effect=AssertionError('Already three')):self.refresh(NOW+timedelta(minutes=40))

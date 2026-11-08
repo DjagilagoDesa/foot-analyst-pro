@@ -6,12 +6,12 @@ w.setInterval=()=>0;let opened;
 w.openMatch=m=>opened=m.id;
 const match={id:'42',date:'2026-11-09T20:00:00Z',home:{id:'1',name:'Club A'},away:{id:'2',name:'Club B'}};
 let board={day:new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Paris'}),status:'partial',groups:[],scorer:{player:{id:'11',name:'Joueur <img src=x>',team_name:'Club A'},match,status:'pending',availability:'unconfirmed',basis:{goals:6,appearances:9},rationale:'Ses raisons <script>bad</script>',source_url:'https://www.espn.com/soccer/match/_/gameId/42'},scorer_performance:{won:2,lost:1,success_pct:66.7}};
-let quote=null;w.api=async path=>path.includes('/scorer-history')?{items:[{...board.scorer,day:board.day,status:'won'}],page:1,has_more:false}:path.endsWith('/scorer-odds')?{odds:quote}:JSON.parse(JSON.stringify(board));
+let quote=null;w.api=async path=>path.includes('/scorer-history')?{items:[{...board.scorer,day:board.day,status:'won'}],page:1,has_more:false}:path.includes('/scorer-odds')?{odds:quote}:JSON.parse(JSON.stringify(board));
 w.eval(fs.readFileSync('organization.js','utf8'));w.eval(fs.readFileSync('daily-opinion.js','utf8'));
 const tick=()=>new Promise(r=>setTimeout(r,0));
 (async()=>{
  await tick();const area=d.getElementById('homeDailyOpinion');
- assert(area.textContent.includes('⚽ Buteur du jour'));assert(area.textContent.includes('6 buts · 9 apparitions'));assert(area.textContent.includes('Titularisation à confirmer'));
+ assert(area.textContent.includes('⚽ Les 3 buteurs du jour'));assert(area.textContent.includes('6 buts · 9 apparitions'));assert(area.textContent.includes('Titularisation à confirmer'));
  assert(area.textContent.includes('Réussite buteurs'));
  const history=area.querySelector('[data-scorer-history]');history.open=true;history.ontoggle();await tick();
  assert(history.textContent.includes('✓ Gagné'));assert(!history.querySelector('img'));
@@ -27,6 +27,8 @@ const tick=()=>new Promise(r=>setTimeout(r,0));
  for(const [status,label] of [['won','✓ Gagné'],['lost','✗ Perdu'],['void','Annulé']]){
   board.scorer.status=status;await w.DailyOpinion.load();await tick();assert(area.textContent.includes(label));assert(!area.textContent.includes('Titularisation à confirmer'));
  }
- board={day:'2026-11-10',status:'partial',groups:[],scorer:null};await w.DailyOpinion.load();await tick();assert(area.textContent.includes('Aucun buteur sélectionné'));assert(!area.textContent.includes('Joueur'));
+ board.scorers=[board.scorer,{...board.scorer,player:{...board.scorer.player,id:'22',name:'Second buteur'},match:{...match,id:'43'},status:'lost'},{...board.scorer,player:{...board.scorer.player,id:'33',name:'Troisième buteur'},match:{...match,id:'44'},status:'won'}];
+ await w.DailyOpinion.load();await tick();assert.equal(area.querySelectorAll('[data-scorer-match]').length,3);area.querySelector('[data-scorer-match="22"]').click();assert.equal(opened,'43');assert(area.textContent.includes('Troisième buteur'));
+ board={day:'2026-11-10',status:'partial',groups:[],scorer:null};await w.DailyOpinion.load();await tick();assert(area.textContent.includes('0/3 buteurs sélectionnés'));assert(!area.textContent.includes('Joueur'));
  console.log('Buteur quotidien : rubrique repliable, données échappées, match ouvrable, résultats et remise à zéro validés.');w.close();
 })().catch(e=>{console.error(e);process.exitCode=1;w.close();});
