@@ -43,8 +43,12 @@ async function ticketVerifyFixtures(results){
  try{
   await Promise.all([...groups.entries()].map(async([key,rows])=>{
    const [league,date]=key.split('|');
-   const feed=await api('/api/fixtures?league='+encodeURIComponent(league)+'&date='+encodeURIComponent(date),45000);
-   if(feed.partial||!Array.isArray(feed.events))throw Error('source_unavailable');
+   let feed;
+   const path='/api/fixtures?league='+encodeURIComponent(league)+'&date='+encodeURIComponent(date);
+   for(let attempt=0;attempt<2;attempt++){
+    try{feed=await api(path,45000);if(feed.partial||!Array.isArray(feed.events))throw Error('source_unavailable');break;}
+    catch(error){if(attempt===1)throw Error('source_unavailable');}
+   }
    for(const r of rows){
     const m=r.match;
     const found=feed.events.filter(e=>e.league===m.league&&String(e.id)===String(m.id));
@@ -54,7 +58,7 @@ async function ticketVerifyFixtures(results){
     ticketAssertFuture([{match:current}]);
    }
   }));
- }catch{throw Error('Ticket non finalisé : une rencontre a changé ou ne peut pas être vérifiée. Réessaie.');}
+ }catch(error){throw Error(error.message==='source_unavailable'?'Ticket non finalisé : le calendrier est temporairement indisponible après deux tentatives. Réessaie dans un instant.':'Ticket non finalisé : une rencontre a commencé ou a changé. Actualise les matchs puis relance la composition.');}
  // Source calls or a suspended phone tab can cross the kickoff boundary.
  ticketAssertFuture(results);
 }
@@ -126,9 +130,9 @@ async function ticketVerifyFixtures(results){
    target.innerHTML=message('Vérification des matchs…');
    await ticketVerifyFixtures(results);
    const untracked=await window.Tracking.record(results.map(r=>({analysis:r.analysis,market:r.market})));
-   await ticketVerifyFixtures(results);
+   ticketAssertFuture(results);
    if(!untracked)await window.Tracking.saveTicket?.('Ticket personnalisé',results.map(r=>({analysis:r.analysis,market:r.market})));
-   await ticketVerifyFixtures(results);
+   ticketAssertFuture(results);
    if(untracked)el('customNotice').innerHTML=message(untracked+' sélection(s) non enregistrée(s) dans le suivi : rencontre non vérifiable, déjà commencée ou ancienne analyse.');
    let joint=results.reduce((v,r)=>v*r.probability/100,1);
    const repeated=new Set(),teams=new Set();for(const r of results){for(const id of [r.match.home.id,r.match.away.id]){if(teams.has(String(id)))repeated.add(String(id));teams.add(String(id));}}

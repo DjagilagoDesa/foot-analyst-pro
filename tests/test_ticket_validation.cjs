@@ -25,7 +25,7 @@ async function scenario(mode){
  const c={window:{},Date:Clock,api:async path=>{
   calls.push(path);const p=new URL('https://test.local'+path).searchParams;
   let events=original.filter(m=>m.league===p.get('league')&&m.date.slice(0,10)===p.get('date')).map(m=>JSON.parse(JSON.stringify(m)));
-  if(mode==='unavailable')throw Error('offline');
+  if(mode==='unavailable'||(mode==='transient'&&calls.length===1))throw Error('offline');
   if(mode==='live')events.forEach(m=>m.state='in');
   if(mode==='postponed')events.forEach(m=>m.status_name='status_postponed');
   if(mode==='canceled')events.forEach(m=>m.status_name='STATUS_CANCELED');
@@ -42,13 +42,13 @@ async function scenario(mode){
  if(mode==='bad-date')results[0].match.date='bad';
  if(mode==='bad-id')results[0].match.id='';
  const before=JSON.stringify(results);
- if(mode==='ok'){
+ if(['ok','transient'].includes(mode)){
   await c.ticketVerifyFixtures(results);
-  assert.equal(calls.length,3,'one source check per league/UTC date');
+  assert.equal(calls.length,mode==='transient'?4:3,'one source check per league/UTC date');
   assert.equal(JSON.stringify(results),before,'validation must not mutate analyses or picks');
   clock=Date.parse('2026-11-03T19:00:00Z');
   assert.throws(()=>c.ticketAssertFuture(results),/actualiser/);
  }else await assert.rejects(()=>c.ticketVerifyFixtures(results));
  if(['past','bad-date','bad-id'].includes(mode))assert.equal(calls.length,0);
 }
-(async()=>{for(const mode of ['ok','live','postponed','canceled','missing','duplicate','wrong-team','rescheduled','unavailable','partial','elapsed','past','bad-date','bad-id'])await scenario(mode);console.log('Ticket validation: 14 scenarios, batched sources, identity, clock and unchanged picks OK');})().catch(e=>{console.error(e);process.exit(1);});
+(async()=>{for(const mode of ['ok','transient','live','postponed','canceled','missing','duplicate','wrong-team','rescheduled','unavailable','partial','elapsed','past','bad-date','bad-id'])await scenario(mode);console.log('Ticket validation: 14 scenarios, batched sources, identity, clock and unchanged picks OK');})().catch(e=>{console.error(e);process.exit(1);});

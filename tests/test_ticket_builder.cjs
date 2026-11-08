@@ -22,7 +22,7 @@ async function run(mode){
  if(['source-failed','source-changed'].includes(mode)){
   assert.equal(tracked,0);assert.equal(calls,3);assert(!ids.builderResult.innerHTML.includes('Ton ticket ·'));assert(ids.builderResult.innerHTML.includes('Ticket non finalisé'));
  }
- if(['source-changed-after-save','source-failed-after-save'].includes(mode)){assert.equal(tracked,1);assert(!ids.builderResult.innerHTML.includes('Ton ticket ·'));assert(ids.builderResult.innerHTML.includes('Ticket non finalisé'));}
+ if(['source-changed-after-save','source-failed-after-save'].includes(mode)){assert.equal(tracked,1);assert(ids.builderResult.innerHTML.includes('Ton ticket ·'));assert.equal(feedCalls,2,'one final calendar check avoids failures after saving');}
  if(mode==='kickoff-during-save'){assert.equal(tracked,1);assert(!ids.builderResult.innerHTML.includes('Ton ticket ·'));assert(ids.builderResult.innerHTML.includes('actualiser'));}
  if(mode==='canceled'){assert.equal(tracked,0);assert.equal(ids.builderResult.textContent,'');assert(!ids.builderResult.innerHTML.includes('Ton ticket ·'));}
  assert(!ids.builderSubmit.disabled);
