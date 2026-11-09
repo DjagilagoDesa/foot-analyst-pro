@@ -43,6 +43,19 @@ def snapshot(db, uid):
                 suggested_cents=max(0,suggested),daily_remaining_cents=max(0,cap-today),daily_limit_bps=daily_bps,bets=bets)
 
 
+def match_metadata(info):
+    result={'date':info['date'].isoformat(),'match_state':info['state'],'match_status':info['name'],'match_completed':info['completed']}
+    for side in ('home','away'):
+        team=info[side].get('team') or {};logos=team.get('logos') or []
+        result[side+'_name']=team.get('displayName') or team.get('name') or ''
+        url=team.get('logo') or (logos[0].get('href') if logos else '')
+        result[side+'_badge']=url if isinstance(url,str) and url.startswith('https://') else ''
+        value=info[side].get('score')
+        if isinstance(value,dict):value=value.get('displayValue',value.get('value'))
+        if value is not None:result['live_'+side+'_score']=str(value)
+    return result
+
+
 def register(bp, user, source, leagues, resolve, score):
     @bp.get('/api/bankroll')
     def get_bankroll():
@@ -122,7 +135,7 @@ def register(bp, user, source, leagues, resolve, score):
             if info['completed'] or info['state'] not in ('pre','in') or any(x in info['name'] for x in ('CANCEL','ABANDON','POSTPON','SUSPEND')):raise AccountError('Ce match ne peut plus être ajouté.')
             label=info['home'].get('team',{}).get('displayName') or info['home'].get('team',{}).get('name') or info['home_id']
             label+=' – '+(info['away'].get('team',{}).get('displayName') or info['away'].get('team',{}).get('name') or info['away_id'])
-            selections.append(dict(league=league,event_id=event,home_id=info['home_id'],away_id=info['away_id'],label=label,market=market,odds=str(odds),status='pending',bookmaker=str(row.get('bookmaker',''))[:100],automatic_odds=row.get('automatic_odds') is True))
+            selections.append(dict(league=league,event_id=event,home_id=info['home_id'],away_id=info['away_id'],label=label,market=market,odds=str(odds),status='pending',**match_metadata(info),bookmaker=str(row.get('bookmaker',''))[:100],automatic_odds=row.get('automatic_odds') is True))
             potential*=odds
         if potential>1000000000000:raise AccountError('Retour potentiel trop élevé.')
         with database() as db:
@@ -157,11 +170,11 @@ def register(bp, user, source, leagues, resolve, score):
 def refresh_results(uid,source,resolve,score):
     """Fetch without a DB lock; settle once after locking the account ledger."""
     with database() as db:
-        pending=[dict(r) for r in db.execute('SELECT id,selections FROM account_bankroll_manual WHERE user_id=? AND payout_cents IS NULL ORDER BY created_at LIMIT 30',(uid,)).fetchall()]
+        pending=[dict(r) for r in db.execute('SELECT id,selections FROM account_bankroll_manual WHERE user_id=? ORDER BY CASE WHEN payout_cents IS NULL THEN 0 ELSE 1 END,created_at DESC LIMIT 60',(uid,)).fetchall()]
     events={}
     for row in pending:
         for leg in json.loads(row['selections']):
-            if leg['status']=='pending':events[(leg['league'],leg['event_id'])]=None
+            if leg['status']=='pending' or 'home_name' not in leg:events[(leg['league'],leg['event_id'])]=None
     chosen=list(events)[:30];errors=0;results={}
     with ThreadPoolExecutor(max_workers=5) as pool:
         jobs={key:pool.submit(source,*key,60) for key in chosen}
@@ -172,14 +185,16 @@ def refresh_results(uid,source,resolve,score):
     with database() as db:
         db.execute('SELECT * FROM account_bankroll WHERE user_id=?'+('' if db.sqlite else ' FOR UPDATE'),(uid,)).fetchone()
         for item in pending:
-            row=db.execute('SELECT * FROM account_bankroll_manual WHERE id=? AND user_id=? AND payout_cents IS NULL',(item['id'],uid)).fetchone()
+            row=db.execute('SELECT * FROM account_bankroll_manual WHERE id=? AND user_id=?',(item['id'],uid)).fetchone()
             if not row:continue
             legs=json.loads(row['selections'])
             for leg in legs:
                 info=results.get((leg['league'],leg['event_id']))
-                if leg['status']!='pending' or not info:continue
+                if not info:continue
                 try:
                     if leg['home_id']!=info['home_id'] or leg['away_id']!=info['away_id']:continue
+                    leg.update(match_metadata(info))
+                    if leg['status']!='pending':continue
                     # A postponed or abandoned match needs bookmaker-specific handling; keep it pending.
                     if any(x in info['name'] for x in ('ABANDON','POSTPON','SUSPEND')):continue
                     void='CANCEL' in info['name']
@@ -190,12 +205,12 @@ def refresh_results(uid,source,resolve,score):
                         hg,ag=score(info['home'].get('score')),score(info['away'].get('score'))
                         leg.update(status='won' if resolve(leg['market'],hg,ag) else 'lost',home_score=hg,away_score=ag)
                 except (ValueError,TypeError,KeyError):errors+=1
-            payout=None
-            if any(l['status']=='lost' for l in legs):payout=0
-            elif all(l['status'] in ('won','void') for l in legs):
+            payout=row['payout_cents']
+            if payout is None and any(l['status']=='lost' for l in legs):payout=0
+            elif payout is None and all(l['status'] in ('won','void') for l in legs):
                 value=Decimal(row['stake_cents'])
                 for leg in legs:
                     if leg['status']=='won':value*=Decimal(leg['odds'])
                 payout=int(value.quantize(Decimal('1'),rounding=ROUND_HALF_UP))
-            db.execute('UPDATE account_bankroll_manual SET selections=?,payout_cents=? WHERE id=? AND user_id=? AND payout_cents IS NULL',(json.dumps(legs),payout,row['id'],uid))
+            db.execute('UPDATE account_bankroll_manual SET selections=?,payout_cents=? WHERE id=? AND user_id=?',(json.dumps(legs),payout,row['id'],uid))
     return errors

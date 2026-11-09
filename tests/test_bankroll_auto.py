@@ -58,3 +58,17 @@ class AutoBankroll(Tracking):
   self.assertEqual(self.state()['bets'][0]['payout_cents'],152)
  def test_unauthorized_write(self):
   self.assertEqual(self.client.post('/api/bankroll/manual',json={}).status_code,403)
+ def test_team_metadata_and_existing_ticket_backfill_preserve_payout(self):
+  competitors=self.info['header']['competitions'][0]['competitors']
+  competitors[0]['team'].update(displayName='Plymouth Parkway',logo='https://example.org/plymouth.png')
+  competitors[1]['team'].update(displayName='Berkhamsted',logos=[{'href':'https://example.org/berkhamsted.png'}])
+  self.add();leg=self.state()['bets'][0]['selections'][0]
+  self.assertEqual(leg['home_name'],'Plymouth Parkway');self.assertEqual(leg['away_badge'],'https://example.org/berkhamsted.png')
+  self.finish();before=self.state();self.assertEqual(before['bets'][0]['payout_cents'],250)
+  with self.app.app_context(),accounts.database() as db:
+   row=db.execute('SELECT id,selections FROM account_bankroll_manual').fetchone();legs=json.loads(row['selections'])
+   for key in ['home_name','away_name','home_badge','away_badge','date']:legs[0].pop(key,None)
+   db.execute('UPDATE account_bankroll_manual SET selections=? WHERE id=?',(json.dumps(legs),row['id']))
+  after=self.state();leg=after['bets'][0]['selections'][0]
+  self.assertEqual(leg['home_name'],'Plymouth Parkway');self.assertEqual(leg['home_badge'],'https://example.org/plymouth.png')
+  self.assertEqual((after['available_cents'],after['bets'][0]['payout_cents']),(before['available_cents'],250))
