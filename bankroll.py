@@ -26,11 +26,12 @@ def snapshot(db, uid):
     now=datetime.now(ZoneInfo('Europe/Paris'));day=now.replace(hour=0,minute=0,second=0,microsecond=0).timestamp()
     # Conservative cap: stakes returned during the day do not replenish the daily allowance.
     today=sum(b['stake_cents'] for b in bets if b['created_at']>=day)
-    cap=config['initial_cents']*5//100
+    daily_bps=max(500,config['risk_bps'])
+    cap=config['initial_cents']*daily_bps//10000
     suggested=min(available*config['risk_bps']//10000, max(0,cap-today), available)
     return dict(configured=True,initial_cents=config['initial_cents'],risk_bps=config['risk_bps'],available_cents=available,
                 pending_cents=pending,profit_cents=profit,total_cents=available+pending,
-                suggested_cents=max(0,suggested),daily_remaining_cents=max(0,cap-today),bets=bets)
+                suggested_cents=max(0,suggested),daily_remaining_cents=max(0,cap-today),daily_limit_bps=daily_bps,bets=bets)
 
 
 def register(bp, user):
@@ -44,7 +45,7 @@ def register(bp, user):
         write_guard();uid=user(True)['id'];data=body()
         initial=cents(data.get('initial'),100)
         risk=data.get('risk_bps',100)
-        if type(risk) is not int or risk not in (50,100,200):raise AccountError('Profil de mise non valide.')
+        if type(risk) is not int or risk not in (50,*range(100,1001,100)):raise AccountError('Profil de mise non valide.')
         with database() as db:
             db.execute('INSERT INTO account_bankroll(user_id,initial_cents,risk_bps) VALUES(?,?,?) ON CONFLICT(user_id) DO NOTHING',(uid,initial,risk))
             db.execute('SELECT * FROM account_bankroll WHERE user_id=?'+('' if db.sqlite else ' FOR UPDATE'),(uid,)).fetchone()

@@ -9,7 +9,7 @@ w.eval(fs.readFileSync('organization.js','utf8'));w.eval(fs.readFileSync('bankro
 const tick=()=>new Promise(r=>setTimeout(r,0));
 (async()=>{
  d.querySelector('[aria-controls="dailyTickets-group-3"]').click();await tick();
- const root=d.getElementById('dailyTickets-group-3');assert(!root.hidden);assert.equal(root.querySelector('[name="initial"]').value,'100');
+ const root=d.getElementById('dailyTickets-group-3');assert(!root.hidden);assert.equal(root.querySelector('[name="initial"]').value,'100');assert(root.querySelector('[name="risk"] option[value="1000"]'));
  root.querySelector('form').dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();
  assert.equal(posted[0].data.initial,'100');assert(root.textContent.includes('Disponible'));
  assert.equal((await w.Bankroll.suggest([{probability:80},{probability:80}])).stake,'1.00');

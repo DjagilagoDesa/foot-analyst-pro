@@ -46,3 +46,15 @@ class Bankroll(TicketArchive):
     db.execute('INSERT INTO account_bankroll_bets VALUES(?,?,?,?,?)',('u',tid,100,500,__import__('time').time()))
   self.assertEqual(self.client.get('/api/bankroll').json['suggested_cents'],0)
   self.assertEqual(self.request('/bets',{'ticket_id':self.tid,'stake':'0.01'}).status_code,400)
+
+ def test_risk_up_to_ten_percent_and_daily_limit(self):
+  self.setup_budget()
+  for percent in range(1,11):
+   r=self.request('',{'initial':100,'risk_bps':percent*100})
+   self.assertEqual(r.status_code,200)
+   self.assertEqual(r.json['suggested_cents'],percent*100)
+   self.assertEqual(r.json['daily_remaining_cents'],max(5,percent)*100)
+  self.assertEqual(self.request('',{'initial':100,'risk_bps':1100}).status_code,400)
+  self.assertEqual(self.request('/bets',{'ticket_id':self.tid,'stake':'10.01'}).status_code,400)
+  d=self.request('/bets',{'ticket_id':self.tid,'stake':'10'}).json
+  self.assertEqual((d['available_cents'],d['pending_cents'],d['daily_remaining_cents']),(9000,1000,0))
