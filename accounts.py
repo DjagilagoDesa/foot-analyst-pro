@@ -54,6 +54,11 @@ SCHEMA = (
       ticket_id TEXT NOT NULL REFERENCES account_tickets(id) ON DELETE CASCADE,
       stake_cents BIGINT NOT NULL, payout_cents BIGINT, created_at BIGINT NOT NULL,
       PRIMARY KEY(user_id,ticket_id))""",
+    """CREATE TABLE IF NOT EXISTS account_bankroll_manual (
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES account_users(id) ON DELETE CASCADE,
+      request_key TEXT NOT NULL, title TEXT NOT NULL, stake_cents BIGINT NOT NULL,
+      payout_cents BIGINT, created_at BIGINT NOT NULL, selections TEXT NOT NULL,
+      UNIQUE(user_id,request_key))""",
     '''CREATE TABLE IF NOT EXISTS account_sessions (
       token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES account_users(id) ON DELETE CASCADE,
       csrf_hash TEXT NOT NULL, expires_at BIGINT NOT NULL)''',

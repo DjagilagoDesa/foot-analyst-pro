@@ -58,3 +58,12 @@ class Bankroll(TicketArchive):
   self.assertEqual(self.request('/bets',{'ticket_id':self.tid,'stake':'10.01'}).status_code,400)
   d=self.request('/bets',{'ticket_id':self.tid,'stake':'10'}).json
   self.assertEqual((d['available_cents'],d['pending_cents'],d['daily_remaining_cents']),(9000,1000,0))
+
+ def test_archived_ticket_with_odds_auto_settles_and_cannot_double_debit(self):
+  self.setup_budget()
+  d=self.request('/bets',{'ticket_id':self.tid,'stake':'1','odds':['2','3']}).json
+  self.assertEqual(d['available_cents'],9900);self.assertTrue(d['bets'][0]['automatic'])
+  d=self.request('/bets',{'ticket_id':self.tid,'stake':'1'}).json
+  self.assertEqual(len(d['bets']),1)
+  self.finish();d=self.client.get('/api/bankroll').json
+  self.assertEqual((d['available_cents'],d['profit_cents']),(10500,500))

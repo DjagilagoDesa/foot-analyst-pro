@@ -8,13 +8,19 @@ w.Accounts={request:async(path,data)=>{posted.push({path,data});if(path==='/api/
 w.eval(fs.readFileSync('organization.js','utf8'));w.eval(fs.readFileSync('bankroll.js','utf8'));
 const tick=()=>new Promise(r=>setTimeout(r,0));
 (async()=>{
- d.querySelector('[aria-controls="dailyTickets-group-3"]').click();await tick();
- const root=d.getElementById('dailyTickets-group-3');assert(!root.hidden);assert.equal(root.querySelector('[name="initial"]').value,'100');assert(root.querySelector('[name="risk"] option[value="1000"]'));
+ await w.Bankroll.load();
+ const root=d.getElementById('bankrollContent');assert(d.querySelector('nav [data-page="bankroll"]'));assert.equal(root.querySelector('[name="initial"]').value,'100');assert(root.querySelector('[name="risk"] option[value="1000"]'));
  root.querySelector('form').dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();
  assert.equal(posted[0].data.initial,'100');assert(root.textContent.includes('Disponible'));
  assert.equal((await w.Bankroll.suggest([{probability:80},{probability:80}])).stake,'1.00');
  assert.equal((await w.Bankroll.suggest([{probability:20},{probability:20}])).stake,'0.25');
- const node=d.createElement('details');root.appendChild(node);await w.Bankroll.mount(node,{id:'test',status:'pending'});assert.equal(node.querySelector('[name="stake"]').value,'1');
+ const node=d.createElement('details');root.appendChild(node);await w.Bankroll.mount(node,{id:'test',status:'pending',selections:[{label:'Alpha – Beta'}]});assert.equal(node.querySelector('[name="stake"]').value,'1');
+ node.querySelector('[data-price]').value='2.5';
  node.querySelector('form').dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();assert.equal(posted[1].path,'/api/bankroll/bets');assert.equal(posted[1].data.ticket_id,'test');
+ w.api=async()=>({events:[{id:'1',league:'fra.1',state:'pre',home:{id:'1',name:'Alpha'},away:{id:'2',name:'Beta'}}]});
+ await w.Bankroll.load();root.querySelector('[data-load]').click();await tick();root.querySelector('[data-fixtures] button').click();
+ const odds=root.querySelector('[data-odds]');odds.value='2.50';odds.dispatchEvent(new w.Event('input'));
+ const add=root.querySelector('[data-bet]');add.elements.stake.value='1';add.dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();
+ assert.equal(posted[2].path,'/api/bankroll/manual');assert.equal(posted[2].data.selections[0].odds,'2.50');
  w.Bankroll.clear();assert.equal(root.textContent,'');dom.window.close();console.log('Bankroll: setup, tab, amounts, confidence scaling and explicit bet confirmation OK');
 })().catch(e=>{console.error(e);dom.window.close();process.exitCode=1;});
