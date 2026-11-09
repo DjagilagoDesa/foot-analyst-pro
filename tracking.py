@@ -46,6 +46,8 @@ def score(value):
 
 def init_app(app, fetch, base, leagues):
     bp=Blueprint('tracking',__name__)
+    from bankroll import register
+    register(bp, lambda csrf=False: current_user(csrf=csrf))
     def source(league,event,ttl):
         return fixture_info(fetch(f'{base}/{league}/summary',{'event':event},ttl=ttl))
 

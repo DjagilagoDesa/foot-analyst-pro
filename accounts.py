@@ -24,6 +24,7 @@ SCHEMA = (
     DAILY_OPINION_SCHEMA,
 
 
+
     '''CREATE TABLE IF NOT EXISTS account_owner_access (slot TEXT PRIMARY KEY, user_id TEXT NOT NULL)''',
     '''CREATE TABLE IF NOT EXISTS account_users (
       id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, nickname TEXT NOT NULL,
@@ -45,6 +46,14 @@ SCHEMA = (
       ticket_id TEXT NOT NULL REFERENCES account_tickets(id) ON DELETE CASCADE,
       position INTEGER NOT NULL, event_id TEXT NOT NULL, market TEXT NOT NULL,
       PRIMARY KEY(ticket_id,position))''',
+    """CREATE TABLE IF NOT EXISTS account_bankroll (
+      user_id TEXT PRIMARY KEY REFERENCES account_users(id) ON DELETE CASCADE,
+      initial_cents BIGINT NOT NULL, risk_bps INTEGER NOT NULL)""",
+    """CREATE TABLE IF NOT EXISTS account_bankroll_bets (
+      user_id TEXT NOT NULL REFERENCES account_users(id) ON DELETE CASCADE,
+      ticket_id TEXT NOT NULL REFERENCES account_tickets(id) ON DELETE CASCADE,
+      stake_cents BIGINT NOT NULL, payout_cents BIGINT, created_at BIGINT NOT NULL,
+      PRIMARY KEY(user_id,ticket_id))""",
     '''CREATE TABLE IF NOT EXISTS account_sessions (
       token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES account_users(id) ON DELETE CASCADE,
       csrf_hash TEXT NOT NULL, expires_at BIGINT NOT NULL)''',
@@ -424,7 +433,9 @@ def export_data():
         tickets=[dict(r) for r in db.execute('SELECT id,title,created_at FROM account_tickets WHERE user_id=? ORDER BY created_at',(user['id'],)).fetchall()]
         for ticket in tickets:
             ticket['selections']=[dict(r) for r in db.execute('SELECT event_id,market FROM account_ticket_legs WHERE ticket_id=? ORDER BY position',(ticket['id'],)).fetchall()]
-    response=jsonify(tickets=tickets,profile=public_user(user),analyses=[dict(label=r['label'],created_at=r['created_at'],result=json.loads(r['result'])) for r in rows],selections=selections)
+    from bankroll import snapshot
+    with database() as db:bankroll=snapshot(db,user['id'])
+    response=jsonify(bankroll=bankroll,tickets=tickets,profile=public_user(user),analyses=[dict(label=r['label'],created_at=r['created_at'],result=json.loads(r['result'])) for r in rows],selections=selections)
     response.headers['Content-Disposition']='attachment; filename=foot-analyst-pro-mes-donnees.json'
     return response
 

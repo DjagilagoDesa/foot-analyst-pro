@@ -83,6 +83,7 @@
    if(host.isConnected){draw();button.disabled=false;}
   };
   panels.set(host,update);draw();
+  if(window.Bankroll){const proposal=await window.Bankroll.suggest(legs);if(proposal&&host.isConnected){stake.value=proposal.stake;const note=document.createElement('p');note.textContent=proposal.label;stake.closest('label').after(note);update();}}
  }
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)document.querySelectorAll('[data-odds-ticket]').forEach(p=>panels.get(p)?.());});
  setInterval(()=>document.querySelectorAll('[data-odds-ticket]').forEach(p=>panels.get(p)?.()),30000);
