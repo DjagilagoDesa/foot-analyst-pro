@@ -16,14 +16,14 @@
    if(!offset)target.innerHTML='';
    for(const ticket of d.tickets||[]){
     const node=document.createElement('details');node.className='panel';
-    node.innerHTML='<summary><strong>'+esc(ticket.title)+'</strong><br><span class="'+({won:'result-won',lost:'result-lost'}[ticket.status]||'')+'">'+esc(statusLabel[ticket.status])+'</span> · '+esc(date(ticket.created_at))+' · '+esc(ticket.selections.length)+' matchs</summary>'+ticket.selections.map(renderPick).join('');target.appendChild(node);
+    node.innerHTML='<summary><strong>'+esc(ticket.title)+'</strong><br><span class="'+({won:'result-won',lost:'result-lost'}[ticket.status]||'')+'">'+esc(statusLabel[ticket.status])+'</span> · '+esc(date(ticket.created_at))+' · '+esc(ticket.selections.length)+' matchs</summary>'+ticket.selections.map(renderPick).join('');target.appendChild(node);window.Bankroll?.mount(node,ticket);
    }
    if(!offset&&!d.tickets?.length)target.innerHTML='<div class="message">Aucun ticket '+(status==='pending'?'en cours':'passé')+'.</div>';
    if(d.next_offset!=null){const more=document.createElement('button');more.type='button';more.className='day list-more';more.textContent='VOIR PLUS';more.onclick=()=>{more.remove();archive(status,d.next_offset,requestEpoch,requestView);};target.appendChild(more);}
   }catch(e){if(requestEpoch===epoch&&requestView===view){const error=document.createElement('div');error.className='message';error.textContent=e.message;target.appendChild(error);}}
  }
  window.Tracking={
- clear:()=>{epoch++;view++;const target=get('trackingResult');if(target)target.textContent='';const summary=get('ticketPerformance');if(summary)summary.textContent='';},
+ clear:()=>{window.Bankroll?.clear();epoch++;view++;const target=get('trackingResult');if(target)target.textContent='';const summary=get('ticketPerformance');if(summary)summary.textContent='';},
  saveTicket:async(title,picks)=>{
   const selections=picks.map(p=>({analysis_id:p.analysis.tracking_id,market:p.market}));
   if(selections.some(p=>!p.analysis_id))throw Error('Ticket non archivé : sélection non enregistrée.');

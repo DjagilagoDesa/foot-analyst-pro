@@ -1,0 +1,20 @@
+const {JSDOM}=require('jsdom'),fs=require('fs'),assert=require('node:assert/strict');
+const html=fs.readFileSync('index.html','utf8').replace(/<script[\s\S]*?<\/script>/g,'');
+const dom=new JSDOM(html,{runScripts:'outside-only',url:'https://foot-analyst-pro.onrender.com'}),w=dom.window,d=w.document;
+w.escapeHtml=s=>String(s).replace(/[&<>"']/g,'');
+let state={configured:false},posted=[];
+w.fetch=async()=>({ok:true,json:async()=>structuredClone(state)});
+w.Accounts={request:async(path,data)=>{posted.push({path,data});if(path==='/api/bankroll')state={configured:true,initial_cents:10000,risk_bps:100,available_cents:10000,pending_cents:0,profit_cents:0,total_cents:10000,suggested_cents:100,daily_remaining_cents:500,bets:[]};return state;}};
+w.eval(fs.readFileSync('organization.js','utf8'));w.eval(fs.readFileSync('bankroll.js','utf8'));
+const tick=()=>new Promise(r=>setTimeout(r,0));
+(async()=>{
+ d.querySelector('[aria-controls="dailyTickets-group-3"]').click();await tick();
+ const root=d.getElementById('dailyTickets-group-3');assert(!root.hidden);assert.equal(root.querySelector('[name="initial"]').value,'100');
+ root.querySelector('form').dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();
+ assert.equal(posted[0].data.initial,'100');assert(root.textContent.includes('Disponible'));
+ assert.equal((await w.Bankroll.suggest([{probability:80},{probability:80}])).stake,'1.00');
+ assert.equal((await w.Bankroll.suggest([{probability:20},{probability:20}])).stake,'0.25');
+ const node=d.createElement('details');root.appendChild(node);await w.Bankroll.mount(node,{id:'test',status:'pending'});assert.equal(node.querySelector('[name="stake"]').value,'1');
+ node.querySelector('form').dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();assert.equal(posted[1].path,'/api/bankroll/bets');assert.equal(posted[1].data.ticket_id,'test');
+ w.Bankroll.clear();assert.equal(root.textContent,'');dom.window.close();console.log('Bankroll: setup, tab, amounts, confidence scaling and explicit bet confirmation OK');
+})().catch(e=>{console.error(e);dom.window.close();process.exitCode=1;});
