@@ -122,7 +122,7 @@ def register(bp, user, source, leagues, resolve, score):
             if info['completed'] or info['state'] not in ('pre','in') or any(x in info['name'] for x in ('CANCEL','ABANDON','POSTPON','SUSPEND')):raise AccountError('Ce match ne peut plus être ajouté.')
             label=info['home'].get('team',{}).get('displayName') or info['home'].get('team',{}).get('name') or info['home_id']
             label+=' – '+(info['away'].get('team',{}).get('displayName') or info['away'].get('team',{}).get('name') or info['away_id'])
-            selections.append(dict(league=league,event_id=event,home_id=info['home_id'],away_id=info['away_id'],label=label,market=market,odds=str(odds),status='pending'))
+            selections.append(dict(league=league,event_id=event,home_id=info['home_id'],away_id=info['away_id'],label=label,market=market,odds=str(odds),status='pending',bookmaker=str(row.get('bookmaker',''))[:100],automatic_odds=row.get('automatic_odds') is True))
             potential*=odds
         if potential>1000000000000:raise AccountError('Retour potentiel trop élevé.')
         with database() as db:

@@ -144,7 +144,7 @@ def init_app(app, fetch, base, leagues):
             rows=db.execute("SELECT * FROM ("+query+") q WHERE status "+("= 'pending'" if status=='pending' else "<> 'pending'")+" ORDER BY created_at DESC,id DESC LIMIT 6 OFFSET ?",(user['id'],offset)).fetchall()
             result=[dict(r) for r in rows[:5]]
             for ticket in result:
-                ticket['selections']=[dict(r) for r in db.execute('''SELECT p.event_id,p.label,p.market,p.probability,p.status,p.home_score,p.away_score,p.starts_at
+                ticket['selections']=[dict(r) for r in db.execute('''SELECT p.event_id,p.league,p.home_id,p.away_id,p.label,p.market,p.probability,p.status,p.home_score,p.away_score,p.starts_at
                   FROM account_ticket_legs l JOIN account_predictions p ON p.event_id=l.event_id AND p.market=l.market AND p.user_id=?
                   WHERE l.ticket_id=? ORDER BY l.position''',(user['id'],ticket['id'])).fetchall()]
         return jsonify(tickets=result,next_offset=offset+5 if len(rows)>5 else None)
