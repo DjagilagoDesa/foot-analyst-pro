@@ -56,6 +56,28 @@ def match_metadata(info):
     return result
 
 
+def scorer_player(info, event_id, player_id, team_id):
+    if info.get('event_id')!=str(event_id) or str(team_id) not in (info['home_id'],info['away_id']):
+        raise AccountError('Identité du match ou de l’équipe à revérifier.')
+    for block in info.get('rosters') or []:
+        if str((block.get('team') or {}).get('id'))!=str(team_id):continue
+        for row in block.get('roster') or []:
+            athlete=row.get('athlete') or {}
+            if str(athlete.get('id'))==str(player_id) and athlete.get('displayName'):
+                return row
+    raise AccountError('Présence du buteur ou de la buteuse non vérifiée.')
+
+
+def scorer_result(info, leg):
+    from daily_scorer import stats
+    try:player=scorer_player(info,leg['event_id'],leg['player']['id'],leg['player']['team_id'])
+    except AccountError:return None
+    values=stats(player.get('stats'));apps=values.get('appearances');goals=values.get('totalGoals')
+    if apps==0 and goals in (None,0):return 'void'
+    if apps!=1 or goals is None or not goals.is_integer() or not 0<=goals<=20:return None
+    return 'won' if goals>0 else 'lost'
+
+
 def register(bp, user, source, leagues, resolve, score):
     @bp.get('/api/bankroll')
     def get_bankroll():
@@ -122,7 +144,7 @@ def register(bp, user, source, leagues, resolve, score):
         for row in rows:
             if not isinstance(row,dict):raise AccountError('Sélection non valide.')
             league=row.get('league');event=str(row.get('event_id',''));market=row.get('market')
-            if not isinstance(league,str) or league not in leagues or not event.isdigit() or not isinstance(market,str) or market not in MARKETS:raise AccountError('Match ou pronostic non pris en charge.')
+            if not isinstance(league,str) or league not in leagues or not event.isdigit() or not isinstance(market,str) or market not in MARKETS|{'anytime_scorer'}:raise AccountError('Match ou pronostic non pris en charge.')
             if (league,event) in seen:raise AccountError('Un même match ne peut être ajouté deux fois au combiné.')
             seen.add((league,event))
             try:
@@ -133,9 +155,16 @@ def register(bp, user, source, leagues, resolve, score):
             except Exception:raise AccountError('Vérification du match indisponible. Réessaie.',503)
             if info['home_id']!=str(row.get('home_id')) or info['away_id']!=str(row.get('away_id')):raise AccountError('Les équipes du match ne correspondent pas.')
             if info['completed'] or info['state'] not in ('pre','in') or any(x in info['name'] for x in ('CANCEL','ABANDON','POSTPON','SUSPEND')):raise AccountError('Ce match ne peut plus être ajouté.')
+            player=None
+            if market=='anytime_scorer':
+                supplied=row.get('player') or {}
+                if not isinstance(supplied,dict) or not str(supplied.get('id','')).isdigit():raise AccountError('Buteur ou buteuse non valide.')
+                verified=scorer_player(info,event,supplied['id'],str(supplied.get('team_id','')))
+                player=dict(id=str(supplied['id']),team_id=str(supplied['team_id']),name=verified['athlete']['displayName'])
             label=info['home'].get('team',{}).get('displayName') or info['home'].get('team',{}).get('name') or info['home_id']
             label+=' – '+(info['away'].get('team',{}).get('displayName') or info['away'].get('team',{}).get('name') or info['away_id'])
             selections.append(dict(league=league,event_id=event,home_id=info['home_id'],away_id=info['away_id'],label=label,market=market,odds=str(odds),status='pending',**match_metadata(info),bookmaker=str(row.get('bookmaker',''))[:100],automatic_odds=row.get('automatic_odds') is True))
+            if player:selections[-1]['player']=player
             potential*=odds
         if potential>1000000000000:raise AccountError('Retour potentiel trop élevé.')
         with database() as db:
@@ -203,7 +232,11 @@ def refresh_results(uid,source,resolve,score):
                     if void:leg['status']='void'
                     else:
                         hg,ag=score(info['home'].get('score')),score(info['away'].get('score'))
-                        leg.update(status='won' if resolve(leg['market'],hg,ag) else 'lost',home_score=hg,away_score=ag)
+                        if leg['market']=='anytime_scorer':
+                            outcome=scorer_result(info,leg)
+                            if outcome is None:continue
+                        else:outcome='won' if resolve(leg['market'],hg,ag) else 'lost'
+                        leg.update(status=outcome,home_score=hg,away_score=ag)
                 except (ValueError,TypeError,KeyError):errors+=1
             payout=row['payout_cents']
             if payout is None and any(l['status']=='lost' for l in legs):payout=0
