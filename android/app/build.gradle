@@ -38,6 +38,8 @@ android {
 
 
 dependencies {
+    // Align legacy jdk7/jdk8 transitives with the merged Kotlin standard library.
+    implementation platform('org.jetbrains.kotlin:kotlin-bom:1.8.22')
     implementation 'com.android.billingclient:billing:9.1.0'
     implementation 'androidx.webkit:webkit:1.14.0'
 }
