@@ -26,6 +26,8 @@ def extract(event, observed_at, now=None):
         return []
     books = []
     for odds in comp.get('odds') or []:
+        if not isinstance(odds, dict):
+            continue
         provider = odds.get('provider') or {}
         if not provider.get('name'):
             continue
@@ -70,6 +72,8 @@ def historical_close(data, pick, now=None):
     if score(info['home'].get('score'))!=pick.get('home_score') or score(info['away'].get('score'))!=pick.get('away_score'):
         return None
     for book in data.get('odds') or data.get('pickcenter') or []:
+        if not isinstance(book, dict):
+            continue
         provider=book.get('provider') or {};markets={}
         for side in ('home','draw','away'):
             value=decimal_price((book.get('moneyline',{}).get(side,{}).get('close') or {}).get('odds'))

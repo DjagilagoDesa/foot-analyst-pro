@@ -48,6 +48,22 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(response.status_code,200)
         self.assertEqual(response.json['events'][0]['league'],'eng.trophy')
 
+    def test_womens_competitions_feed_search_and_fixture_calendar(self):
+        for league in server.WOMENS_LEAGUES:
+            self.assertIn(league, self.client.get('/api/leagues').json['leagues'])
+            with patch.object(server,'fetch',return_value={'events':[event(completed=False,future=True)]}):
+                response=self.client.get('/api/fixtures?league='+league)
+            self.assertEqual(response.status_code,200)
+            self.assertEqual(response.json['events'][0]['league'],league)
+        def fetch(url,*args,**kwargs):
+            if '/uefa.wchampions/teams' in url:
+                return {'sports':[{'leagues':[{'teams':[{'team':{'id':'200','displayName':'Chelsea','logos':[]}}]}]}]}
+            return {'sports':[]}
+        with patch.object(server,'fetch',side_effect=fetch):
+            response=self.client.get('/api/search-teams?q=chelsea')
+        self.assertEqual(response.json['teams'][0]['league'],'uefa.wchampions')
+        self.assertTrue(response.json['teams'][0]['women'])
+
     def test_low_sample_never_generates_probabilities(self):
         with patch.object(server,'history',return_value=([],[])), patch.object(server,'head_to_head',return_value={'matches':[]}), server.app.test_request_context('/api/analyze',method='POST',json={'league':'fra.1','home_id':'1','away_id':'2'}):
             data=server.analyze().get_json()
