@@ -19,6 +19,7 @@ from venue_test import build as build_venue, freeze as freeze_venue, report as v
 
 PARIS = ZoneInfo('Europe/Paris')
 INTERVAL = 900
+SELECTION_REVISION = 'cup-domestic-history-v1'
 LIMIT = 24
 SCHEMA = DAILY_OPINION_SCHEMA
 GROUPS = [('prudent', 3, 'Mes 3 choix prudents'),
@@ -140,7 +141,7 @@ def choose(results, existing, now, day):
                                   markets=r['prediction']['markets'],
                                   source_errors=r.get('source_errors'), history=r.get('history'),
                                   captured_at=now.isoformat())),
-                              model_version='poisson-ucl-540d-v1' if m['league']=='uefa.champions' else MODEL_VERSION, published_at=now.isoformat(), status='pending', home_score=None, away_score=None))
+                              model_version=('poisson-multicompetition-10-v1' if any(g.get('competition',m['league'])!=m['league'] for rows in (r.get('history') or {}).values() for g in rows) else 'poisson-ucl-540d-v1' if m['league']=='uefa.champions' else MODEL_VERSION), published_at=now.isoformat(), status='pending', home_score=None, away_score=None))
             picks[-1]['selection_test'] = selection_decision(picks[-1], now)
             picks[-1]['venue_test'] = freeze_venue(r, now)
             used_events.add(m['id'])
@@ -243,8 +244,8 @@ class DailyOpinion:
             db.execute(SCHEMA)
             db.execute("INSERT INTO daily_opinion_boards(day,payload) VALUES(?,'{}') ON CONFLICT(day) DO NOTHING", (day,))
             row = db.execute('''UPDATE daily_opinion_boards SET lease_until=?,lease_token=?
-                WHERE day=? AND (checked_at<=? OR payload NOT LIKE ?) AND lease_until<=? RETURNING payload''',
-                (epoch + 300, token, day, epoch - INTERVAL, '%"scorers":%', epoch)).fetchone()
+                WHERE day=? AND (checked_at<=? OR payload NOT LIKE ? OR payload NOT LIKE ?) AND lease_until<=? RETURNING payload''',
+                (epoch + 300, token, day, epoch - INTERVAL, '%"scorers":%', '%"selection_revision": "'+SELECTION_REVISION+'"%', epoch)).fetchone()
         if not row:
             return
         board = json.loads(row['payload'])
@@ -293,7 +294,7 @@ class DailyOpinion:
             scorer=scorers[0] if scorers else None
             picks = choose(results, existing, publication, day)
             retain_team_odds(picks, matches, publication)
-            updated = dict(day=day, picks=picks, scorer=scorer, scorers=scorers, scorer_selection=scorer_meta, generated_at=board.get('generated_at') or publication.isoformat(),
+            updated = dict(day=day, selection_revision=SELECTION_REVISION, picks=picks, scorer=scorer, scorers=scorers, scorer_selection=scorer_meta, generated_at=board.get('generated_at') or publication.isoformat(),
                            checked_at=publication.isoformat(), source_errors=failures,
                            fixtures_found=len(matches), candidates_examined=len(eligible))
             self.settle(updated)
@@ -339,8 +340,9 @@ class DailyOpinion:
 
     def analyze(self, match):
         # Independent of /api/analyze: no account, history, or trial balance is touched.
-        home_games, he = self.server.history(match['league'], match['home']['id'])
-        away_games, ae = self.server.history(match['league'], match['away']['id'])
+        history = getattr(self.server, 'expanded_history', self.server.history)
+        home_games, he = history(match['league'], match['home']['id'])
+        away_games, ae = history(match['league'], match['away']['id'])
         if len(home_games) < 10 or len(away_games) < 10:
             return None
         home = self.server.summary(home_games, match['home']['id'])
@@ -454,7 +456,7 @@ def init_app(app, server):
             day=day, status=status, stale=stale, groups=groups,scorers=scorer_picks(board),scorer_target=3,scorer_model_version=daily_scorer.MODEL,
             performance=service.performance(day),scorer_performance=service.scorer_performance(day),
             refresh_seconds=30 if status == 'preparing' else 120,
-            method='Modèle statistique Poisson, 10 matchs terminés par équipe. Pas de cotes bookmaker, compositions ou absences vérifiées. Probabilités non calibrées.',
+            method='Modèle statistique Poisson, Au moins 10 matchs terminés par équipe, recherche élargie aux championnats pour les coupes. Pas de cotes bookmaker, compositions ou absences vérifiées. Probabilités non calibrées.',
             scope=f'Compétitions couvertes : {len(server.LEAGUES)}. Au maximum {LIMIT} rencontres étudiées, réparties sur la journée. Ce n’est pas une sélection exhaustive du football mondial.',
             update_note='Nouvelle journée à minuit, heure de Paris. Vérification environ toutes les 15 minutes lorsque le serveur est actif ; reprise à son réveil. Les choix publiés restent figés, les places manquantes peuvent être complétées avant le coup d’envoi.')
         response.headers['Cache-Control'] = 'no-store'

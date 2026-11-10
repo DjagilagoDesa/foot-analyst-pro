@@ -246,6 +246,20 @@ class PersistenceTests(unittest.TestCase):
         dates = {call.args[1]['dates'] for call in self.server.fetch.call_args_list}
         self.assertEqual(dates, {'20261031', '20261101'})
 
+    def test_daily_analysis_uses_expanded_womens_history_and_keeps_ten_game_minimum(self):
+        match=result(99)['match'];match['league']='uefa.wchampions'
+        server=SimpleNamespace(history=Mock(return_value=([],[])),expanded_history=Mock(return_value=([{}]*10,[])),
+            summary=lambda games,team: dict(matches=len(games),wins=6,draws=2,losses=2,goals_for_avg=2,goals_against_avg=1),
+            probabilities=lambda h,a: result(99)['prediction'])
+        service=DailyOpinion(self.app,server)
+        with patch('daily_opinion.build_venue',return_value={}):
+            analyzed=service.analyze(match)
+        self.assertIsNotNone(analyzed)
+        self.assertEqual(analyzed['home']['matches'],10)
+        server.history.assert_not_called()
+        server.expanded_history.return_value=([{}]*9,[])
+        self.assertIsNone(service.analyze(match))
+
     def test_womens_fixtures_enter_the_daily_analysis_pool(self):
         self.server.LEAGUES=['fra.1','uefa.wchampions']
         female=result(99)['match'];female['league']='uefa.wchampions'
