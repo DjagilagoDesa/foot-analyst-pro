@@ -48,7 +48,7 @@
   const state={won:'✓ Gagné',lost:'✗ Perdu',void:'Annulé',pending:new Date(p.match.date)>new Date()?'À venir':'Résultat à vérifier'}[p.status];
   const lineup={reported_starter:'Titulaire indiqué par la source',unconfirmed:'Titularisation à confirmer',bench:'Remplaçant indiqué par la source',not_listed:'Présence à revérifier',unavailable:'Disponibilité à revérifier'}[p.availability]||'Titularisation à confirmer';
 
-  html+='<article class="opinion-pick"><div class="row"><h3>'+esc(p.player.name)+'</h3><span data-scorer-odds="'+esc(p.player.id)+'">'+scorerPrice(p)+'</span></div><p class="gold">'+esc(p.player.team_name)+' · Buteur</p><p>'+esc(p.match.home.name)+' – '+esc(p.match.away.name)+' · '+esc(new Date(p.match.date).toLocaleTimeString('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'}))+'</p><p><span class="'+({won:'result-won',lost:'result-lost'}[p.status]||'')+'">'+esc(state)+'</span></p>';
+  html+='<article class="opinion-pick"><div class="row"><h3>'+esc(p.player.name)+'</h3><span data-scorer-odds="'+esc(p.player.id)+'">'+scorerPrice(p)+'</span></div><p class="gold">'+esc(p.player.team_name)+' · '+(p.player.competition_category==='women'?'Buteuse':'Buteur')+'</p><p>'+esc(p.match.home.name)+' – '+esc(p.match.away.name)+' · '+esc(new Date(p.match.date).toLocaleTimeString('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'}))+'</p><p><span class="'+({won:'result-won',lost:'result-lost'}[p.status]||'')+'">'+esc(state)+'</span></p>';
   if(p.status==='pending')html+='<p>'+esc(lineup)+'</p>';
   html+='<p><strong>'+esc(p.basis.goals)+' buts · '+esc(p.basis.appearances)+' apparitions</strong></p><details><summary>Pourquoi ce buteur ?</summary><p>'+esc(p.rationale)+'</p>';
 
