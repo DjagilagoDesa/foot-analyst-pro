@@ -79,6 +79,49 @@ class ScorerModel(unittest.TestCase):
   self.assertEqual(pick['status'],'pending')
 
 
+class DomesticScorerEvidence(unittest.TestCase):
+ def setup_source(self,female=True):
+  from types import SimpleNamespace
+  match,data=payload();match['league']='uefa.wchampions' if female else 'eng.trophy'
+  # A short cup campaign is insufficient by itself.
+  for block in data['leaders']:
+   for lead in block['leaders'][0]['leaders']:lead['statistics'][1]['value']=2
+  team=match['home']['id'];code='esp.w.1' if female else 'eng.3'
+  athlete=dict(id='11',displayName='Test scorer',gender='FEMALE' if female else 'MALE',status={'type':'active'},
+    defaultTeam={'id':team},statistics={'splits':{'categories':[{'stats':[dict(name='totalGoals',value=4),dict(name='appearances',value=9)]}]}})
+  roster=dict(team={'id':team},season={'year':NOW.year},athletes=[athlete])
+  info=dict(team=dict(id=team,defaultLeague=dict(slug=code,name='Domestic league')))
+  server=SimpleNamespace(ESPN='source',LEAGUES=['uefa.wchampions','esp.w.1','eng.trophy','eng.3'],
+    fetch=lambda url,**kwargs:roster if url.endswith('/roster') else info)
+  return match,data,server,roster,info
+ def test_women_and_men_use_the_same_domestic_statistics_checks(self):
+  for female in (True,False):
+   match,data,server,source,info=self.setup_source(female)
+   self.assertEqual(scorer.candidates(data,match,NOW),[])
+   enriched,errors=scorer.domestic_evidence(server,data,match,[match['home']['id']],NOW)
+   picks=scorer.candidates(enriched,match,NOW)
+   self.assertEqual(errors,0);self.assertEqual(len(picks),1)
+   self.assertEqual(picks[0]['player']['competition_category'],'women' if female else 'men')
+   self.assertEqual(picks[0]['basis']['appearances'],9)
+   self.assertIn('Domestic league',picks[0]['rationale'])
+   self.assertEqual(data['leaders'][0]['leaders'][0]['leaders'][0]['statistics'][1]['value'],2)
+ def test_wrong_team_season_category_and_player_membership_are_rejected(self):
+  for mode in ('team','season','league','athlete_gender','athlete_team'):
+   match,data,server,source,info=self.setup_source()
+   if mode=='team':source['team']['id']='999'
+   if mode=='season':source['season']['year']=NOW.year-2
+   if mode=='league':info['team']['defaultLeague']['slug']='eng.3'
+   if mode=='athlete_gender':source['athletes'][0]['gender']='MALE'
+   if mode=='athlete_team':source['athletes'][0]['defaultTeam']['id']='999'
+   enriched,_=scorer.domestic_evidence(server,data,match,[match['home']['id']],NOW)
+   self.assertEqual(scorer.candidates(enriched,match,NOW),[],mode)
+ def test_domestic_stats_never_override_match_availability(self):
+  match,data,server,source,info=self.setup_source()
+  data['rosters'][0]['roster'][0]['starter']=False
+  enriched,_=scorer.domestic_evidence(server,data,match,[match['home']['id']],NOW)
+  self.assertEqual(scorer.candidates(enriched,match,NOW),[])
+
+
 class ScorerPersistence(unittest.TestCase):
  setUp=dailytests.PersistenceTests.setUp
  tearDown=dailytests.PersistenceTests.tearDown
