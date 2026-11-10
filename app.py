@@ -325,7 +325,10 @@ def analyze():
                 try: extra[team] = job.result()
                 except (requests.RequestException,ValueError,TypeError): extra[team] = ([],['source_unavailable'])
     def evidence(team, primary, errors):
-        batches = [(league,primary)]
+        primary_groups = defaultdict(list)
+        for game in primary:
+            primary_groups[game.get('competition',league)].append(game)
+        batches = list(primary_groups.items())
         if context:
             national = context.get('teams',{}).get(team,{})
             batches.append((national.get('league','unknown'),national.get('model_games',[])))
