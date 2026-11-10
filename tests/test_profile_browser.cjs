@@ -46,7 +46,8 @@ fs.mkdirSync('artifacts',{recursive:true});
  await page.locator('#profileHistory [data-history="0"]').waitFor();
  await page.locator('#profileHistory [data-history="0"]').click();
  await page.locator('#profileHistory .analysis').waitFor();
- await page.locator('nav [data-page="premium"]').click();
+ await page.locator('nav [data-page="home"]').click();
+ await page.locator('#home .mini-grid [data-page="premium"]').click();
  await page.locator('#premiumSubscribe').click();
  await page.locator('#billingAccount').waitFor();
  if(await page.locator('#billingSubscribe').isEnabled())throw Error('Unconfigured purchase must stay disabled');
@@ -67,4 +68,3 @@ fs.mkdirSync('artifacts',{recursive:true});
  await require('./odds_mobile.cjs')(browser);
  await browser.close();
 })().catch(e=>{console.error(e);process.exit(1)});
-
