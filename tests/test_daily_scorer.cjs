@@ -4,7 +4,7 @@ const dom=new JSDOM(html,{runScripts:'outside-only',url:'https://foot-analyst-pr
 w.escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 w.setInterval=()=>0;let opened;
 w.openMatch=m=>opened=m.id;
-const match={id:'42',date:'2026-11-09T20:00:00Z',home:{id:'1',name:'Club A'},away:{id:'2',name:'Club B'}};
+const match={id:'42',date:new Date(Date.now()+3600000).toISOString(),home:{id:'1',name:'Club A'},away:{id:'2',name:'Club B'}};
 let board={day:new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Paris'}),status:'partial',groups:[],scorer:{player:{id:'11',name:'Joueur <img src=x>',team_name:'Club A'},match,status:'pending',availability:'unconfirmed',basis:{goals:6,appearances:9},rationale:'Ses raisons <script>bad</script>',source_url:'https://www.espn.com/soccer/match/_/gameId/42'},scorer_performance:{won:2,lost:1,success_pct:66.7}};
 let quote=null;w.api=async path=>path.includes('/scorer-history')?{items:[{...board.scorer,day:board.day,status:'won'}],page:1,has_more:false}:path.includes('/scorer-odds')?{odds:quote}:JSON.parse(JSON.stringify(board));
 w.eval(fs.readFileSync('organization.js','utf8'));w.eval(fs.readFileSync('daily-opinion.js','utf8'));

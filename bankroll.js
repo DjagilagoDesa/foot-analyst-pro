@@ -116,7 +116,8 @@
   let feedVersion=0;
   async function loadFixtures(){const button=get('[data-load]'),version=++feedVersion;selectedDay=date.value;button.disabled=true;list.textContent='Chargement…';try{const data=await api('/api/fixtures?date='+encodeURIComponent(date.value),45000);if(id!==generation||version!==feedVersion)return;fixtures=(data.events||[]).filter(m=>!m.completed&&m.state==='pre');visible=5;renderFixtures();}catch(error){if(id===generation&&version===feedVersion)list.textContent=error.message;}finally{if(version===feedVersion)button.disabled=false;}}
   get('[data-load]').onclick=loadFixtures;date.onchange=()=>{fixtures=[];loadFixtures();};get('[data-filter]').oninput=()=>{visible=5;renderFixtures();};
-  get('[data-picker]').ontoggle=()=>{if(get('[data-picker]').open)renderFixtures();};
+  const picker=get('[data-picker]');
+  picker.ontoggle=()=>{if(id===generation&&picker.isConnected&&picker.open)renderFixtures();};
   form.elements.stake.oninput=()=>{draftStake=form.elements.stake.value;potential();};
   form.onsubmit=async e=>{e.preventDefault();if(!draft.length||draft.some(l=>l.loading||!(Number(l.odds)>1))){feedback.textContent='Une cote manque sur ton ticket.';return;}
    const expired=draft.filter(l=>l.automatic_odds&&Date.parse(l.expires_at)<=Date.now());

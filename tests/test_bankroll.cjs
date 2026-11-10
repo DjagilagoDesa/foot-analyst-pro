@@ -1,6 +1,7 @@
 const {JSDOM}=require('jsdom'),fs=require('fs'),assert=require('node:assert/strict');
 const html=fs.readFileSync('index.html','utf8').replace(/<script[\s\S]*?<\/script>/g,'');
 const dom=new JSDOM(html,{runScripts:'outside-only',url:'https://foot-analyst-pro.onrender.com'}),w=dom.window,d=w.document;
+const browserErrors=[];w.addEventListener('error',event=>browserErrors.push(event.error));
 w.api=async()=>({events:[]});
 w.escapeHtml=s=>String(s).replace(/[&<>"']/g,'');
 let state={configured:false},posted=[];
@@ -53,5 +54,7 @@ const tick=()=>new Promise(r=>setTimeout(r,0));
  assert(!root.querySelector('#bankroll-past').textContent.includes('Ticket à suivre'));
  assert(root.querySelector('.bank-record').textContent.includes('100 %'));
  await w.Bankroll.load();assert.equal(root.querySelector('#bankroll-past').hidden,false);
- w.Bankroll.clear();assert.equal(root.textContent,'');dom.window.close();console.log('Bankroll: setup, tab, amounts, confidence scaling and explicit bet confirmation OK');
+ const oldPicker=root.querySelector('[data-picker]');oldPicker.open=true;
+ w.Bankroll.clear();assert.equal(root.textContent,'');await tick();
+ assert.deepEqual(browserErrors,[],'Detached match pickers must not cause errors after refresh or sign-out');dom.window.close();console.log('Bankroll: setup, tab, amounts, confidence scaling and explicit bet confirmation OK');
 })().catch(e=>{console.error(e);dom.window.close();process.exitCode=1;});
