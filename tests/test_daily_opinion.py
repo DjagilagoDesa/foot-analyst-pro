@@ -246,6 +246,19 @@ class PersistenceTests(unittest.TestCase):
         dates = {call.args[1]['dates'] for call in self.server.fetch.call_args_list}
         self.assertEqual(dates, {'20261031', '20261101'})
 
+    def test_womens_fixtures_enter_the_daily_analysis_pool(self):
+        self.server.LEAGUES=['fra.1','uefa.wchampions']
+        female=result(99)['match'];female['league']='uefa.wchampions'
+        self.server._fixture=lambda event,league,observed: dict(event,league=league)
+        self.server.fetch.side_effect=lambda url,*args,**kwargs: {'events':[female]} if '/uefa.wchampions/' in url else {'events':[]}
+        fixtures,errors=self.service.fixtures(DAY)
+        self.assertEqual(errors,0)
+        self.assertEqual([m['league'] for m in fixtures],['uefa.wchampions'])
+        analyzed=result(99);analyzed['match']=fixtures[0]
+        picks=choose([analyzed],[],NOW,DAY)
+        self.assertTrue(picks)
+        self.assertEqual(picks[0]['match']['league'],'uefa.wchampions')
+
     def test_public_performance_excludes_pending_and_void(self):
         self.refresh()
         board, _ = self.service.read(DAY)
