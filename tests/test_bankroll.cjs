@@ -14,6 +14,12 @@ const tick=()=>new Promise(r=>setTimeout(r,0));
  const root=d.getElementById('bankrollContent');assert(d.querySelector('nav [data-page="bankroll"]'));assert.equal(root.querySelector('[name="initial"]').value,'100');assert(root.querySelector('[name="risk"] option[value="1000"]'));
  root.querySelector('form').dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();
  assert.equal(posted[0].data.initial,'100');assert(root.textContent.includes('Disponible'));
+ const summary=root.querySelector('.bankroll-summary');
+ for(const label of ['Budget de départ','Capital actuel','Engagé sur mes tickets','Mise proposée','Budget de mises restant aujourd’hui'])assert(summary.textContent.includes(label));
+ summary.querySelector('[data-budget-settings]').click();
+ assert(root.querySelector('[data-config]').closest('details').open);
+ assert.equal(d.activeElement,root.querySelector('[name="risk"]'));
+
  assert.equal((await w.Bankroll.suggest([{probability:80},{probability:80}])).stake,'1.00');
  assert.equal((await w.Bankroll.suggest([{probability:20},{probability:20}])).stake,'0.25');
  const node=d.createElement('details');root.appendChild(node);await w.Bankroll.mount(node,{id:'test',status:'pending',selections:[{label:'Alpha – Beta'}]});assert.equal(node.querySelector('[name="stake"]').value,'1');
