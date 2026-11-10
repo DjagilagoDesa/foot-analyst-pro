@@ -1,4 +1,4 @@
-"""Persistent accounts, opaque sessions and atomic three-analysis trials."""
+"""Persistent accounts, opaque sessions and atomic weekly three-analysis quotas."""
 import hashlib
 import json
 import os
@@ -9,6 +9,8 @@ import time
 import uuid
 from contextlib import contextmanager
 from functools import wraps
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from flask import Blueprint, current_app, jsonify, request
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -252,10 +254,27 @@ def recovery_code():
     return secrets.token_urlsafe(24)
 
 
+def weekly_window(now=None):
+    local = datetime.fromtimestamp(time.time() if now is None else now, ZoneInfo('Europe/Paris'))
+    start = (local - timedelta(days=local.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+    return int(start.timestamp()), int((start + timedelta(days=7)).timestamp())
+
+
+def weekly_used(db, user_id, now=None):
+    start, end = weekly_window(now)
+    return db.execute("""SELECT COUNT(*) AS n FROM account_analyses
+        WHERE user_id=? AND charged=1 AND created_at>=? AND created_at<?
+        AND (status='complete' OR (status='pending' AND created_at>=?))""",
+        (user_id, start, end, int(time.time() if now is None else now)-600)).fetchone()['n']
+
+
 def public_user(row):
     owner=owner_access(row['id'])
+    with database() as db:
+        used = weekly_used(db, row['id'])
     return dict(id=row['id'], email=row['email'], nickname=row['nickname'], created_at=row['created_at'],
-                trial_used=row['trial_used'], trial_remaining=max(0, 3-row['trial_used']),
+                trial_used=used, trial_remaining=max(0, 3-used),
+                trial_period='week', trial_resets_at=weekly_window()[1], trial_timezone='Europe/Paris',
                 premium_active=owner or row['premium_until'] > int(time.time()), premium_until=row['premium_until'], complimentary_premium=owner)
 
 
@@ -463,8 +482,9 @@ def reserve_analysis(user, key, label):
             raise AccountError('Reconnecte-toi pour continuer.',401,'login_required')
         charged=int(fresh['premium_until']<=now and not owner_access(user['id'],db))
         if charged:
-            row=db.execute('UPDATE account_users SET trial_used=trial_used+1 WHERE id=? AND trial_used<3 RETURNING id',(user['id'],)).fetchone()
-            if not row: raise AccountError('Tes 3 analyses offertes sont utilisées. L’abonnement Premium sera disponible prochainement.',402,'trial_exhausted')
+            if weekly_used(db, user['id'], now) >= 3:
+                raise AccountError('Tes 3 analyses gratuites de la semaine sont utilisées. Elles se renouvellent lundi à minuit (heure de Paris).',402,'trial_exhausted')
+            db.execute('UPDATE account_users SET trial_used=trial_used+1 WHERE id=?',(user['id'],))
         analysis_id=str(uuid.uuid4())
         db.execute('INSERT INTO account_analyses(id,user_id,request_key,label,status,charged,created_at) VALUES(?,?,?,?,?,?,?)',
                    (analysis_id,user['id'],key,label[:150],'pending',charged,now))
@@ -505,7 +525,7 @@ def metered_analysis(func):
                     or 'error' in result or result.get('status','ok') != 'ok'):
                 return response
             return jsonify(status='locked', analysis_generated=True,
-                           message='Tes 3 analyses offertes sont utilisées. Passe à Premium pour lire cette analyse.',
+                           message='Tes 3 analyses gratuites de la semaine sont utilisées. Renouvellement lundi à minuit (heure de Paris).',
                            offer={'price_eur':'29.90','period':'month','page':'subscription'},
                            preview_sections=['Jugement du match','Arguments des deux équipes',
                                              'Surprises possibles','Confrontations passées','Probabilités'])
