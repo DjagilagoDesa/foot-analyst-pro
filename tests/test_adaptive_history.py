@@ -23,6 +23,35 @@ class AdaptiveHistoryTests(unittest.TestCase):
         self.assertEqual(basis['competitions'],{'uefa.champions':4,'tur.1':16})
         self.assertTrue(basis['mixed_competitions'])
 
+    def test_short_cup_history_uses_verified_domestic_membership(self):
+        calls=[]
+        def history(league,team,**kwargs):
+            calls.append(league)
+            return [game('cup'+str(i),team,days=i+2) for i in range(2)] if league=='eng.trophy' else [game('dom'+str(i),team,days=i+5) for i in range(10)],[]
+        def roster(url,*args,**kwargs):
+            entries=[{'team':{'id':'1'}}] if '/eng.3/' in url else []
+            return {'sports':[{'leagues':[{'teams':entries}]}]}
+        with patch.object(server,'history',side_effect=history),patch.object(server,'fetch',side_effect=roster):
+            rows,errors=server.expanded_history('eng.trophy','1')
+        self.assertEqual(len(rows),10)
+        self.assertEqual(set(calls),{'eng.trophy','eng.3'})
+        self.assertEqual({g['competition'] for g in rows},{'eng.trophy','eng.3'})
+        self.assertEqual(errors,[])
+
+    def test_womens_cup_history_never_uses_mens_leagues(self):
+        checked=[]
+        def roster(url,*args,**kwargs):
+            checked.append(url)
+            return {'sports':[{'leagues':[{'teams':[{'team':{'id':'1'}}] if '/fra.w.1/' in url else []}]}]}
+        def history(league,team,**kwargs):
+            n=3 if league=='uefa.wchampions' else 10
+            return [game(league+str(i),team,days=i+2) for i in range(n)],[]
+        with patch.object(server,'history',side_effect=history),patch.object(server,'fetch',side_effect=roster):
+            rows,_=server.expanded_history('uefa.wchampions','1')
+        self.assertEqual(len(rows),10)
+        self.assertEqual({g['competition'] for g in rows},{'uefa.wchampions','fra.w.1'})
+        self.assertTrue(all(any('/'+lg+'/' in url for lg in server.WOMENS_LEAGUES) for url in checked))
+
     def test_ucl_research_uses_domestic_results_independently_per_team(self):
         def history(league,team,**kwargs):
             if league=='uefa.champions':return [game('e'+team+str(i),team,days=i+2) for i in range(4 if team=='1' else 3)],[]
