@@ -19,8 +19,9 @@ SESSION.headers.update({'User-Agent': 'FootAnalystPro/22 (football statistics)'}
 CACHE = {}
 LOCK = threading.Lock()
 ESPN = 'https://site.api.espn.com/apis/site/v2/sports/soccer'
+WOMENS_LEAGUES = ('eng.w.1','esp.w.1','fra.w.1','usa.nwsl','uefa.wchampions')
 LEAGUES = ['eng.1','esp.1','ita.1','ger.1','fra.1','bra.1','por.1','ned.1','usa.1','arg.1','mex.1','uefa.champions','uefa.europa',
-           'eng.2','eng.3','eng.4','eng.fa','eng.league_cup','eng.trophy']
+           'eng.2','eng.3','eng.4','eng.fa','eng.league_cup','eng.trophy', *WOMENS_LEAGUES]
 
 def fetch(url, params=None, ttl=900):
     key = (url, tuple(sorted((params or {}).items())))
@@ -222,7 +223,7 @@ def search_teams():
                     aliases=[name,team.get('shortDisplayName'),team.get('abbreviation'),team.get('location')]
                     if any(q in _normalize_team_name(a) for a in aliases if a):
                         logos=team.get('logos') or []
-                        output.append({'id':team.get('id'),'name':name,'badge':logos[0].get('href') if logos else None,'league':league})
+                        output.append({'id':team.get('id'),'name':name,'badge':logos[0].get('href') if logos else None,'league':league,'women':league in WOMENS_LEAGUES})
         return output
     found=[];errors=0
     with ThreadPoolExecutor(max_workers=len(LEAGUES)) as pool:
@@ -504,7 +505,7 @@ def team_next():
     with ThreadPoolExecutor(max_workers=20) as pool:
         for season in (now.year-1,now.year,now.year+1):
             jobs.append((pool.submit(fetch,f'{ESPN}/{lg}/teams/{team}/schedule',{'season':season},120),lg,'schedule_'+str(season)))
-        priority={lg,'uefa.champions','uefa.europa'}
+        priority={lg,'uefa.wchampions'} if lg in WOMENS_LEAGUES else {lg,'uefa.champions','uefa.europa'}
         for league in LEAGUES:
             for offset in range(8 if league in priority else 1):
                 day=(now+timedelta(days=offset)).strftime('%Y%m%d')
