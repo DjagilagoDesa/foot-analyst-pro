@@ -29,7 +29,16 @@
  async function load(){
   const id=++generation;root.innerHTML='<div class="message">Chargement de la bankroll…</div>';
   try{const d=await read();if(id!==generation)return;
-   const summary=d.configured?'<div class="panel bankroll-summary"><div><span>Disponible</span><strong>'+money(d.available_cents)+'</strong></div><div><span>Gains / pertes</span><strong class="'+(d.profit_cents<0?'result-lost':'result-won')+'">'+money(d.profit_cents)+'</strong></div></div>':'';
+   const metric=(label,value,style='')=>'<div><span>'+label+'</span><strong class="'+style+'">'+value+'</strong></div>';
+   const profitStyle=d.profit_cents<0?'result-lost':d.profit_cents>0?'result-won':'';
+   const summary=d.configured?'<div class="panel bankroll-summary">'+
+    metric('Budget de départ',money(d.initial_cents))+
+    metric('Capital actuel',money(d.total_cents))+
+    metric('Disponible',money(d.available_cents))+
+    metric('Engagé sur mes tickets',money(d.pending_cents))+
+    metric('Gains / pertes',money(d.profit_cents),profitStyle)+
+    metric('Mise proposée',money(d.suggested_cents))+
+    '<div class="bank-budget-controls"><span>Mise réglée : '+(d.risk_bps/100).toLocaleString('fr-FR')+' % · Budget de mises restant aujourd’hui : '+money(d.daily_remaining_cents)+'</span><button type="button" class="day" data-budget-settings>RÉGLER MON BUDGET</button></div></div>':'';
    const history=d.configured?'<details class="panel"><summary>Mes tickets · '+d.bets.filter(b=>b.payout_cents!==null&&b.payout_cents>b.stake_cents).length+' gagnés / '+d.bets.filter(b=>b.payout_cents!==null&&b.payout_cents<b.stake_cents).length+' perdus</summary>'+(d.bets.length?d.bets.map((b,i)=>'<details><summary>'+esc(b.title)+' · '+money(b.stake_cents)+' · '+(b.payout_cents===null?'En cours':(b.payout_cents>b.stake_cents?'✓ Gagné':b.payout_cents<b.stake_cents?'✗ Perdu':'Annulé')+' · '+(b.payout_cents===null?'En attente':money(b.payout_cents-b.stake_cents)))+'</summary>'+(b.automatic?b.selections.map((l,j)=>savedCard(l,i,j)).join('')+(b.payout_cents===null?'':'Retour : '+money(b.payout_cents)):(b.payout_cents===null?'<form data-settle="'+i+'"><label>Retour réel (€)<input class="day" name="payout" type="number" min="0" max="1000000" step="0.01" required></label><button class="day">ENREGISTRER</button></form>':'Retour : '+money(b.payout_cents)))+'</details>').join(''):'Aucun ticket enregistré.')+(d.bets.length>historyLimit?'<button type="button" class="day" data-history-more>VOIR PLUS</button>':'')+'</details>':'';
    const editor=d.configured?'<section class="panel" data-add><h2>Mon ticket</h2><form data-bet><div data-draft></div><details data-picker open><summary>＋ Ajouter un match</summary><input class="day" type="search" data-filter placeholder="Rechercher une équipe"><div class="bankroll-toolbar"><input class="day" data-date type="date" aria-label="Date des matchs"><button type="button" class="day" data-load aria-label="Actualiser les matchs">↻</button></div><div class="bankroll-matches" data-fixtures></div></details><label>Mise (€)<input class="day" name="stake" type="number" min="0.01" step="0.01" max="'+d.available_cents/100+'" required></label><div data-potential role="status"></div><button class="btn">ENREGISTRER MON TICKET</button></form><p data-add-feedback role="status"></p></section>':'';
    root.innerHTML=summary+editor+history+form(d)+'<div data-feedback role="status"></div>';
@@ -37,8 +46,9 @@
     const won=d.bets.filter(b=>b.payout_cents!==null&&b.payout_cents>b.stake_cents).length;
     const lost=d.bets.filter(b=>b.payout_cents!==null&&b.payout_cents<b.stake_cents).length;
     const record=document.createElement('div');record.className='bank-record';
-    record.innerHTML='<b class="result-won">'+won+' gagnés</b><b class="result-lost">'+lost+' perdus</b><b>'+(won+lost?Math.round(100*won/(won+lost))+' %':'—')+'</b>';
+    record.innerHTML='<b class="result-won">'+won+' gagnés</b><b class="result-lost">'+lost+' perdus</b><b>'+(won+lost?Math.round(100*won/(won+lost))+' %':'—')+' de réussite</b>';
     root.querySelector('.bankroll-summary').appendChild(record);
+    root.querySelector('[data-budget-settings]').onclick=()=>{const settings=root.querySelector('[data-config]').closest('details');settings.open=true;settings.scrollIntoView?.({behavior:'smooth',block:'start'});settings.querySelector('[name="risk"]').focus({preventScroll:true});};
     const editor=root.querySelector('[data-add]'),archive=editor.nextElementSibling;
     const nav=document.createElement('div');nav.className='section-tabs';nav.setAttribute('aria-label','Ma bankroll');
     const groups=[['new','Nouveau ticket',editor],['pending','En cours',null],['past','Terminés',null]];
