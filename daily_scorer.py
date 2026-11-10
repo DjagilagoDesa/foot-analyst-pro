@@ -9,7 +9,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from tracking import fixture_info
 
-MODEL = 'scorer-recent-usage-v2'
+MODEL = 'scorer-domestic-usage-v3'
+WOMENS_LEAGUES = ('eng.w.1','esp.w.1','fra.w.1','usa.nwsl','uefa.wchampions')
 MAX_FIXTURES = 12
 
 
@@ -78,6 +79,36 @@ def availability(data,team_id,pid):
     return 'unconfirmed'
 
 
+def domestic_evidence(server, data, match, team_ids, now):
+    """Supplement short cup leader lists with current, identity-checked domestic stats."""
+    enriched=copy.deepcopy(data);failures=0
+    female=match['league'] in WOMENS_LEAGUES
+    allowed=set(getattr(server,'LEAGUES',()))
+    for team_id in team_ids:
+        try:
+            info=server.fetch(f"{server.ESPN}/{match['league']}/teams/{team_id}",ttl=3600).get('team') or {}
+            league=info.get('defaultLeague') or {};code=league.get('slug')
+            if str(info.get('id'))!=str(team_id) or code not in allowed or (code in WOMENS_LEAGUES)!=female:continue
+            source=server.fetch(f"{server.ESPN}/{code}/teams/{team_id}/roster",ttl=300)
+            season=source.get('season') or {}
+            if str((source.get('team') or {}).get('id'))!=str(team_id) or season.get('year') not in (now.year,now.year-1):continue
+            leaders=[]
+            for athlete in source.get('athletes') or []:
+                if not isinstance(athlete,dict):continue
+                home=athlete.get('defaultTeam') or {}
+                if home.get('id') is not None and str(home['id'])!=str(team_id):continue
+                if athlete.get('gender') and str(athlete['gender']).upper()!=('FEMALE' if female else 'MALE'):continue
+                categories=((athlete.get('statistics') or {}).get('splits') or {}).get('categories') or []
+                values=[stat for category in categories if isinstance(category,dict) for stat in category.get('stats') or []]
+                leaders.append(dict(athlete=athlete,statistics=values))
+            enriched.setdefault('leaders',[]).append(dict(team={'id':str(team_id)},
+                statistics_competition=code,statistics_label=league.get('name') or code,statistics_season=season,
+                leaders=[dict(name='goalsLeaders',leaders=leaders)]))
+        except Exception:
+            failures+=1
+    return enriched,failures
+
+
 def candidates(data,match,now):
     info=verified(data,match)
     if info['state']!='pre' or info['completed'] or info['date']<=now or any(s in info['name'] for s in ('POSTPON','CANCEL','ABANDON','SUSPEND')):return []
@@ -107,18 +138,20 @@ def candidates(data,match,now):
                     # Shrink small samples; temper by observed attack and opposing defence.
                     context=max(.65,min(1.6,(own_avg+opponent_avg)/2/1.4))
                     ranking=(goals+1)/(apps+5)*context*(1 if ready=='reported_starter' else .85)
-                    lineup='Il est indiqué titulaire par la source.' if ready=='reported_starter' else 'Sa titularisation reste à confirmer.'
-                    rationale=(f"Je choisis {name} : {int(goals)} buts en {int(apps)} apparitions dans les statistiques de cette compétition. "
+                    lineup='Titulaire indiqué par la source.' if ready=='reported_starter' else 'La titularisation reste à confirmer.'
+                    source_label=block.get('statistics_label') or 'cette compétition'
+                    rationale=(f"Je choisis {name} : {int(goals)} buts en {int(apps)} apparitions dans les statistiques de {source_label}. "
                         f"{team['name']} a marqué {sum(g['scored'] for g in own_games)} buts sur ses {len(own_games)} derniers matchs exploitables, "
                         f"et {opponent['name']} en a encaissé {conceded} sur {len(other_games)}. "
                         f"{lineup} Je privilégie son rendement individuel, ajusté au contexte offensif de cette rencontre. "
                         "Le temps de jeu futur et le rôle sur penalties restent à confirmer : une rotation ou une défense plus efficace peut faire échouer ce choix.")
-                    output.append(dict(player=dict(id=pid,name=name,team_id=team_id,team_name=team['name']),
+                    output.append(dict(player=dict(id=pid,name=name,team_id=team_id,team_name=team['name'],competition_category='women' if match['league'] in WOMENS_LEAGUES else 'men'),
                         match=copy.deepcopy(match),market='anytime_scorer',market_label='Marque au moins un but',
                         availability=ready,status='pending',home_score=None,away_score=None,
                         rationale=rationale,ranking=round(ranking,6),model_version=MODEL,
                         basis=dict(goals=int(goals),appearances=int(apps),team_form=own_games,opponent_form=other_games,
-                            season=(data.get('header') or {}).get('season'),observed_at=now.isoformat()),
+                            season=block.get('statistics_season') or (data.get('header') or {}).get('season'),
+                            statistics_competition=block.get('statistics_competition') or match['league'],observed_at=now.isoformat()),
                         source_url='https://www.espn.com/soccer/match/_/gameId/'+str(match['id'])))
     return output
 
@@ -204,12 +237,20 @@ def select(server,matches,now,day):
     if len(eligible)>MAX_FIXTURES:eligible=[eligible[round(i*(len(eligible)-1)/(MAX_FIXTURES-1))] for i in range(MAX_FIXTURES)]
     def load(match):
         data=server.fetch(f"{server.ESPN}/{match['league']}/summary",{'event':match['id']},ttl=300)
-        return candidates(data,match,now)
+        picks=candidates(data,match,now)
+        represented={p['player']['team_id'] for p in picks}
+        missing=[str(match[side]['id']) for side in ('home','away') if str(match[side]['id']) not in represented]
+        failures=0
+        if missing:
+            data,failures=domestic_evidence(server,data,match,missing,now)
+            picks=candidates(data,match,now)
+        return picks,failures
     pool=[];errors=0
     with ThreadPoolExecutor(max_workers=4) as executor:
         jobs=[executor.submit(load,m) for m in eligible]
         for job in as_completed(jobs):
-            try:pool.extend(job.result())
+            try:
+                picks,failures=job.result();pool.extend(picks);errors+=failures
             except Exception:errors+=1
     # Real time is checked again by the caller before persisting the choice.
     pool.sort(key=lambda p:(-p['ranking'],p['match']['date'],str(p['match']['id']),p['player']['id']))
