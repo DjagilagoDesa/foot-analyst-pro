@@ -19,6 +19,7 @@ import android.widget.TextView;
 public class MainActivity extends Activity {
     private static final String HOME = "https://foot-analyst-pro.onrender.com/";
     private WebView web;
+    private PlayBilling billing;
     private LinearLayout root;
     private LinearLayout errorPanel;
 
@@ -63,6 +64,7 @@ public class MainActivity extends Activity {
                 if (request.isForMainFrame()) showError();
             }
         });
+        billing = new PlayBilling(this, web);
         root.addView(web, new LinearLayout.LayoutParams(-1, 0, 1));
         errorPanel = new LinearLayout(this);
         errorPanel.setOrientation(LinearLayout.VERTICAL);
@@ -89,5 +91,5 @@ public class MainActivity extends Activity {
     }
     @Override public void onBackPressed() { goBack(); }
     @Override protected void onSaveInstanceState(Bundle state) { web.saveState(state); super.onSaveInstanceState(state); }
-    @Override protected void onDestroy() { web.destroy(); super.onDestroy(); }
+    @Override protected void onDestroy() { if (billing != null) billing.close(); web.destroy(); super.onDestroy(); }
 }

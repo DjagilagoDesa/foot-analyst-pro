@@ -50,7 +50,7 @@
     if(id('hideRecovery'))id('hideRecovery').onclick=()=>{recovery='';draw();};
   }
   function privacy() {
-    return '<details class="profile-privacy"><summary>Mes données personnelles</summary><p>Ton e-mail sert à te connecter ; ton pseudo identifie ton profil. Ton mot de passe est stocké sous forme d’empreinte sécurisée. Nous conservons ton compteur d’essais, ton historique d’analyses et les sessions actives. Des compteurs temporaires limitent les tentatives de connexion.</p><p>Tu peux télécharger tes données et supprimer ton compte depuis le Profil. Le code de récupération permet de réinitialiser ton mot de passe : ne le partage pas. Aucune carte bancaire n’est demandée et aucun abonnement ne démarre automatiquement.</p><p><a href="/privacy">Politique de confidentialité</a> · <a href="/terms">Conditions du service</a> · <a href="/account-deletion">Suppression de compte sur le Web</a>. Les informations éditeur de la version préparatoire restent à confirmer avant publication.</p></details>';
+    return '<details class="profile-privacy"><summary>Mes données personnelles</summary><p>Ton e-mail sert à te connecter ; ton pseudo identifie ton profil. Ton mot de passe est stocké sous forme d’empreinte sécurisée. Nous conservons ton compteur hebdomadaire, ton historique d’analyses et les sessions actives. Des compteurs temporaires limitent les tentatives de connexion.</p><p>Tu peux télécharger tes données et supprimer ton compte depuis le Profil. Le code de récupération permet de réinitialiser ton mot de passe : ne le partage pas. L’offre gratuite ne demande pas de carte bancaire. Seul un achat confirmé dans Google Play démarre l’abonnement Premium.</p><p><a href="/privacy">Politique de confidentialité</a> · <a href="/terms">Conditions du service</a> · <a href="/account-deletion">Suppression de compte sur le Web</a>. Les informations éditeur de la version préparatoire restent à confirmer avant publication.</p></details>';
   }
   function draw() {
     const target=id('profileContent'); if(!target)return;
@@ -116,6 +116,7 @@
       await refresh(false);const u=state.user;
       id('billingAccount').textContent=u?(u.complimentary_premium?'Premium offert · aucun abonnement à payer':u.premium_active?'Premium actif jusqu’au '+date(u.premium_until):u.nickname+' · '+u.trial_remaining+' analyse(s) gratuite(s) restante(s) cette semaine'):'Connecte-toi ou crée ton compte pour utiliser tes 3 analyses gratuites par semaine.';
     }catch{id('billingAccount').textContent='Impossible de charger ton compte. Réessaie depuis Profil.';}
+    window.PlayBillingUI?.load();
     id('billingProfile').onclick=()=>show('info');
     id('billingManage').onclick=()=>{window.location.href='https://play.google.com/store/account/subscriptions';};
   }
