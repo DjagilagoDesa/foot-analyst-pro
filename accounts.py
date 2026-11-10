@@ -126,6 +126,8 @@ def init_schema(app):
         with database() as db:
             for sql in SCHEMA:
                 db.execute(sql)
+            from billing import SCHEMA as BILLING_SCHEMA
+            db.execute(BILLING_SCHEMA)
 
 
 def initialize_owner_access(app):
@@ -135,6 +137,8 @@ def initialize_owner_access(app):
         if not configured():return
         with database() as db:
             for sql in SCHEMA:db.execute(sql)
+            from billing import SCHEMA as BILLING_SCHEMA
+            db.execute(BILLING_SCHEMA)
             db.execute("CREATE TABLE IF NOT EXISTS account_owner_access (slot TEXT PRIMARY KEY, user_id TEXT NOT NULL)")
             existing=db.execute("SELECT user_id FROM account_owner_access WHERE slot='owner'").fetchone()
             if existing:return
@@ -189,7 +193,7 @@ def init_app(app):
 
     @app.after_request
     def private_headers(response):
-        if request.path.startswith(('/api/account','/api/tracking')) or request.path in ('/api/analyze', '/api/ticket', '/api/analyse-statistique', '/api/assistant'):
+        if request.path.startswith(('/api/account','/api/tracking','/api/billing')) or request.path in ('/api/analyze', '/api/ticket', '/api/analyse-statistique', '/api/assistant'):
             response.headers['Cache-Control'] = 'no-store'
             response.headers['Vary'] = 'Cookie'
         response.headers['X-Content-Type-Options'] = 'nosniff'
@@ -291,7 +295,8 @@ def current_user(required=True, csrf=False):
         return None
     if csrf and not secrets.compare_digest(row['csrf_hash'], digest(request.headers.get('X-CSRF-Token', ''))):
         raise AccountError('Ta session doit être actualisée. Rouvre ton profil.', 403, 'csrf_invalid')
-    return row
+    from billing import refresh_entitlement
+    return refresh_entitlement(row)
 
 
 def session_response(user, recovery=None):
@@ -465,6 +470,8 @@ def export_data():
 
 
 def reserve_analysis(user, key, label):
+    from billing import refresh_entitlement
+    refresh_entitlement(user)
     now = int(time.time())
     with database() as db:
         # Lock the account for quota, deletion, and duplicate-request consistency.

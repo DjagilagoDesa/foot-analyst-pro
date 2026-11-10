@@ -13,6 +13,8 @@ app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 app.config['MAX_CONTENT_LENGTH'] = 32 * 1024
 init_accounts(app)
+from billing import init_app as init_billing
+init_billing(app)
 CORS(app, resources={r'/api/(health|leagues|teams|search-teams|next-match|team-next|fixtures)$': {'origins': '*'}})
 SESSION = requests.Session()
 SESSION.headers.update({'User-Agent': 'FootAnalystPro/22 (football statistics)'})
@@ -379,7 +381,12 @@ def ticket():
 
 @app.get('/api/billing/catalog')
 def billing_catalog():
-    return jsonify({'product_id':'foot_analyst_pro_premium_monthly','price_eur':'29.90','period':'month','trial_analyses':3,'trial_period':'week','trial_timezone':'Europe/Paris','purchase_available':False,'provider':'google_play','reason':'play_billing_setup_required'})
+    from billing import enabled
+    return jsonify({'product_id':'foot_analyst_pro_premium_monthly','price_eur':'29.90','period':'month','trial_analyses':3,'trial_period':'week','trial_timezone':'Europe/Paris','purchase_available':enabled(),'provider':'google_play','reason':None if enabled() else 'play_billing_setup_required'})
+
+@app.get('/play-billing.js')
+def play_billing_asset():
+    return send_from_directory('.', 'play-billing.js', mimetype='application/javascript')
 
 @app.get('/organization.js')
 def organization_script():

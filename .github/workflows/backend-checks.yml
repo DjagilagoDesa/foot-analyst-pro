@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, live-scores-v46, profile-v47, analysis-premium-v48]
   pull_request:
-    paths: ['market_odds.py', 'odds-ticket.js', 'ticket-builder.js', 'match_availability.py', 'personnel.js', 'docs/PERSONNEL_CONTEXT.md', 'shadow_experiment.py', 'opponent_review.py', 'shadow_seed.json.gz', 'docs/SHADOW_EXPERIMENT.md', 'opponent_benchmark.py', 'tools/benchmark_opponents.py', 'tools/collect_opponent_archive.py', 'docs/opponent-research.md', 'app.py', 'accounts.py', 'profile.js', 'engine.py', 'analysis_report.py', 'daily_opinion.py', 'custom-ticket.js', 'daily-tickets.js', 'Dockerfile', 'index.html', 'tests/**', '.github/workflows/backend-checks.yml']
+    paths: ['market_odds.py', 'odds-ticket.js', 'ticket-builder.js', 'match_availability.py', 'personnel.js', 'docs/PERSONNEL_CONTEXT.md', 'shadow_experiment.py', 'opponent_review.py', 'shadow_seed.json.gz', 'docs/SHADOW_EXPERIMENT.md', 'opponent_benchmark.py', 'tools/benchmark_opponents.py', 'tools/collect_opponent_archive.py', 'docs/opponent-research.md', 'billing.py', 'play-billing.js', 'app.py', 'accounts.py', 'profile.js', 'engine.py', 'analysis_report.py', 'daily_opinion.py', 'custom-ticket.js', 'daily-tickets.js', 'Dockerfile', 'index.html', 'tests/**', '.github/workflows/backend-checks.yml']
 permissions:
   contents: read
 jobs:
@@ -35,6 +35,11 @@ jobs:
       - run: node tests/test_odds_ticket.cjs
       - run: node --check personnel.js
       - run: node --check profile.js
+      - run: node --check play-billing.js
+      - name: Check Google Play billing interface
+        run: |
+          npm --prefix "$RUNNER_TEMP/billing-ui" install jsdom@26
+          NODE_PATH="$RUNNER_TEMP/billing-ui/node_modules" node tests/test_play_billing.cjs
       - run: node tests/test_calendar.js
       - run: node --check ticket-builder.js
       - run: node tests/test_ticket_builder.cjs

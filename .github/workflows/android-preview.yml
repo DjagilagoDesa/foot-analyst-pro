@@ -1,6 +1,8 @@
 name: Android preview
 on:
   workflow_dispatch:
+  pull_request:
+    paths: ['android/**', '.github/workflows/android-preview.yml']
   push:
     branches: [main, playstore-preparation-v45]
     paths: ['android/**', '.github/workflows/android-preview.yml']

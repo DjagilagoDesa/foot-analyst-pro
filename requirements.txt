@@ -3,3 +3,4 @@ flask-cors>=4,<6
 requests>=2.31,<3
 gunicorn>=22,<24
 psycopg[binary]>=3.2,<4
+google-auth[requests]>=2.40,<3
