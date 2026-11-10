@@ -48,7 +48,11 @@ def init_app(app, fetch, base, leagues):
     bp=Blueprint('tracking',__name__)
     from bankroll import register
     def source(league,event,ttl):
-        return fixture_info(fetch(f'{base}/{league}/summary',{'event':event},ttl=ttl))
+        data=fetch(f'{base}/{league}/summary',{'event':event},ttl=ttl)
+        info=fixture_info(data)
+        info['event_id']=str((data.get('header') or {}).get('id',''))
+        info['rosters']=data.get('rosters') or []
+        return info
     register(bp, lambda csrf=False: current_user(csrf=csrf),source,leagues,resolve,score)
 
     @bp.post('/api/tracking/record')
