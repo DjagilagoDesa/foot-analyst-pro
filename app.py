@@ -379,7 +379,7 @@ def ticket():
 
 @app.get('/api/billing/catalog')
 def billing_catalog():
-    return jsonify({'product_id':'foot_analyst_pro_premium_monthly','price_eur':'29.90','period':'month','trial_analyses':3,'purchase_available':False,'provider':'google_play','reason':'play_billing_setup_required'})
+    return jsonify({'product_id':'foot_analyst_pro_premium_monthly','price_eur':'29.90','period':'month','trial_analyses':3,'trial_period':'week','trial_timezone':'Europe/Paris','purchase_available':False,'provider':'google_play','reason':'play_billing_setup_required'})
 
 @app.get('/organization.js')
 def organization_script():

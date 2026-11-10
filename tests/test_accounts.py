@@ -167,5 +167,49 @@ class AccountTests(unittest.TestCase):
         with server.app.app_context(),accounts.database() as db:
             self.assertEqual(db.execute('SELECT trial_used FROM account_users').fetchone()['trial_used'],3)
 
+class WeeklyQuotaTests(AccountTests):
+    def test_week_rollover_and_cached_results(self):
+        user = self.register()['user']
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        sunday = int(datetime(2026, 11, 15, 23, 59, tzinfo=ZoneInfo('Europe/Paris')).timestamp())
+        with patch('accounts.time.time', return_value=sunday):
+            for i in range(3):
+                with server.app.app_context():
+                    aid, _ = accounts.reserve_analysis(user, 'old-'+str(i), 'Match')
+                    accounts.finish_analysis(user['id'], aid, {'status':'ok'})
+            with server.app.app_context():
+                with self.assertRaises(accounts.AccountError):
+                    accounts.reserve_analysis(user, 'fourth', 'Match')
+        with patch('accounts.time.time', return_value=sunday+60), server.app.app_context():
+            self.assertEqual(accounts.public_user(user)['trial_remaining'], 3)
+            self.assertEqual(accounts.reserve_analysis(user, 'old-0', 'Match'), (None, {'status':'ok'}))
+            aid, _ = accounts.reserve_analysis(user, 'new', 'Match')
+            self.assertEqual(accounts.public_user(user)['trial_remaining'], 2)
+            accounts.finish_analysis(user['id'], aid)
+            self.assertEqual(accounts.public_user(user)['trial_remaining'], 3)
+
+    def test_old_pending_failure_does_not_refund_current_week(self):
+        user = self.register()['user']
+        start, end = accounts.weekly_window()
+        with server.app.app_context():
+            with patch('accounts.time.time', return_value=end-1):
+                old, _ = accounts.reserve_analysis(user, 'old-pending', 'Match')
+            with patch('accounts.time.time', return_value=end+1):
+                new, _ = accounts.reserve_analysis(user, 'new-pending', 'Match')
+                accounts.finish_analysis(user['id'], old)
+                self.assertEqual(accounts.public_user(user)['trial_remaining'], 2)
+                accounts.finish_analysis(user['id'], new)
+                self.assertEqual(accounts.public_user(user)['trial_remaining'], 3)
+
+    def test_paris_daylight_saving_week_boundaries(self):
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        for month, day, hours in ((3, 25, 167), (10, 25, 169)):
+            now = datetime(2026, month, day, 12, tzinfo=ZoneInfo('Europe/Paris')).timestamp()
+            start, end = accounts.weekly_window(now)
+            self.assertEqual((end-start)//3600, hours)
+            self.assertEqual(datetime.fromtimestamp(end, ZoneInfo('Europe/Paris')).weekday(), 0)
+
 if __name__=='__main__':unittest.main()
 
