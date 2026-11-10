@@ -72,7 +72,8 @@ async function dailyVerifiedSelections(results){
     if(seen.has(String(m.id)))return false;seen.add(String(m.id));
     return m.state==='pre'&&!m.completed&&new Date(m.date)>new Date()&&!/POSTPONED|CANCELED|CANCELLED|ABANDONED|SUSPENDED/.test(m.status_name||'');
    }).sort((a,b)=>a.date.localeCompare(b.date));
-   const total=fixtures.length;fixtures=fixtures.slice(0,16);
+   const total=fixtures.length;
+   if(fixtures.length>24)fixtures=Array.from({length:24},(_,i)=>fixtures[Math.round(i*(fixtures.length-1)/23)]);
    if(!fixtures.length){out.innerHTML=message('Aucun match encore à venir retrouvé aujourd’hui dans les compétitions couvertes. Les tickets personnalisés restent disponibles ci-dessous.');return;}
    await window.Accounts.refresh(false);
    for(const m of fixtures){
