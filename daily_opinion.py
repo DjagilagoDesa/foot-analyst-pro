@@ -19,7 +19,7 @@ from venue_test import build as build_venue, freeze as freeze_venue, report as v
 
 PARIS = ZoneInfo('Europe/Paris')
 INTERVAL = 900
-SELECTION_REVISION = 'cup-domestic-history-v1'
+SELECTION_REVISION = 'cup-domestic-history-scorers-v2'
 LIMIT = 24
 SCHEMA = DAILY_OPINION_SCHEMA
 GROUPS = [('prudent', 3, 'Mes 3 choix prudents'),
