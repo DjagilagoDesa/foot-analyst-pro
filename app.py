@@ -97,6 +97,34 @@ def history(league,team_id,limit=10,regulation_only=None):
     matches=sorted(collected.values(),key=lambda m:m.get('date') or '',reverse=True)
     return matches[:limit],errors
 
+def expanded_history(league, team_id, limit=10, regulation_only=True):
+    """Fill short cup histories with verified domestic membership and played games."""
+    from adaptive_history import combine
+    primary, errors = history(league, team_id, limit=limit, regulation_only=regulation_only)
+    domestic = (('eng.1','eng.2','eng.3','eng.4') if league in ('eng.fa','eng.league_cup','eng.trophy') else
+                ('eng.w.1','esp.w.1','fra.w.1','usa.nwsl') if league=='uefa.wchampions' else ())
+    if not domestic or len(primary)>=limit:
+        return primary, errors
+    def member(code):
+        data=fetch(f'{ESPN}/{code}/teams',ttl=86400)
+        return any(str(entry.get('team',{}).get('id'))==str(team_id)
+                   for sport in data.get('sports',[]) for group in sport.get('leagues',[])
+                   for entry in group.get('teams',[]))
+    batches=[(league,primary)];errors=list(errors)
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        jobs={pool.submit(member,code):code for code in domestic}
+        for job in as_completed(jobs):
+            code=jobs[job]
+            try:
+                if job.result():
+                    games,failed=history(code,team_id,limit=limit,regulation_only=regulation_only)
+                    batches.append((code,games));errors.extend(failed)
+            except (requests.RequestException,ValueError,KeyError,TypeError):
+                errors.append(code+': source_unavailable')
+    games,_=combine(team_id,batches)
+    return games[:limit],errors
+
+
 def head_to_head(league, home_id, away_id, limit=10):
     """Search five season labels in the selected ESPN competition only."""
     now = datetime.now(timezone.utc)
@@ -281,8 +309,8 @@ def analyze():
     with ThreadPoolExecutor(max_workers=4) as pool:
         context_job = pool.submit(collect,sys.modules[__name__],home,away,str(data.get('event_id',''))) if league=='uefa.champions' else None
         head_job=pool.submit(head_to_head,league,home,away)
-        hf=pool.submit(history,league,home,limit=20,regulation_only=True)
-        af=pool.submit(history,league,away,limit=20,regulation_only=True)
+        hf=pool.submit(expanded_history,league,home,limit=20,regulation_only=True)
+        af=pool.submit(expanded_history,league,away,limit=20,regulation_only=True)
         hm,he=hf.result()
         am,ae=af.result()
         confrontations=head_job.result()
