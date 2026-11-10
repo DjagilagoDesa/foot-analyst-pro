@@ -51,6 +51,16 @@ class OddsTests(unittest.TestCase):
         data=fixture();data['competitions'][0]['odds'][0].pop('provider')
         self.assertEqual(extract(data,'observed'),[])
 
+    def test_null_odds_entries_do_not_hide_the_fixture(self):
+        data=fixture();data['competitions'][0]['odds']=[None]
+        self.assertEqual(extract(data,'observed'),[])
+        client=server.app.test_client()
+        with patch.object(server,'fetch',return_value={'events':[data]}):
+            response=client.get('/api/fixtures?league=uefa.wchampions&date='+data['date'][:10])
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(len(response.json['events']),1)
+        self.assertEqual(response.json['events'][0]['market_odds']['books'],[])
+
     def test_route_identity_validation_source_failure_and_observation_time(self):
         client=server.app.test_client();data=fixture()
         query='/api/odds?league=fra.1&event_id=123&home_id=1&away_id=2&date='+data['date'][:10]
