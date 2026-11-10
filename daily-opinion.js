@@ -43,6 +43,10 @@
   const picks=scorerPicks(board);
   return '<div class="opinion-group"><h3>⚽ Les 3 buteurs du jour</h3>'+picks.map(scorerCard).join('')+(picks.length<3?message(picks.length+'/3 buteurs sélectionnés. Recherche des choix restants…'):'')+'</div>'+scorerTracking(board.scorer_performance);
  }
+ function addButton(p,kind){
+  if(p.status!=='pending'||Date.parse(p.match.date)<=Date.now())return '';
+  return '<button type="button" class="day" data-bank-'+kind+'="'+esc(kind==='scorer'?p.player.id:p.match.id)+'">AJOUTER À MON TICKET</button><p data-bank-feedback role="status"></p>';
+ }
  function scorerCard(p){
   let html='';
   const state={won:'✓ Gagné',lost:'✗ Perdu',void:'Annulé',pending:new Date(p.match.date)>new Date()?'À venir':'Résultat à vérifier'}[p.status];
@@ -53,7 +57,7 @@
   html+='<p><strong>'+esc(p.basis.goals)+' buts · '+esc(p.basis.appearances)+' apparitions</strong></p><details><summary>Pourquoi ce buteur ?</summary><p>'+esc(p.rationale)+'</p>';
 
   html+='<p><a href="'+esc(p.source_url)+'" target="_blank" rel="noopener noreferrer">Voir les données du match</a></p></details><button type="button" class="day" data-scorer-match="'+esc(p.player.id)+'">OUVRIR LE MATCH</button></article>';
-  return html;
+  return html.replace('</article>',addButton(p,'scorer')+'</article>');
  }
  function render(board){
   const signature=JSON.stringify(board);if(signature===lastSignature)return;lastSignature=signature;
@@ -66,12 +70,18 @@
   if(board.stale&&board.status!=='preparing')html+=message('Actualisation en retard.');
   html+=(board.groups||[]).map(group=>'<div class="opinion-group"><h3>'+esc(group.title)+'</h3>'+group.picks.map(p=>{
    const m=p.match, state={won:'✓ Gagné',lost:'✗ Perdu',void:'Annulé / non réglable',pending:new Date(m.date)>new Date()?'À venir':'Résultat à vérifier'}[p.status];
-   return '<article class="opinion-pick"><div class="row"><strong>'+esc(m.home.name)+' – '+esc(m.away.name)+'</strong><span class="opinion-prob">'+esc(p.probability)+' %</span></div><p class="gold">'+esc(p.market==='home'?'Victoire '+m.home.name:p.market==='away'?'Victoire '+m.away.name:p.market_label)+'</p><p class="opinion-state">'+esc(new Date(m.date).toLocaleTimeString('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'}))+' · <span class="'+({won:'result-won',lost:'result-lost'}[p.status]||'')+'">'+esc(state)+'</span>'+(p.home_score!==null?' · '+esc(p.home_score)+' – '+esc(p.away_score):'')+'</p><details><summary>Pourquoi ce choix ?</summary><p>'+esc(p.rationale)+'</p><button type="button" class="day" data-opinion-match="'+esc(m.id)+'">OUVRIR LE MATCH</button></details>'+teamOdds(p)+'</article>';
+   return '<article class="opinion-pick"><div class="row"><strong>'+esc(m.home.name)+' – '+esc(m.away.name)+'</strong><span class="opinion-prob">'+esc(p.probability)+' %</span></div><p class="gold">'+esc(p.market==='home'?'Victoire '+m.home.name:p.market==='away'?'Victoire '+m.away.name:p.market_label)+'</p><p class="opinion-state">'+esc(new Date(m.date).toLocaleTimeString('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'}))+' · <span class="'+({won:'result-won',lost:'result-lost'}[p.status]||'')+'">'+esc(state)+'</span>'+(p.home_score!==null?' · '+esc(p.home_score)+' – '+esc(p.away_score):'')+'</p><details><summary>Pourquoi ce choix ?</summary><p>'+esc(p.rationale)+'</p><button type="button" class="day" data-opinion-match="'+esc(m.id)+'">OUVRIR LE MATCH</button></details>'+addButton(p,'opinion')+teamOdds(p)+'</article>';
   }).join('')+(!group.picks.length?message('Aucun choix admissible pour le moment.'):'')+'</div>').join('');
   html+=scorerHtml(board);
   if(board.source_errors||board.result_source_errors)html+=message('Données partiellement indisponibles.');
   for(const id of targets){
    const target=document.getElementById(id);if(!target)continue;target.innerHTML=html;
+   target.querySelectorAll('[data-bank-opinion],[data-bank-scorer]').forEach(button=>button.onclick=async()=>{
+    const pick=button.dataset.bankScorer?scorerPicks(board).find(p=>String(p.player.id)===button.dataset.bankScorer):(board.groups||[]).flatMap(g=>g.picks).find(p=>String(p.match.id)===button.dataset.bankOpinion);
+    if(!pick)return;button.disabled=true;
+    try{await window.Bankroll.addSelection(pick);}catch(error){const feedback=button.closest('article').querySelector('[data-bank-feedback]');if(feedback)feedback.textContent=error.message;}
+    finally{button.disabled=false;}
+   });
    const history=target.querySelector('[data-scorer-history]');if(history)history.ontoggle=()=>{if(history.open&&!history.querySelector('[data-scorer-history-content]').innerHTML)historyPage(history,1);};
    target.querySelectorAll('[data-scorer-match]').forEach(button=>button.onclick=()=>{const pick=scorerPicks(board).find(p=>String(p.player.id)===button.dataset.scorerMatch);if(pick)openMatch(pick.match,'home');});
    target.querySelectorAll('[data-opinion-match]').forEach(button=>button.onclick=()=>{

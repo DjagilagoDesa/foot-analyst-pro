@@ -72,3 +72,30 @@ class AutoBankroll(Tracking):
   after=self.state();leg=after['bets'][0]['selections'][0]
   self.assertEqual(leg['home_name'],'Plymouth Parkway');self.assertEqual(leg['home_badge'],'https://example.org/plymouth.png')
   self.assertEqual((after['available_cents'],after['bets'][0]['payout_cents']),(before['available_cents'],250))
+
+ def scorer_leg(self):
+  self.info['header']['id']='123'
+  self.info['rosters']=[dict(team={'id':'1'},roster=[dict(athlete={'id':'11','displayName':'Verified scorer'})])]
+  return dict(self.leg(market='anytime_scorer'),player=dict(id='11',team_id='1',name='Untrusted name'))
+ def test_scorer_identity_and_win_auto_settle(self):
+  self.assertEqual(self.add([self.scorer_leg()]).status_code,200)
+  self.assertEqual(self.state()['bets'][0]['selections'][0]['player']['name'],'Verified scorer')
+  self.finish();self.info['rosters'][0]['roster'][0]['stats']=[dict(name='appearances',value=1),dict(name='totalGoals',value=1)]
+  d=self.state();self.assertEqual(d['bets'][0]['payout_cents'],250)
+  self.assertEqual(d['available_cents'],10150)
+  self.assertEqual(self.state()['available_cents'],10150)
+ def test_scorer_missing_stats_never_uses_team_score(self):
+  self.add([self.scorer_leg()]);self.finish()
+  self.assertIsNone(self.state()['bets'][0]['payout_cents'])
+  self.info['rosters'][0]['roster'][0]['stats']=[dict(name='appearances',value=1),dict(name='totalGoals',value=0),dict(name='ownGoals',value=1)]
+  self.assertEqual(self.state()['bets'][0]['payout_cents'],0)
+ def test_scorer_did_not_play_is_refunded(self):
+  self.add([self.scorer_leg()]);self.finish()
+  self.info['rosters'][0]['roster'][0]['stats']=[dict(name='appearances',value=0)]
+  self.assertEqual(self.state()['bets'][0]['payout_cents'],100)
+  self.assertEqual(self.state()['available_cents'],10000)
+ def test_scorer_wrong_player_or_team_cannot_debit(self):
+  for field,value in [('id','999'),('team_id','2')]:
+   leg=self.scorer_leg();leg['player'][field]=value
+   self.assertEqual(self.add([leg]).status_code,400)
+  self.assertEqual(self.state()['available_cents'],10000)

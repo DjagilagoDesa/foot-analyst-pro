@@ -20,7 +20,7 @@
   return '<span class="bank-team">'+crest(m.home)+'<strong>'+esc(m.home.name)+'</strong></span><span class="bank-vs">'+score+'</span><span class="bank-team">'+crest(m.away)+'<strong>'+esc(m.away.name)+'</strong></span>';
  }
  function gameHeader(l,attributes){const m=legMatch(l);return '<button type="button" class="bank-game" '+attributes+' aria-label="Voir '+esc(m.home.name+' – '+m.away.name)+'">'+teamsMarkup(m)+'</button>';}
- function pickName(l){const m=legMatch(l);return l.market==='home'?'Victoire '+m.home.name:l.market==='away'?'Victoire '+m.away.name:labels[l.market]||l.market;}
+ function pickName(l){const m=legMatch(l);if(l.market==='anytime_scorer')return (l.player?.name||'Buteur')+' · Marque au moins un but';return l.market==='home'?'Victoire '+m.home.name:l.market==='away'?'Victoire '+m.away.name:labels[l.market]||l.market;}
  function savedCard(l,bi,li){
   const status=({won:'✓ Gagné',lost:'✗ Perdu',void:'Annulé',pending:'En cours'})[l.status]||'En cours',m=legMatch(l),date=m.date?new Date(m.date):null;
   const when=date&&Number.isFinite(date.getTime())?date.toLocaleString('fr-FR',{timeZone:'Europe/Paris',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
@@ -83,25 +83,30 @@
   const get=s=>root.querySelector(s),date=get('[data-date]'),list=get('[data-fixtures]'),chosen=get('[data-draft]'),feedback=get('[data-add-feedback]'),form=get('[data-bet]');
   date.value=selectedDay||new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Paris'});form.elements.stake.value=draftStake??d.suggested_cents/100;
   let visible=5;
-  const name=(l,k)=>k==='home'?'Victoire '+l.home_name:k==='away'?'Victoire '+l.away_name:labels[k]||k;
+  const name=(l,k)=>k==='anytime_scorer'?(l.player?.name||'Buteur')+' · Marque au moins un but':k==='home'?'Victoire '+l.home_name:k==='away'?'Victoire '+l.away_name:labels[k]||k;
   function potential(){
    const amount=Number(form.elements.stake.value),ready=draft.length&&draft.every(l=>Number(l.odds)>1&&!l.loading),total=draft.reduce((v,l)=>v*Number(l.odds||0),1);
    get('[data-potential]').textContent=ready?'Cote '+total.toFixed(2).replace('.',',')+' · Retour potentiel '+money(Math.round(amount*100*total)):'';
    form.querySelector('.btn').disabled=!ready;
   }
   function draw(){
-   chosen.innerHTML=draft.map((l,i)=>'<div class="bankroll-pick"><div class="bankroll-line">'+gameHeader(l,'data-draft-match="'+i+'"')+'<button type="button" class="day" data-remove="'+i+'" aria-label="Retirer '+esc(l.label)+'">×</button></div><select class="day" data-market="'+i+'" aria-label="Mon pari pour '+esc(l.label)+'">'+Object.keys(labels).map(k=>'<option value="'+k+'">'+esc(name(l,k))+'</option>').join('')+'</select><span data-quote>'+esc(l.loading?'Recherche de la cote…':l.odds?'Cote '+String(l.odds).replace('.',',')+(l.bookmaker?' · '+l.bookmaker:''):'Cote indisponible')+'</span>'+(!l.loading?'<details class="bankroll-adjust"><summary>'+(!l.odds?'Saisir ma cote':'Modifier la cote')+'</summary><input class="day" data-odds="'+i+'" aria-label="Cote réellement jouée" type="number" min="1.01" max="10000" step="0.01" value="'+esc(l.odds||'')+'"></details>':'')+'</div>').join('');
+   chosen.innerHTML=draft.map((l,i)=>'<div class="bankroll-pick"><div class="bankroll-line">'+gameHeader(l,'data-draft-match="'+i+'"')+'<button type="button" class="day" data-remove="'+i+'" aria-label="Retirer '+esc(l.label)+'">×</button></div><select class="day" data-market="'+i+'" aria-label="Mon pari pour '+esc(l.label)+'">'+(l.market==='anytime_scorer'?['anytime_scorer']:Object.keys(labels)).map(k=>'<option value="'+k+'">'+esc(name(l,k))+'</option>').join('')+'</select><span data-quote>'+esc(l.loading?'Recherche de la cote…':l.odds?'Cote '+String(l.odds).replace('.',',')+(l.bookmaker?' · '+l.bookmaker:''):'Cote indisponible')+'</span>'+(!l.loading?'<details class="bankroll-adjust"><summary>'+(!l.odds?'Saisir ma cote':'Modifier la cote')+'</summary><input class="day" data-odds="'+i+'" aria-label="Cote réellement jouée" type="number" min="1.01" max="10000" step="0.01" value="'+esc(l.odds||'')+'"></details>':'')+'</div>').join('');
    chosen.querySelectorAll('[data-draft-match]').forEach(button=>button.onclick=()=>openMatch(legMatch(draft[Number(button.dataset.draftMatch)]),'bankroll'));
    chosen.querySelectorAll('[data-market]').forEach(n=>{n.value=draft[Number(n.dataset.market)].market;n.onchange=()=>{const l=draft[Number(n.dataset.market)];l.market=n.value;l.odds='';requestKey=newKey();quote(l);};});
    chosen.querySelectorAll('[data-odds]').forEach(n=>n.oninput=()=>{const l=draft[Number(n.dataset.odds)];l.odds=n.value;l.automatic_odds=false;l.bookmaker='Cote saisie';n.closest('.bankroll-pick').querySelector('[data-quote]').textContent='Cote '+String(l.odds).replace('.',',')+' · Cote saisie';requestKey=newKey();potential();});
    chosen.querySelectorAll('[data-remove]').forEach(n=>n.onclick=()=>{draft.splice(Number(n.dataset.remove),1);if(!draft.length){bookmaker=null;get('[data-picker]').open=true;}requestKey=newKey();draw();});potential();
   }
   async function quote(l,initial=false){
-   l.loading=true;draw();const version=l.quoteVersion=(l.quoteVersion||0)+1;
-   let data;try{data=await window.OddsTicket?.load(l.match)||{books:[]};}catch{data={books:[]};}
+   l.needsQuote=false;l.loading=true;draw();const version=l.quoteVersion=(l.quoteVersion||0)+1;
+   let data;
+   if(l.market==='anytime_scorer'){
+    let q;try{q=(await api('/api/daily-opinion/scorer-odds?player_id='+encodeURIComponent(l.player.id)+'&event_id='+encodeURIComponent(l.event_id),15000)).odds;}catch{}
+    const valid=q&&String(q.player_id)===String(l.player.id)&&String(q.event_id)===l.event_id&&q.market==='anytime_scorer'&&q.kind==='prematch_quote'&&Number(q.price)>1&&Date.parse(q.expires_at)>Date.now();
+    data=valid?{books:[{bookmaker:q.bookmaker}],expires_at:q.expires_at,scorerPrice:Number(q.price)}:{books:[]};
+   }else{try{data=await window.OddsTicket?.load(l.match)||{books:[]};}catch{data={books:[]};}}
    if(version!==l.quoteVersion||!draft.includes(l))return;
    const book=data.books?.find(b=>!bookmaker||b.bookmaker===bookmaker);
-   const quoted=k=>window.OddsTicket?.price(data,k,book?.bookmaker);
+   const quoted=k=>k==='anytime_scorer'?data.scorerPrice:window.OddsTicket?.price(data,k,book?.bookmaker);
    if(initial&&!(Number(quoted(l.market))>1))l.market=Object.keys(labels).find(k=>k.startsWith('over_')&&Number(quoted(k))>1)||Object.keys(labels).find(k=>Number(quoted(k))>1)||l.market;
    const price=book?quoted(l.market):undefined;
    if(Number.isFinite(price)&&price>1){if(!bookmaker)bookmaker=book.bookmaker;l.odds=price.toFixed(2);l.bookmaker=book.bookmaker;l.expires_at=data.expires_at;l.automatic_odds=true;}
@@ -133,10 +138,10 @@
    const expired=draft.filter(l=>l.automatic_odds&&Date.parse(l.expires_at)<=Date.now());
    if(expired.length){await Promise.all(expired.map(l=>quote(l)));feedback.textContent='Cotes actualisées. Vérifie puis enregistre ton ticket.';return;}
    const button=form.querySelector('.btn');button.disabled=true;
-   try{await window.Accounts.request('/api/bankroll/manual',{request_key:requestKey,title:draft.length===1?draft[0].label:'Combiné · '+draft.length+' matchs',stake:form.elements.stake.value,selections:draft.map(l=>({event_id:l.event_id,league:l.league,home_id:l.home_id,away_id:l.away_id,market:l.market,odds:l.odds,bookmaker:l.bookmaker,automatic_odds:l.automatic_odds}))});if(id!==generation)return;draft=[];fixtures=[];draftStake=null;bookmaker=null;requestKey=newKey();activeTab='pending';await load();const message=root.querySelector('[data-feedback]');if(message)message.textContent='Ticket enregistré. Résultats et bankroll suivis automatiquement.';}catch(error){if(id===generation){feedback.textContent=error.message;potential();}}
+   try{await window.Accounts.request('/api/bankroll/manual',{request_key:requestKey,title:draft.length===1?draft[0].label:'Combiné · '+draft.length+' matchs',stake:form.elements.stake.value,selections:draft.map(l=>({event_id:l.event_id,league:l.league,home_id:l.home_id,away_id:l.away_id,market:l.market,odds:l.odds,bookmaker:l.bookmaker,automatic_odds:l.automatic_odds,...(l.player?{player:l.player}:{})}))});if(id!==generation)return;draft=[];fixtures=[];draftStake=null;bookmaker=null;requestKey=newKey();activeTab='pending';await load();const message=root.querySelector('[data-feedback]');if(message)message.textContent='Ticket enregistré. Résultats et bankroll suivis automatiquement.';}catch(error){if(id===generation){feedback.textContent=error.message;potential();}}
   };
   draw();get('[data-picker]').open=!draft.length;if(fixtures.length)renderFixtures();else loadFixtures();
-  for(const l of draft)if(l.loading)quote(l);
+  for(const l of draft)if(l.loading||l.needsQuote)quote(l);
  }
  async function mount(node,ticket){
   if(ticket.status!=='pending')return;const version=generation;
@@ -152,6 +157,16 @@
    inputs.forEach((n,i)=>{const value=book?window.OddsTicket?.price(data[i],ticket.selections[i].market,book):undefined;n.value=Number.isFinite(value)?value:'';form.querySelector('[data-price-label="'+i+'"]').textContent=value?'Cote '+value+' · '+book:'Cote indisponible';});button.disabled=!valid();
   }catch{/* Account errors are handled by tracking. */}
  }
- window.Bankroll={load,mount,clear(){generation++;draft=[];fixtures=[];selectedDay='';draftStake=null;bookmaker=null;requestKey=newKey();root.textContent='';},async suggest(legs){try{const d=await read();if(!d.configured)return null;const joint=legs.reduce((p,r)=>p*(Number(r.probability)||0)/100,1);const amount=Math.floor(d.suggested_cents*(joint<.25?.25:joint<.5?.5:1));return {stake:(amount/100).toFixed(2),label:'Mise proposée : '+money(amount)+' · montant à risque, pas une probabilité de gain.'};}catch{return null;}}};
+ window.Bankroll={load,mount,async addSelection(pick){
+  const m=pick?.match;
+  if(!m||pick.status!=='pending'||m.state!=='pre'||m.completed||Date.parse(m.date)<=Date.now())throw Error('Ce match ne peut plus être ajouté avant son coup d’envoi.');
+  if(draft.length>=8)throw Error('8 matchs maximum par ticket.');
+  if(draft.some(l=>l.event_id===String(m.id)&&l.league===m.league))throw Error('Ce match est déjà dans ton ticket.');
+  if(!labels[pick.market]&&pick.market!=='anytime_scorer')throw Error('Ce pari ne peut pas être ajouté.');
+  if(pick.market==='anytime_scorer'&&!pick.player?.id)throw Error('Buteur ou buteuse à revérifier.');
+  await read();
+  draft.push({event_id:String(m.id),league:m.league,home_id:String(m.home.id),away_id:String(m.away.id),home_name:m.home.name,away_name:m.away.name,label:m.home.name+' – '+m.away.name,market:pick.market,odds:'',match:m,player:pick.market==='anytime_scorer'?{id:String(pick.player.id),team_id:String(pick.player.team_id),name:pick.player.name}:undefined,needsQuote:true});
+  activeTab='new';requestKey=newKey();show('bankroll');
+ },clear(){generation++;draft=[];fixtures=[];selectedDay='';draftStake=null;bookmaker=null;requestKey=newKey();root.textContent='';},async suggest(legs){try{const d=await read();if(!d.configured)return null;const joint=legs.reduce((p,r)=>p*(Number(r.probability)||0)/100,1);const amount=Math.floor(d.suggested_cents*(joint<.25?.25:joint<.5?.5:1));return {stake:(amount/100).toFixed(2),label:'Mise proposée : '+money(amount)+' · montant à risque, pas une probabilité de gain.'};}catch{return null;}}};
  setInterval(()=>{if(!root.closest('section').classList.contains('hidden')&&!document.hidden&&!draft.length&&draftStake===null&&!root.contains(document.activeElement))load();},60000);
 })();
