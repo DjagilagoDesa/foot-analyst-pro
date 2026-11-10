@@ -20,9 +20,11 @@ module.exports=async function(browser){
   await page.route('**/api/daily-opinion',r=>r.fulfill({contentType:'application/json',body:JSON.stringify(board)}));
   await page.route('**/api/tracking/performance',r=>r.fulfill({contentType:'application/json',body:JSON.stringify({won:99,lost:0,pending:0,void:0,success_pct:100,recent:[],note:'Personal history'})}));
   await page.goto('http://127.0.0.1:19047/');
-  await page.locator('#homeDailyOpinion .opinion-pick').first().waitFor();
+  await page.locator('#homeDailyOpinion .opinion-pick').first().waitFor({state:'attached'});
+  assert.equal(await page.locator('#homeDailyOpinion > details[open]').count(),0);
+  await page.locator('#homeDailyOpinion > details > summary').first().click();
   assert.equal(await page.locator('#homeDailyOpinion .opinion-pick').count(),6);
-  assert.equal(await page.locator('#homeDailyOpinion .opinion-group').count(),3);
+  assert.equal(await page.locator('#homeDailyOpinion .opinion-group').count(),4);
  assert.equal(await page.locator('#homeDailyOpinion .fine').count(),0);
  assert.doesNotMatch(await page.locator('#home').innerText(),/Chaque match mérite|FOOTBALL INTELLIGENCE|6 \/ 6 choix/);
   const cards=page.locator('#homeDailyOpinion .opinion-pick');
@@ -49,18 +51,19 @@ module.exports=async function(browser){
  await page.locator('#homeDailyOpinion [data-opinion-match]').first().click();
   await page.locator('#detail:not(.hidden) #analyzeBtn').waitFor();
   await page.locator('nav [data-page="dailyTickets"]').click();
-  await page.locator('#trackingResult .stat').first().waitFor();
+  await page.locator('[aria-controls="dailyTickets-group-1"]').click();
+  await page.locator('#ticketPerformance .stat').first().waitFor();
   assert.equal(await page.locator('#dailyTickets .opinion-performance').count(),0);
   assert.equal(await page.locator('#dailyOpinionResult').count(),0);
-  assert.match(await page.locator('#trackingResult').innerText(),/Ma réussite\s+100 %/);
-  assert.doesNotMatch(await page.locator('#trackingResult').innerText(),/66.7 %/);
+  assert.match(await page.locator('#ticketPerformance').innerText(),/Réussite\s+100 %/);
+  assert.doesNotMatch(await page.locator('#ticketPerformance').innerText(),/66.7 %/);
   // No settled personal selections means no personal rate, never the public rate.
   await page.unroute('**/api/tracking/performance');
   await page.route('**/api/tracking/performance',r=>r.fulfill({contentType:'application/json',body:JSON.stringify({won:0,lost:0,pending:1,void:0,success_pct:null,recent:[]})}));
   await page.locator('#refreshTracking').click();
   await page.waitForFunction(()=>!document.getElementById('refreshTracking').disabled);
-  assert.match(await page.locator('#trackingResult').innerText(),/Ma réussite\s+—/);
-  assert.doesNotMatch(await page.locator('#trackingResult').innerText(),/66.7 %|100 %/);
+  assert.match(await page.locator('#ticketPerformance').innerText(),/Réussite\s+—/);
+  assert.doesNotMatch(await page.locator('#ticketPerformance').innerText(),/66.7 %|100 %/);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   await page.waitForFunction(()=>!window.DailyOpinion.isLoading());
   // A source failure must keep the current day's published choices with a stale notice.
