@@ -35,6 +35,15 @@ const tick=()=>new Promise(r=>setTimeout(r,0));
  assert.equal(root.querySelector('[data-market]').value,'over_2_5');assert.equal(root.querySelector('[data-odds]').value,'1.85');
  assert.equal(root.querySelector('[data-odds]').closest('details').open,false,'No manual price field expanded');
  assert.equal(root.querySelector('[data-picker]').open,false,'Match list collapses after adding');
+ // Regression: only home odds available (outsider at 15) must not change the intended bet.
+ root.querySelector('[data-remove]').click();
+ const originalLoad=w.OddsTicket.load;
+ w.OddsTicket.load=async()=>({expires_at:new Date(Date.now()+60000).toISOString(),books:[{bookmaker:'TestBook',markets:{home:15}}]});
+ row.querySelector('.day').click();await tick();
+ assert.equal(root.querySelector('[data-market]').value,'over_2_5','Missing odds must not silently select the home outsider');
+ assert.equal(root.querySelector('[data-odds]').value,'');
+ assert(root.querySelector('[data-bet] .btn').disabled);
+ w.OddsTicket.load=originalLoad;
  const market=root.querySelector('[data-market]');market.value='btts';market.dispatchEvent(new w.Event('change'));await tick();
  assert(root.querySelector('[data-bet] .btn').disabled,'Missing market price must block recording');
  assert(root.querySelector('[data-draft]').textContent.includes('Cote indisponible'));

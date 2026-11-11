@@ -96,7 +96,7 @@
    chosen.querySelectorAll('[data-odds]').forEach(n=>n.oninput=()=>{const l=draft[Number(n.dataset.odds)];l.odds=n.value;l.automatic_odds=false;l.bookmaker='Cote saisie';n.closest('.bankroll-pick').querySelector('[data-quote]').textContent='Cote '+String(l.odds).replace('.',',')+' · Cote saisie';requestKey=newKey();potential();});
    chosen.querySelectorAll('[data-remove]').forEach(n=>n.onclick=()=>{draft.splice(Number(n.dataset.remove),1);if(!draft.length){bookmaker=null;get('[data-picker]').open=true;}requestKey=newKey();draw();});potential();
   }
-  async function quote(l,initial=false){
+  async function quote(l){
    l.needsQuote=false;l.loading=true;draw();const version=l.quoteVersion=(l.quoteVersion||0)+1;
    let data;
    if(l.market==='anytime_scorer'){
@@ -107,7 +107,7 @@
    if(version!==l.quoteVersion||!draft.includes(l))return;
    const book=data.books?.find(b=>!bookmaker||b.bookmaker===bookmaker);
    const quoted=k=>k==='anytime_scorer'?data.scorerPrice:window.OddsTicket?.price(data,k,book?.bookmaker);
-   if(initial&&!(Number(quoted(l.market))>1))l.market=Object.keys(labels).find(k=>k.startsWith('over_')&&Number(quoted(k))>1)||Object.keys(labels).find(k=>Number(quoted(k))>1)||l.market;
+   // Missing odds must never replace the selected market with another bet.
    const price=book?quoted(l.market):undefined;
    if(Number.isFinite(price)&&price>1){if(!bookmaker)bookmaker=book.bookmaker;l.odds=price.toFixed(2);l.bookmaker=book.bookmaker;l.expires_at=data.expires_at;l.automatic_odds=true;}
    else{l.odds='';l.bookmaker='';l.automatic_odds=false;}
@@ -116,7 +116,7 @@
   function addMatch(m){
    if(draft.length>=8){feedback.textContent='8 matchs maximum.';return;}
    if(draft.some(l=>l.event_id===String(m.id)&&l.league===m.league)){feedback.textContent='Match déjà ajouté.';return;}
-   const l={event_id:String(m.id),league:m.league,home_id:String(m.home.id),away_id:String(m.away.id),home_name:m.home.name,away_name:m.away.name,label:m.home.name+' – '+m.away.name,market:'over_2_5',odds:'',match:m};draft.push(l);get('[data-picker]').open=false;feedback.textContent='';quote(l,true);
+   const l={event_id:String(m.id),league:m.league,home_id:String(m.home.id),away_id:String(m.away.id),home_name:m.home.name,away_name:m.away.name,label:m.home.name+' – '+m.away.name,market:'over_2_5',odds:'',match:m};draft.push(l);get('[data-picker]').open=false;feedback.textContent='';quote(l);
   }
   function renderFixtures(){
    const q=get('[data-filter]').value.toLocaleLowerCase('fr'),filtered=fixtures.filter(m=>(m.home.name+' '+m.away.name).toLocaleLowerCase('fr').includes(q));list.innerHTML='';
