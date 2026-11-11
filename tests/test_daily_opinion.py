@@ -39,6 +39,32 @@ class SelectionTests(unittest.TestCase):
             self.assertEqual(candidates_for(candidate, 'prudent'), [{'market': 'over_2_5', 'probability': 80}])
             self.assertEqual(candidates_for(candidate, 'surprise'), [])
 
+    def test_extreme_outsider_win_is_not_published_even_as_surprise(self):
+        r = result(99, {'home': 25, 'away': 74})
+        r['match']['market_odds'] = {
+            'observed_at': NOW.isoformat(),
+            'books': [{'bookmaker': 'DraftKings', 'markets': {'home': 15, 'draw': 7, 'away': 1.15}}]}
+        self.assertEqual(choose([r], [], NOW, DAY), [])
+        # Changing the quote must never choose the opposite team automatically.
+        r['prediction']['markets'] = {'home': 80, 'away': 10, 'over_2_5': 78}
+        picks = choose([r], [], NOW, DAY)
+        self.assertEqual([p['market'] for p in picks], ['over_2_5'])
+
+    def test_outsider_check_ignores_expired_or_invalid_quotes(self):
+        for observed, price in [(NOW - timedelta(minutes=6), 15), (NOW, float('nan')), (NOW, True)]:
+            r = result(99, {'home': 25, 'away': 74})
+            r['match']['market_odds'] = {
+                'observed_at': observed.isoformat(),
+                'books': [{'bookmaker': 'TestBook', 'markets': {'home': price, 'draw': 7, 'away': 1.15}}]}
+            self.assertEqual([p['market'] for p in choose([r], [], NOW, DAY) if p['group'] == 'surprise'], ['home'])
+
+    def test_outsider_guard_does_not_rewrite_published_picks(self):
+        r = result(99, {'home': 25, 'away': 74})
+        existing = choose([r], [], NOW, DAY)
+        r['match']['market_odds'] = {'observed_at': NOW.isoformat(), 'books': [
+            {'bookmaker': 'TestBook', 'markets': {'home': 15, 'draw': 7, 'away': 1.15}}]}
+        self.assertEqual(choose([r], existing, NOW, DAY), existing)
+
     def test_six_unique_games_and_teams_in_three_bands(self):
         picks = choose(results(), [], NOW, DAY)
         self.assertEqual([sum(p['group'] == g for p in picks) for g in ('prudent', 'challenge', 'surprise')], [3, 2, 1])

@@ -19,7 +19,7 @@ from venue_test import build as build_venue, freeze as freeze_venue, report as v
 
 PARIS = ZoneInfo('Europe/Paris')
 INTERVAL = 900
-SELECTION_REVISION = 'cup-domestic-history-scorers-v2'
+SELECTION_REVISION = 'daily-extreme-outsider-check-v3'
 LIMIT = 24
 SCHEMA = DAILY_OPINION_SCHEMA
 GROUPS = [('prudent', 3, 'Mes 3 choix prudents'),
@@ -100,6 +100,29 @@ def candidates_for(result, group):
                   key=lambda p: (-p['probability'], p['market']))
 
 
+def extreme_outsider(result, market, now):
+    """Veto extreme win prices; odds never create or replace a model choice."""
+    if market not in ('home', 'away'):
+        return False
+    snapshot = result['match'].get('market_odds') or {}
+    try:
+        observed = datetime.fromisoformat(snapshot['observed_at'].replace('Z', '+00:00'))
+        kickoff = datetime.fromisoformat(result['match']['date'].replace('Z', '+00:00'))
+        if observed.tzinfo is None or not 0 <= (now - observed).total_seconds() <= 300 or observed >= kickoff:
+            return False
+    except (KeyError, ValueError, TypeError, AttributeError):
+        return False
+    for book in snapshot.get('books') or []:
+        prices = book.get('markets') or {}
+        if not book.get('bookmaker') or not all(
+                type(prices.get(k)) in (int, float) and math.isfinite(prices[k]) and prices[k] > 1
+                for k in ('home', 'draw', 'away')):
+            continue
+        if prices[market] >= 10:
+            return True
+    return False
+
+
 def choose(results, existing, now, day):
     """Fill vacant slots only; published choices and their probabilities never change."""
     picks = copy.deepcopy(existing)
@@ -110,7 +133,8 @@ def choose(results, existing, now, day):
         for r in results:
             if not upcoming(r['match'], now, day):
                 continue
-            options = candidates_for(r, group)
+            options = [option for option in candidates_for(r, group)
+                       if not extreme_outsider(r, option['market'], now)]
             if options:
                 pool.append((r, options[0]))
         pool.sort(key=lambda pair: (-pair[1]['probability'], pair[0]['match']['date'], pair[0]['match']['id']))
