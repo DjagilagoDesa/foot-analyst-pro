@@ -87,11 +87,11 @@
   const name=(l,k)=>k==='anytime_scorer'?(l.player?.name||'Buteur')+' · Marque au moins un but':k==='home'?'Victoire '+l.home_name:k==='away'?'Victoire '+l.away_name:labels[k]||k;
   function potential(){
    const amount=Number(form.elements.stake.value),ready=draft.length&&draft.every(l=>Number(l.odds)>1&&!l.loading),total=draft.reduce((v,l)=>v*Number(l.odds||0),1);
-   get('[data-potential]').textContent=ready?'Cote '+total.toFixed(2).replace('.',',')+' · Retour potentiel '+money(Math.round(amount*100*total)):'';
-   form.querySelector('.btn').disabled=!ready;
+   get('[data-potential]').textContent=ready?'Cote '+total.toFixed(2).replace('.',',')+' · Retour potentiel '+money(Math.round(amount*100*total)):draft.some(l=>l.loading)?'Recherche des cotes…':draft.length?'Renseigne les cotes manquantes pour enregistrer ton ticket.':'';
+   form.querySelector('.btn').disabled=!draft.length||draft.some(l=>l.loading);
   }
   function draw(){
-   chosen.innerHTML=draft.map((l,i)=>'<div class="bankroll-pick"><div class="bankroll-line">'+gameHeader(l,'data-draft-match="'+i+'"')+'<button type="button" class="day" data-remove="'+i+'" aria-label="Retirer '+esc(l.label)+'">×</button></div><select class="day" data-market="'+i+'" aria-label="Mon pari pour '+esc(l.label)+'">'+(l.market==='anytime_scorer'?['anytime_scorer']:Object.keys(labels)).map(k=>'<option value="'+k+'">'+esc(name(l,k))+'</option>').join('')+'</select><span data-quote>'+esc(l.loading?'Recherche de la cote…':l.odds?'Cote '+String(l.odds).replace('.',',')+(l.bookmaker?' · '+l.bookmaker:''):'Cote indisponible')+'</span>'+(!l.loading?'<details class="bankroll-adjust"><summary>'+(!l.odds?'Saisir ma cote':'Modifier la cote')+'</summary><input class="day" data-odds="'+i+'" aria-label="Cote réellement jouée" type="number" min="1.01" max="10000" step="0.01" value="'+esc(l.odds||'')+'"></details>':'')+'</div>').join('');
+   chosen.innerHTML=draft.map((l,i)=>'<div class="bankroll-pick"><div class="bankroll-line">'+gameHeader(l,'data-draft-match="'+i+'"')+'<button type="button" class="day" data-remove="'+i+'" aria-label="Retirer '+esc(l.label)+'">×</button></div><select class="day" data-market="'+i+'" aria-label="Mon pari pour '+esc(l.label)+'">'+(l.market==='anytime_scorer'?['anytime_scorer']:Object.keys(labels)).map(k=>'<option value="'+k+'">'+esc(name(l,k))+'</option>').join('')+'</select><span data-quote>'+esc(l.loading?'Recherche de la cote…':l.odds?'Cote '+String(l.odds).replace('.',',')+(l.bookmaker?' · '+l.bookmaker:''):'Cote indisponible')+'</span>'+(!l.loading?'<details class="bankroll-adjust" '+(!l.odds?'open':'')+'><summary>'+(!l.odds?'Saisir ma cote':'Modifier la cote')+'</summary><input class="day" data-odds="'+i+'" aria-label="Cote réellement jouée" type="number" min="1.01" max="10000" step="0.01" value="'+esc(l.odds||'')+'"></details>':'')+'</div>').join('');
    chosen.querySelectorAll('[data-draft-match]').forEach(button=>button.onclick=()=>openMatch(legMatch(draft[Number(button.dataset.draftMatch)]),'bankroll'));
    chosen.querySelectorAll('[data-market]').forEach(n=>{n.value=draft[Number(n.dataset.market)].market;n.onchange=()=>{const l=draft[Number(n.dataset.market)];l.market=n.value;l.odds='';requestKey=newKey();quote(l);};});
    chosen.querySelectorAll('[data-odds]').forEach(n=>n.oninput=()=>{const l=draft[Number(n.dataset.odds)];l.odds=n.value;l.automatic_odds=false;l.bookmaker='Cote saisie';n.closest('.bankroll-pick').querySelector('[data-quote]').textContent='Cote '+String(l.odds).replace('.',',')+' · Cote saisie';requestKey=newKey();potential();});
@@ -135,7 +135,8 @@
   const picker=get('[data-picker]');
   picker.ontoggle=()=>{if(id===generation&&picker.isConnected&&picker.open)renderFixtures();};
   form.elements.stake.oninput=()=>{draftStake=form.elements.stake.value;potential();};
-  form.onsubmit=async e=>{e.preventDefault();if(!draft.length||draft.some(l=>l.loading||!(Number(l.odds)>1))){feedback.textContent='Une cote manque sur ton ticket.';return;}
+  form.addEventListener('invalid',e=>{const details=e.target.closest('details');if(details)details.open=true;},true);
+  form.onsubmit=async e=>{e.preventDefault();if(!draft.length||draft.some(l=>l.loading||!(Number(l.odds)>1))){feedback.textContent='Renseigne la cote réellement jouée pour chaque pari avant d’enregistrer.';const missing=draft.findIndex(l=>!(Number(l.odds)>1));const input=chosen.querySelector('[data-odds="'+missing+'"]');if(input){input.closest('details').open=true;input.focus();input.scrollIntoView?.({behavior:'smooth',block:'center'});}return;}
    const expired=draft.filter(l=>l.automatic_odds&&Date.parse(l.expires_at)<=Date.now());
    if(expired.length){await Promise.all(expired.map(l=>quote(l)));feedback.textContent='Cotes actualisées. Vérifie puis enregistre ton ticket.';return;}
    const button=form.querySelector('.btn');button.disabled=true;
