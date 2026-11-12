@@ -8,7 +8,7 @@ Dans Analyse, choisir :
 - prudent (75 % minimum par choix), équilibré (60–80 %), offensif (45–65 %) ;
 - tous les marchés simples, double chance, buts, BTTS ou double chance + buts sur le même match.
 
-Le moteur ne force pas une sélection en dehors de la plage demandée. Il examine au maximum 16 rencontres en mode automatique, dans l’ordre horaire. Toutes les nouvelles analyses abouties utilisent les essais habituels ; le compte propriétaire conserve son accès gratuit. Les résultats déjà enregistrés sont réutilisés. Une composition incomplète n’est pas présentée comme un ticket terminé.
+Le moteur ne force pas une sélection en dehors de la plage demandée. Il examine au maximum 16 rencontres en mode automatique, en alternant les compétitions, puis les horaires au sein de chaque compétition. Toutes les nouvelles analyses abouties utilisent les essais habituels ; le compte propriétaire conserve son accès gratuit. Les résultats déjà enregistrés sont réutilisés. Une composition incomplète n’est pas présentée comme un ticket terminé.
 
 La cote affichée est théorique et la probabilité combinée suppose des matchs indépendants. Pour une double condition sur un match, la probabilité est calculée sur l’intersection des scores possibles. Les sélections sont envoyées au suivi pré-match existant ; une impossibilité d’enregistrement est signalée.
 
