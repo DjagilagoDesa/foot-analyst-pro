@@ -1,0 +1,24 @@
+const {JSDOM}=require('jsdom'),fs=require('fs'),assert=require('node:assert/strict');
+const source=fs.readFileSync('index.html','utf8');
+const dom=new JSDOM(source.replace(/<script[\s\S]*?<\/script>/g,''),{runScripts:'outside-only',url:'https://foot-analyst-pro.onrender.com'}),w=dom.window,d=w.document;
+const calls=[];
+const state={configured:true,initial_cents:10000,risk_bps:100,available_cents:10000,pending_cents:0,profit_cents:0,total_cents:10000,suggested_cents:100,daily_remaining_cents:500,bets:[]};
+w.fetch=async path=>{calls.push(path);return {ok:true,json:async()=>path.includes('/api/leagues')?{leagues:['fra.1','uefa.nations'],names:{'fra.1':'Ligue 1','uefa.nations':'UEFA Nations League'}}:path.includes('/api/bankroll')?state:{events:[]}};};
+w.AbortController=AbortController;w.scrollTo=()=>{};w.escapeHtml=s=>String(s).replace(/[&<>"']/g,'');
+w.Accounts={request:async()=>state};
+w.eval(source.match(/<script>([\s\S]*?)<\/script>/)[1]);
+w.eval(fs.readFileSync('organization.js','utf8'));w.eval(fs.readFileSync('bankroll.js','utf8'));
+const tick=()=>new Promise(r=>setTimeout(r,0));
+(async()=>{
+ await tick();const calendar=d.getElementById('calendarCompetition');
+ assert.equal(calendar.options.length,3);assert.equal(calendar.options[2].textContent,'Ligue des nations UEFA');
+ calendar.value='uefa.nations';calendar.dispatchEvent(new w.Event('change'));await tick();
+ assert(calls.some(p=>p.includes('/api/fixtures?')&&p.includes('league=uefa.nations')));
+ await w.Bankroll.load();await tick();
+ let picker=d.querySelector('[data-competition]');assert.equal(picker.options.length,3);
+ picker.value='fra.1';picker.dispatchEvent(new w.Event('change'));await tick();
+ assert(calls.some(p=>p.includes('/api/fixtures?')&&p.includes('league=fra.1')));
+ await w.Bankroll.load();await tick();assert.equal(d.querySelector('[data-competition]').value,'fra.1');
+ assert.equal(calls.filter(p=>p==='/api/leagues').length,1);
+ console.log('Competition selectors: named options, targeted calendar and bankroll requests, persistent choice OK');dom.window.close();
+})().catch(e=>{console.error(e);dom.window.close();process.exitCode=1;});

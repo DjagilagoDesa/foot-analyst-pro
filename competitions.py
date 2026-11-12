@@ -12,3 +12,24 @@ def national_group(league):
     for group in (MENS_NATIONAL_LEAGUES, WOMENS_NATIONAL_LEAGUES):
         if league in group: return group
     return ()
+
+
+def representative_fixtures(matches, limit):
+    """Spread bounded analysis across competitions, then across kickoff times."""
+    from collections import defaultdict
+    buckets = defaultdict(list)
+    for match in sorted(matches, key=lambda m: (m['date'], str(m['id']))):
+        buckets[match['league']].append(match)
+    groups = sorted(buckets, key=lambda code: (not bool(national_group(code)), code))
+    selected = []
+    depth = 0
+    while len(selected) < limit:
+        found = False
+        for code in groups:
+            rows = buckets[code]
+            if depth < len(rows):
+                selected.append(rows[depth]); found = True
+                if len(selected) == limit: break
+        if not found: break
+        depth += 1
+    return selected

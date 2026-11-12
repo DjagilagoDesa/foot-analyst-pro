@@ -42,3 +42,22 @@
   more.onclick=()=>{count+=size;target.dataset.listCount=String(count);rows.forEach((row,i)=>row.hidden=i>=count);more.hidden=count>=rows.length;};target.appendChild(more);
  }};
 })();
+
+/* Shared competition selector for calendar and manual tickets. */
+(()=>{
+ let catalogue;
+ const french={'uefa.nations':'Ligue des nations UEFA','uefa.w.nations':'Ligue des nations féminine UEFA','fifa.world':'Coupe du monde','fifa.wwc':'Coupe du monde féminine','uefa.champions':'Ligue des champions','uefa.wchampions':'Ligue des champions féminine','uefa.europa':'Ligue Europa','uefa.europa.conf':'Ligue Conférence','fra.1':'Ligue 1','fra.2':'Ligue 2','eng.1':'Premier League','esp.1':'Liga','ita.1':'Serie A','ger.1':'Bundesliga','fifa.friendly':'Matchs amicaux internationaux','fifa.friendly.w':'Matchs amicaux internationaux féminins','club.friendly':'Matchs amicaux de clubs','caf.nations':"Coupe d’Afrique des nations",'uefa.euro':'Euro','uefa.weuro':'Euro féminin'};
+ window.CompetitionPicker={async fill(select){
+  const value=select.value||'all';
+  try{
+   if(!catalogue)catalogue=api('/api/leagues').catch(e=>{catalogue=null;throw e;});
+   const data=await catalogue,fragment=document.createDocumentFragment();
+   const all=document.createElement('option');all.value='all';all.textContent='Toutes les compétitions';fragment.append(all);
+   const entries=(data.leagues||[]).map(code=>[code,french[code]||data.names?.[code]||code]).sort((a,b)=>a[1].localeCompare(b[1],'fr'));
+   for(const [code,name] of entries){const option=document.createElement('option');option.value=code;option.textContent=name;fragment.append(option);}
+   select.replaceChildren(fragment);select.value=entries.some(([code])=>code===value)?value:'all';
+  }catch{select.title='Liste des compétitions indisponible. Réessaie en ouvrant la liste.';}
+ }};
+ const select=document.getElementById('calendarCompetition');
+ if(select)window.CompetitionPicker.fill(select);
+})();

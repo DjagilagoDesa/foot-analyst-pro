@@ -9,9 +9,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from tracking import fixture_info
 
-MODEL = 'scorer-domestic-usage-v3'
-from competitions import WOMENS_LEAGUES
-MAX_FIXTURES = 12
+MODEL = 'scorer-international-usage-v4'
+from competitions import WOMENS_LEAGUES, national_group, representative_fixtures
+MAX_FIXTURES = 48
 
 
 def instant(value):
@@ -41,7 +41,7 @@ def verified(data,match,check_date=True):
     return info
 
 
-def form(data,team_id,now):
+def form(data,team_id,now,window_days=90):
     games=[]
     for block in data.get('lastFiveGames') or []:
         if str(block.get('team',{}).get('id'))!=team_id:continue
@@ -50,7 +50,7 @@ def form(data,team_id,now):
                 home,away=str(game['homeTeamId']),str(game['awayTeamId'])
                 age=(now-instant(game['gameDate'])).total_seconds()
                 hg,ag=number(game.get('homeTeamScore')),number(game.get('awayTeamScore'))
-                if team_id not in (home,away) or not 3*3600<=age<=90*86400 or game.get('gameResult') not in ('W','L','D'):continue
+                if team_id not in (home,away) or not 3*3600<=age<=window_days*86400 or game.get('gameResult') not in ('W','L','D'):continue
                 if hg is None or ag is None or not hg.is_integer() or not ag.is_integer():continue
                 games.append(dict(id=str(game['id']),date=game['gameDate'],scored=int(hg if home==team_id else ag),conceded=int(ag if home==team_id else hg),home_id=home,away_id=away))
             except (KeyError,ValueError,TypeError,AttributeError):continue
@@ -109,13 +109,39 @@ def domestic_evidence(server, data, match, team_ids, now):
     return enriched,failures
 
 
+def supplement_form(server, data, match, now):
+    history = getattr(server, 'expanded_history', None)
+    if not history: return data
+    window = 540 if national_group(match['league']) else 90
+    enriched = copy.deepcopy(data)
+    for side in ('home', 'away'):
+        team_id = str(match[side]['id'])
+        if len(form(enriched, team_id, now, window)) >= 3: continue
+        try:
+            games, _ = history(match['league'], team_id, limit=10, regulation_only=True)
+            rows = []
+            for game in games:
+                home, away = str(game['home_id']), str(game['away_id'])
+                hg, ag = game['home_goals'], game['away_goals']
+                if team_id not in (home, away): continue
+                own, other = (hg, ag) if home == team_id else (ag, hg)
+                rows.append(dict(id=game['id'], gameDate=game['date'], homeTeamId=home,
+                    awayTeamId=away, homeTeamScore=hg, awayTeamScore=ag,
+                    gameResult='W' if own > other else 'L' if own < other else 'D'))
+            enriched.setdefault('lastFiveGames', []).append(dict(team={'id':team_id}, events=rows))
+        except Exception:
+            continue
+    return enriched
+
+
 def candidates(data,match,now):
     info=verified(data,match)
     if info['state']!='pre' or info['completed'] or info['date']<=now or any(s in info['name'] for s in ('POSTPON','CANCEL','ABANDON','SUSPEND')):return []
     output=[]
     for side,other in [('home','away'),('away','home')]:
         team,opponent=match[side],match[other];team_id=str(team['id'])
-        own_games,other_games=form(data,team_id,now),form(data,str(opponent['id']),now)
+        window=540 if national_group(match['league']) else 90
+        own_games,other_games=form(data,team_id,now,window),form(data,str(opponent['id']),now,window)
         if min(len(own_games),len(other_games))<3:continue
         own_avg=sum(g['scored'] for g in own_games)/len(own_games)
         conceded=sum(g['conceded'] for g in other_games)
@@ -234,9 +260,10 @@ def enrich_recent(server, pool, now):
 def select(server,matches,now,day):
     from daily_opinion import upcoming
     eligible=sorted((m for m in matches if upcoming(m,now,day)),key=lambda m:(m['date'],str(m['id'])))
-    if len(eligible)>MAX_FIXTURES:eligible=[eligible[round(i*(len(eligible)-1)/(MAX_FIXTURES-1))] for i in range(MAX_FIXTURES)]
+    eligible=representative_fixtures(eligible,MAX_FIXTURES)
     def load(match):
         data=server.fetch(f"{server.ESPN}/{match['league']}/summary",{'event':match['id']},ttl=300)
+        data=supplement_form(server,data,match,now)
         picks=candidates(data,match,now)
         represented={p['player']['team_id'] for p in picks}
         missing=[str(match[side]['id']) for side in ('home','away') if str(match[side]['id']) not in represented]

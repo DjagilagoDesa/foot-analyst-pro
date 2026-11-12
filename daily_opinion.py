@@ -19,8 +19,8 @@ from venue_test import build as build_venue, freeze as freeze_venue, report as v
 
 PARIS = ZoneInfo('Europe/Paris')
 INTERVAL = 900
-SELECTION_REVISION = 'daily-extreme-outsider-check-v3'
-LIMIT = 24
+SELECTION_REVISION = 'daily-all-competitions-v4'
+LIMIT = 120
 SCHEMA = DAILY_OPINION_SCHEMA
 GROUPS = [('prudent', 3, 'Mes 3 choix prudents'),
           ('challenge', 2, 'Mes 2 choix plus difficiles'),
@@ -283,9 +283,8 @@ class DailyOpinion:
             results = []
             eligible = [m for m in matches if upcoming(m, now, day)]
             # Sample across kick-off times rather than only the first games of the day.
-            eligible.sort(key=lambda m: (m['date'], m['id']))
-            if len(eligible) > LIMIT:
-                eligible = [eligible[round(i * (len(eligible) - 1) / (LIMIT - 1))] for i in range(LIMIT)]
+            from competitions import representative_fixtures
+            eligible = representative_fixtures(eligible, LIMIT)
             if len(existing) < 6:
                 with ThreadPoolExecutor(max_workers=4) as pool:
                     jobs = [pool.submit(self.analyze, m) for m in eligible
@@ -481,7 +480,7 @@ def init_app(app, server):
             performance=service.performance(day),scorer_performance=service.scorer_performance(day),
             refresh_seconds=30 if status == 'preparing' else 120,
             method='Modèle statistique Poisson, Au moins 10 matchs terminés par équipe, recherche élargie aux championnats pour les coupes. Pas de cotes bookmaker, compositions ou absences vérifiées. Probabilités non calibrées.',
-            scope=f'Compétitions couvertes : {len(server.LEAGUES)}. Au maximum {LIMIT} rencontres étudiées, réparties sur la journée. Ce n’est pas une sélection exhaustive du football mondial.',
+            scope=f'Compétitions couvertes : {len(server.LEAGUES)}. Au maximum {LIMIT} rencontres étudiées, réparties entre les compétitions et les horaires. Ce n’est pas une sélection exhaustive du football mondial.',
             update_note='Nouvelle journée à minuit, heure de Paris. Vérification environ toutes les 15 minutes lorsque le serveur est actif ; reprise à son réveil. Les choix publiés restent figés, les places manquantes peuvent être complétées avant le coup d’envoi.')
         response.headers['Cache-Control'] = 'no-store'
         return response
