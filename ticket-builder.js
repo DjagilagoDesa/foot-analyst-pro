@@ -6,6 +6,15 @@ function builderSelection(markets,risk,type,odds){
  const choices=(types[type]||types.all).filter(k=>Number.isFinite(values[k])&&values[k]>=min&&values[k]<=max&&values[k]<100).map(market=>({market,probability:values[market]}));
  return (window.OddsTicket?.rank(choices,odds)||choices.sort((a,b)=>b.probability-a.probability))[0]||null;
 }
+function builderCandidates(matches,limit=16){
+ const groups=new Map();
+ for(const match of matches){const key=match.league||'';if(!groups.has(key))groups.set(key,[]);groups.get(key).push(match);}
+ const result=[];
+ for(let depth=0;result.length<Math.min(limit,matches.length);depth++){
+  for(const rows of groups.values()){if(rows[depth])result.push(rows[depth]);if(result.length===limit)break;}
+ }
+ return result;
+}
 (()=>{
  const get=id=>document.getElementById(id),esc=escapeHtml;
  let busy=false,generation=0;
@@ -24,7 +33,7 @@ function builderSelection(markets,risk,type,odds){
   try{
    let matches=personal?(window.PersonalTicket?.getMatches()||[]):[],count=personal?matches.length:Number(get('builderCount').value),available=0,feedPartial=false;
    if(count<2||count>8){target.innerHTML=message('Sélectionne de 2 à 8 matchs dans ton ticket personnalisé avant de composer.',true);return;}
-   if(!personal){target.innerHTML=message('Recherche des rencontres à venir…');const feed=await api('/api/fixtures?date='+encodeURIComponent(get('builderDate').value),45000);feedPartial=!!feed.partial;matches=(feed.events||[]).filter(upcoming).sort((a,b)=>a.date.localeCompare(b.date));available=matches.length;matches=matches.slice(0,16);}
+   if(!personal){target.innerHTML=message('Recherche des rencontres à venir…');const feed=await api('/api/fixtures?date='+encodeURIComponent(get('builderDate').value),45000);feedPartial=!!feed.partial;matches=(feed.events||[]).filter(upcoming).sort((a,b)=>a.date.localeCompare(b.date));available=matches.length;matches=builderCandidates(matches);}
    if(matches.length<count){target.innerHTML=message('Calendrier du '+get('builderDate').value.split('-').reverse().join('/')+' : '+matches.length+' rencontre(s) à venir retrouvée(s)'+(feedPartial?' (calendrier partiel)':'')+'. Il en faut '+count+' pour ce ticket.',true);return;}
    await window.Accounts.refresh(false);
    const teams=new Set(),events=new Set();
@@ -45,7 +54,7 @@ function builderSelection(markets,risk,type,odds){
     if(!choice){skipped.push(name+' : aucun pari ne respecte le profil et le type choisis');continue;}
     results.push({match,analysis:d,...choice});teams.add(String(match.home.id));teams.add(String(match.away.id));
    }
-   if(results.length!==count){target.innerHTML=message('Je ne peux pas proposer les '+count+' matchs demandés avec ces critères. '+results.length+' sélection(s) admissible(s) trouvée(s). Aucun ticket incomplet présenté comme terminé.',true)+skipped.map(s=>message(s)).join('')+message('Les analyses terminées sont conservées dans ton historique. Essaie un autre profil, davantage de types de paris ou moins de matchs.');return;}
+   if(results.length!==count){target.innerHTML=message('Je ne peux pas proposer les '+count+' matchs demandés avec ces critères. '+results.length+' sélection(s) admissible(s) trouvée(s) sur '+matches.length+' rencontre(s) examinée(s)'+(!personal&&available>matches.length?' parmi '+available+' disponibles':'')+'.',true)+'<details><summary>Pourquoi ces matchs ont été écartés</summary>'+skipped.map(s=>message(s)).join('')+'</details>'+message('Les analyses terminées sont conservées dans ton historique. Essaie un autre profil, davantage de types de paris ou moins de matchs.');return;}
    target.innerHTML=message('Vérification des matchs…');
    await ticketVerifyFixtures(results);
    if(run!==generation)return;
