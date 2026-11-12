@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from tracking import fixture_info
 
 VERSION = 2
-SUPPORTED_LEAGUES = ('eng.1','esp.1','ita.1','ger.1','fra.1','bra.1','por.1','ned.1','usa.1','arg.1','mex.1','uefa.champions','uefa.europa','eng.2','eng.3','eng.4','eng.fa','eng.league_cup','eng.trophy','eng.w.1','esp.w.1','fra.w.1','usa.nwsl','uefa.wchampions')
+from competitions import LEAGUES as SUPPORTED_LEAGUES
 REFRESH_SECONDS = 300
 MAX_REPORT_AGE_DAYS = 7
 

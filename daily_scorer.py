@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from tracking import fixture_info
 
 MODEL = 'scorer-domestic-usage-v3'
-WOMENS_LEAGUES = ('eng.w.1','esp.w.1','fra.w.1','usa.nwsl','uefa.wchampions')
+from competitions import WOMENS_LEAGUES
 MAX_FIXTURES = 12
 
 

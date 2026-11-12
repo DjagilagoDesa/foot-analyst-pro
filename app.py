@@ -21,9 +21,7 @@ SESSION.headers.update({'User-Agent': 'FootAnalystPro/22 (football statistics)'}
 CACHE = {}
 LOCK = threading.Lock()
 ESPN = 'https://site.api.espn.com/apis/site/v2/sports/soccer'
-WOMENS_LEAGUES = ('eng.w.1','esp.w.1','fra.w.1','usa.nwsl','uefa.wchampions')
-LEAGUES = ['eng.1','esp.1','ita.1','ger.1','fra.1','bra.1','por.1','ned.1','usa.1','arg.1','mex.1','uefa.champions','uefa.europa',
-           'eng.2','eng.3','eng.4','eng.fa','eng.league_cup','eng.trophy', *WOMENS_LEAGUES]
+from competitions import LEAGUES, WOMENS_LEAGUES, COMPETITION_NAMES, national_group
 
 def fetch(url, params=None, ttl=900):
     key = (url, tuple(sorted((params or {}).items())))
@@ -104,7 +102,7 @@ def expanded_history(league, team_id, limit=10, regulation_only=True):
     from adaptive_history import combine
     primary, errors = history(league, team_id, limit=limit, regulation_only=regulation_only)
     domestic = (('eng.1','eng.2','eng.3','eng.4') if league in ('eng.fa','eng.league_cup','eng.trophy') else
-                ('eng.w.1','esp.w.1','fra.w.1','usa.nwsl') if league=='uefa.wchampions' else ())
+                ('eng.w.1','esp.w.1','fra.w.1','usa.nwsl') if league=='uefa.wchampions' else tuple(code for code in national_group(league) if code != league))
     if not domestic or len(primary)>=limit:
         return primary, errors
     def member(code):
@@ -214,7 +212,7 @@ def frontend_icon():
 def healthcheck(): return jsonify({'status':'ok','version':'54','champions_context_version':1,'personnel_context_version':2,'adaptive_analysis_version':1,'sources':['ESPN (unofficial)'],'note':'Coverage varies by league; no guaranteed predictions'})
 
 @app.get('/api/leagues')
-def leagues(): return jsonify({'leagues':LEAGUES})
+def leagues(): return jsonify({'leagues':LEAGUES, 'names':COMPETITION_NAMES})
 
 @app.get('/api/teams')
 def teams():
@@ -256,7 +254,7 @@ def search_teams():
                         output.append({'id':team.get('id'),'name':name,'badge':logos[0].get('href') if logos else None,'league':league,'women':league in WOMENS_LEAGUES})
         return output
     found=[];errors=0
-    with ThreadPoolExecutor(max_workers=len(LEAGUES)) as pool:
+    with ThreadPoolExecutor(max_workers=min(20,len(LEAGUES))) as pool:
         futures=[pool.submit(one_league,lg) for lg in LEAGUES]
         for f in as_completed(futures):
             try: found.extend(f.result())
@@ -475,7 +473,7 @@ def fixtures():
             observed=datetime.fromtimestamp(cached[0] if cached else started,timezone.utc).isoformat()
         return [x for e in data.get('events') or [] if (x:=_fixture(e,lg,observed))]
     found=[];failed=[]
-    with ThreadPoolExecutor(max_workers=len(leagues_to_check)) as pool:
+    with ThreadPoolExecutor(max_workers=min(20,len(leagues_to_check))) as pool:
         futures={pool.submit(load,lg):lg for lg in leagues_to_check}
         for future in as_completed(futures):
             try:found.extend(future.result())
@@ -543,7 +541,7 @@ def team_next():
     with ThreadPoolExecutor(max_workers=20) as pool:
         for season in (now.year-1,now.year,now.year+1):
             jobs.append((pool.submit(fetch,f'{ESPN}/{lg}/teams/{team}/schedule',{'season':season},120),lg,'schedule_'+str(season)))
-        priority={lg,'uefa.wchampions'} if lg in WOMENS_LEAGUES else {lg,'uefa.champions','uefa.europa'}
+        priority=set(national_group(lg)) or ({lg,'uefa.wchampions'} if lg in WOMENS_LEAGUES else {lg,'uefa.champions','uefa.europa'})
         for league in LEAGUES:
             for offset in range(8 if league in priority else 1):
                 day=(now+timedelta(days=offset)).strftime('%Y%m%d')

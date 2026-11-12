@@ -351,7 +351,7 @@ class DailyOpinion:
             cached=getattr(self.server,'CACHE',{}).get((url,tuple(sorted(params.items()))))
             observed=datetime.fromtimestamp(cached[0] if cached else started,timezone.utc).isoformat()
             return [self.server._fixture(e, league, observed) for e in data.get('events', [])]
-        with ThreadPoolExecutor(max_workers=8) as pool:
+        with ThreadPoolExecutor(max_workers=20) as pool:
             jobs = [pool.submit(load, league, date) for league in self.server.LEAGUES for date in utc_days]
             for job in as_completed(jobs):
                 try:
