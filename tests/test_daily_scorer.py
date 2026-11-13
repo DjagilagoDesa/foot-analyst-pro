@@ -264,10 +264,10 @@ class MatchScorerChoices(unittest.TestCase):
   self.assertEqual(result['status'],'partial')
   self.assertEqual([p['player']['id'] for p in result['teams'][0]['choices']],['11'])
  def test_started_and_wrong_fixture_have_no_choices(self):
-  for mode in ('started','mismatch'):
+  for mode in ('completed','mismatch'):
    analysis,data,server=self.setup_match()
    comp=data['header']['competitions'][0]
-   if mode=='started':comp['status']['type']['state']='in'
+   if mode=='completed':comp['status']['type'].update(state='post',completed=True)
    else:comp['id']='9999'
    result=scorer.match_choices(server,analysis,now=NOW)
    self.assertTrue(all(not t['choices'] for t in result['teams']))
@@ -277,3 +277,18 @@ class MatchScorerChoices(unittest.TestCase):
   server.fetch=failed
   result=scorer.match_choices(server,analysis,now=NOW)
   self.assertEqual(result['status'],'unavailable')
+
+ def test_live_match_returns_two_choices_per_team(self):
+  analysis,data,server=self.setup_match()
+  data['header']['competitions'][0]['status']['type']['state']='in'
+  result=scorer.match_choices(server,analysis,now=NOW)
+  self.assertTrue(result['live'])
+  self.assertEqual(result['status'],'ok')
+  self.assertEqual([len(t['choices']) for t in result['teams']],[2,2])
+ def test_live_substituted_and_sent_off_players_are_excluded(self):
+  for field in ('subbedOut','sentOff'):
+   analysis,data,server=self.setup_match()
+   data['header']['competitions'][0]['status']['type']['state']='in'
+   data['rosters'][0]['roster'][0][field]=True
+   result=scorer.match_choices(server,analysis,now=NOW)
+   self.assertNotIn('11',[p['player']['id'] for p in result['teams'][0]['choices']])
