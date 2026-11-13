@@ -306,3 +306,63 @@ def settle(server,pick,now):
     if apps==0 and goals in (None,0):pick.update(status='void',settlement_reason='did_not_play');return
     if apps!=1 or goals is None or not goals.is_integer():return
     pick.update(status='won' if goals>0 else 'lost',goals_scored=int(goals),settled_at=now.isoformat())
+
+
+def match_choices(server, analysis, histories=None, now=None):
+    """Two distinct, eligible scorers per team for a single upcoming fixture."""
+    now = now or datetime.now(timezone.utc)
+    output = {'teams': [], 'observed_at': now.isoformat(), 'model_version': MODEL}
+    for side in ('home', 'away'):
+        output['teams'].append(dict(team_id=str(analysis.get(side+'_id', '')),
+            team_name=analysis.get(side+'_name') or side, choices=[]))
+    event_id = str(analysis.get('event_id', ''))
+    if not event_id.isdigit():
+        output['status'] = 'unavailable'
+        return output
+    try:
+        data = server.fetch(f"{server.ESPN}/{analysis['league']}/summary", {'event': event_id}, ttl=300)
+        info = fixture_info(data)
+        match = dict(id=event_id, league=analysis['league'], date=info['date'].isoformat(),
+            home=dict(id=analysis['home_id'], name=analysis['home_name']),
+            away=dict(id=analysis['away_id'], name=analysis['away_name']))
+        verified(data, match)
+        if info['state'] != 'pre' or info['completed'] or info['date'] <= now:
+            output['status'] = 'closed'
+            return output
+        data = copy.deepcopy(data)
+        # Reuse the histories already fetched by the analysis, without more requests.
+        for side in ('home', 'away'):
+            team_id = str(analysis[side+'_id'])
+            rows = []
+            for game in (histories or {}).get(side, []):
+                home, away = str(game['home_id']), str(game['away_id'])
+                if team_id not in (home, away): continue
+                hg, ag = game['home_goals'], game['away_goals']
+                own, other = (hg, ag) if team_id == home else (ag, hg)
+                rows.append(dict(id=game['id'], gameDate=game['date'], homeTeamId=home,
+                    awayTeamId=away, homeTeamScore=hg, awayTeamScore=ag,
+                    gameResult='W' if own > other else 'L' if own < other else 'D'))
+            if rows: data.setdefault('lastFiveGames', []).append(dict(team={'id': team_id}, events=rows))
+        pool = candidates(data, match, now)
+        missing = [t['team_id'] for t in output['teams']
+            if len({p['player']['id'] for p in pool if p['player']['team_id'] == t['team_id']}) < 2]
+        if missing:
+            data, _ = domestic_evidence(server, data, match, missing, now)
+            pool = candidates(data, match, now)
+        pool.sort(key=lambda p: (-p['ranking'], p['player']['id']))
+        for team in output['teams']:
+            seen = set()
+            for pick in pool:
+                player = pick['player']
+                if player['team_id'] != team['team_id'] or player['id'] in seen: continue
+                seen.add(player['id'])
+                basis = pick['basis']
+                team['choices'].append(dict(rank=len(team['choices'])+1, player=player,
+                    rationale=f"{basis['goals']} buts en {basis['appearances']} apparitions. "
+                        + ('Titulaire annoncé.' if pick['availability'] == 'reported_starter' else 'Titularisation à confirmer.'),
+                    availability=pick['availability'], basis=basis))
+                if len(team['choices']) == 2: break
+        output['status'] = 'ok' if all(len(t['choices']) == 2 for t in output['teams']) else 'partial'
+    except Exception:
+        output['status'] = 'unavailable'
+    return output
