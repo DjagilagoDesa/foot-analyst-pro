@@ -365,7 +365,7 @@ def analyze():
     if result.get('status') == 'ok':
         from match_availability import collect as collect_personnel, apply_context
         apply_context(result, collect_personnel(sys.modules[__name__], league, home, away, result['event_id']))
-    if result.get('status') == 'ok':
+    if result.get('status') in ('ok','insufficient_data'):
         from daily_scorer import match_choices
         result['scorer_choices'] = match_choices(sys.modules[__name__], result, histories={'home':hm,'away':am})
     if result.get('status')=='ok':result['report']=build_report(result, histories={'home':hm,'away':am})

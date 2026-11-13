@@ -74,3 +74,49 @@ class Tracking(unittest.TestCase):
   self.assertEqual((personal['won'],personal['lost'],personal['success_pct']),(1,0,100))
   self.assertEqual((editorial['won'],editorial['lost'],editorial['success_pct']),(0,1,0))
 if __name__=='__main__':unittest.main()
+
+
+class ScorerTracking(Tracking):
+ def add_scorer(self):
+  with self.app.app_context(),accounts.database() as db:
+   row=db.execute("SELECT result FROM account_analyses WHERE id='a'").fetchone();result=json.loads(row['result'])
+   result['scorer_choices']={'teams':[{'choices':[{'player':{'id':'11','name':'Real Forward','team_id':'1'}}]}]}
+   db.execute("UPDATE account_analyses SET result=? WHERE id='a'",(json.dumps(result),))
+  self.info['header']['id']='123'
+  self.info['rosters']=[dict(team={'id':'1'},roster=[dict(athlete={'id':'11','displayName':'Real Forward'},stats=[dict(name='appearances',value=1),dict(name='totalGoals',value=1)])])]
+ def test_scorer_record_and_verified_goal_settlement(self):
+  self.add_scorer()
+  self.assertEqual(self.post('scorer:11').status_code,200)
+  self.assertEqual(self.post('scorer:999').status_code,400)
+  self.finish();d=self.client.get('/api/tracking/performance').json
+  self.assertEqual(d['won'],1)
+  self.assertIsNone(d['recent'][0]['probability'])
+  self.assertIn('Real Forward',d['recent'][0]['label'])
+ def test_team_win_does_not_make_scorer_win(self):
+  self.add_scorer();self.post('scorer:11')
+  self.info['rosters'][0]['roster'][0]['stats'][1]['value']=0
+  self.finish();d=self.client.get('/api/tracking/performance').json
+  self.assertEqual((d['won'],d['lost']),(0,1))
+ def test_scorer_without_player_stats_remains_pending(self):
+  self.add_scorer();self.post('scorer:11');self.info['rosters'][0]['roster'][0]['stats']=[]
+  self.finish();d=self.client.get('/api/tracking/performance').json
+  self.assertEqual(d['pending'],1)
+ def test_scorer_did_not_play_is_void(self):
+  self.add_scorer();self.post('scorer:11')
+  for stat in self.info['rosters'][0]['roster'][0]['stats']:stat['value']=0
+  self.finish();d=self.client.get('/api/tracking/performance').json
+  self.assertEqual(d['void'],1)
+
+ def test_scorer_ticket_is_archived_with_name(self):
+  self.add_scorer()
+  with self.app.app_context(),accounts.database() as db:
+   result=json.loads(db.execute("SELECT result FROM account_analyses WHERE id='a'").fetchone()['result'])
+   result['event_id']='456'
+   db.execute('INSERT INTO account_analyses VALUES(?,?,?,?,?,?,?,?)',('b','u','second','A-B','complete',0,1,json.dumps(result)))
+  self.assertEqual(self.post('scorer:11').status_code,200)
+  self.assertEqual(self.post('scorer:11','b').status_code,200)
+  response=self.client.post('/api/tracking/tickets',json={'title':'Ticket Buteurs','selections':[{'analysis_id':'a','market':'scorer:11'},{'analysis_id':'b','market':'scorer:11'}]},headers={'X-App-Request':'1'})
+  self.assertEqual(response.status_code,200)
+  ticket=self.client.get('/api/tracking/tickets').json['tickets'][0]
+  self.assertEqual(ticket['title'],'Ticket Buteurs')
+  self.assertTrue(all('Real Forward' in p['label'] and p['probability'] is None for p in ticket['selections']))

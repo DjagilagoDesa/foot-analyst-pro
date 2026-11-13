@@ -542,7 +542,7 @@ def metered_analysis(func):
                 scorer_stale = (datetime.now(timezone.utc)-datetime.fromisoformat(scorer_data.get('observed_at',''))).total_seconds() >= 60
             except (ValueError, TypeError):
                 scorer_stale = True
-            if cached.get('league') and cached.get('status') == 'ok' and (scorer_stale or scorer_data.get('status') == 'closed' and not scorer_data.get('live_supported')):
+            if cached.get('league') and cached.get('status') == 'ok' and (scorer_stale or scorer_data.get('selection_version',0) < 2):
                 import app as server
                 from daily_scorer import match_choices
                 cached['scorer_choices'] = match_choices(server, cached)

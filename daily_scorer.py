@@ -313,10 +313,73 @@ def settle(server,pick,now):
     pick.update(status='won' if goals>0 else 'lost',goals_scored=int(goals),settled_at=now.isoformat())
 
 
+def roster_alternatives(server, data, match, team_id, now):
+    """Rank real squad members when season totals or team form are missing."""
+    rows = list(roster(data, team_id))
+    if not rows:
+        for block in data.get('leaders') or []:
+            if str((block.get('team') or {}).get('id')) != team_id: continue
+            for category in block.get('leaders') or []:
+                if category.get('name') == 'goalsLeaders':
+                    rows.extend(dict(athlete=lead.get('athlete') or {}) for lead in category.get('leaders') or [])
+    def eligible(row):
+        athlete = row.get('athlete') or {}
+        pid = str(athlete.get('id', ''))
+        name = athlete.get('displayName') or athlete.get('fullName')
+        position = row.get('position') or athlete.get('position') or {}
+        role = str(position.get('abbreviation') or position.get('name') or '').upper()
+        values = stats(row.get('stats'))
+        if not pid.isdigit() or not isinstance(name, str) or not name.strip(): return None
+        if role in ('GK', 'G', 'GOALKEEPER') or row.get('active') is False: return None
+        if row.get('subbedOut') is True or row.get('sentOff') is True or (values.get('redCards') or 0)>0: return None
+        if availability(data, team_id, pid) == 'unavailable': return None
+        state = athlete.get('status') or {}
+        if str(state.get('type','active')).lower() in ('inactive','out','injured','suspended','doubtful','questionable'): return None
+        offensive = role in ('F','FW','ST','CF','LW','RW','FORWARD','STRIKER')
+        midfield = role in ('M','MF','AM','CM','LM','RM','DM','AMF','MIDFIELDER')
+        goals = None
+        for block in data.get('leaders') or []:
+            if str((block.get('team') or {}).get('id')) != team_id: continue
+            for category in block.get('leaders') or []:
+                if category.get('name') != 'goalsLeaders': continue
+                for lead in category.get('leaders') or []:
+                    if str((lead.get('athlete') or {}).get('id')) == pid:
+                        observed = stats(lead.get('statistics'))
+                        if observed.get('totalGoals') is not None: goals = observed['totalGoals']
+        playing = row.get('starter') is True or row.get('subbedIn') is True
+        bench = row.get('starter') is False and row.get('subbedIn') is not True
+        # Prefer the actual lineup, then offensive role and observed scoring output.
+        score = (100 if playing else -100 if bench else 0) + (30 if offensive else 15 if midfield else 0) + min(goals or 0,25)
+        reason = ('Profil offensif' if offensive else 'Profil de milieu' if midfield else 'Choix dans l’effectif disponible')
+        reason += (' ; '+str(int(goals))+' buts recensés' if goals is not None else ' ; statistiques de buts incomplètes')
+        reason += '. '+('Entrée en jeu nécessaire.' if bench else 'Temps de jeu restant à vérifier.' if match.get('live') else 'Titularisation à confirmer.' if not playing else 'Titulaire annoncé.')
+        return dict(player=dict(id=pid,name=name.strip(),team_id=team_id), rationale=reason,
+            availability='bench' if bench else 'reported_starter' if playing else 'unconfirmed',
+            basis={'selection_method':'squad_role','position':role,'goals':goals}, _score=score)
+    # Fetch the team's actual squad only when the fixture roster cannot fill two slots.
+    if sum(eligible(row) is not None for row in rows) < 2:
+        try:
+            squad = server.fetch(f"{server.ESPN}/{match['league']}/teams/{team_id}/roster", ttl=300)
+            if str((squad.get('team') or {}).get('id')) == team_id:
+                season = squad.get('season') or {}
+                if not season.get('year') or season['year'] in (now.year, now.year-1):
+                    for athlete in squad.get('athletes') or []:
+                        for member in athlete.get('items', [athlete]):
+                            # A published match lineup takes precedence over the general squad.
+                            if not any(str((r.get('athlete') or {}).get('id')) == str(member.get('id')) for r in rows):
+                                rows.append(dict(athlete=member))
+        except Exception:
+            pass
+    choices = [choice for row in rows if (choice := eligible(row)) is not None]
+    choices.sort(key=lambda p:(-p['_score'],p['player']['id']))
+    for choice in choices: choice.pop('_score')
+    return choices
+
+
 def match_choices(server, analysis, histories=None, now=None):
     """Two distinct, eligible scorers per team for a single upcoming fixture."""
     now = now or datetime.now(timezone.utc)
-    output = {'teams': [], 'observed_at': now.isoformat(), 'model_version': MODEL, 'live_supported': True}
+    output = {'teams': [], 'observed_at': now.isoformat(), 'model_version': MODEL, 'live_supported': True, 'selection_version': 2}
     for side in ('home', 'away'):
         output['teams'].append(dict(team_id=str(analysis.get(side+'_id', '')),
             team_name=analysis.get(side+'_name') or side, choices=[]))
@@ -331,6 +394,9 @@ def match_choices(server, analysis, histories=None, now=None):
             home=dict(id=analysis['home_id'], name=analysis['home_name']),
             away=dict(id=analysis['away_id'], name=analysis['away_name']))
         verified(data, match)
+        for side,team in zip(('home','away'),output['teams']):
+            name=info[side].get('team',{}).get('displayName')
+            if name:team['team_name']=name;match[side]['name']=name
         if info['state'] not in ('pre', 'in') or info['completed'] or (info['state'] == 'pre' and info['date'] <= now):
             output['status'] = 'closed'
             return output
@@ -367,6 +433,18 @@ def match_choices(server, analysis, histories=None, now=None):
                     rationale=f"{basis['goals']} buts en {basis['appearances']} apparitions. "
                         + (('Match en cours : temps de jeu restant à vérifier.') if output['live'] else ('Titulaire annoncé.' if pick['availability'] == 'reported_starter' else 'Titularisation à confirmer.')),
                     availability=pick['availability'], basis=basis))
+                if len(team['choices']) == 2: break
+        match['live'] = output['live']
+        for team in output['teams']:
+            if len(team['choices']) >= 2: continue
+            seen = {p['player']['id'] for p in team['choices']}
+            for choice in roster_alternatives(server, data, match, team['team_id'], now):
+                if choice['player']['id'] in seen: continue
+                if choice['player']['name'].casefold() == team['team_name'].casefold(): continue
+                seen.add(choice['player']['id'])
+                choice['player']['team_name'] = team['team_name']
+                choice['rank'] = len(team['choices'])+1
+                team['choices'].append(choice)
                 if len(team['choices']) == 2: break
         output['status'] = 'ok' if all(len(t['choices']) == 2 for t in output['teams']) else 'partial'
     except Exception:

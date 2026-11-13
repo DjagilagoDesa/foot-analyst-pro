@@ -13,6 +13,19 @@ MARKETS={'home','away','draw','home_or_draw','away_or_draw','over_1_5','over_2_5
 
 MARKETS.update(side+'_and_'+goal for side in ('home_or_draw','away_or_draw') for goal in ('btts','btts_no','over_1_5','over_2_5','under_1_5','under_2_5'))
 
+def scorer_id(market):
+    return market.split(':',1)[1] if isinstance(market,str) and market.startswith('scorer:') and market.split(':',1)[1].isdigit() else None
+
+
+def valid_market(market):
+    return isinstance(market,str) and (market in MARKETS or scorer_id(market) is not None)
+
+
+def stored_scorer(result, market):
+    pid=scorer_id(market)
+    return next((p['player'] for team in (result.get('scorer_choices') or {}).get('teams',[]) for p in team.get('choices',[]) if str(p.get('player',{}).get('id'))==pid),None)
+
+
 def resolve(market,home,away):
     outcomes={'home':home>away,'away':away>home,'draw':home==away,
             'home_or_draw':home>=away,'away_or_draw':away>=home,
@@ -59,12 +72,16 @@ def init_app(app, fetch, base, leagues):
     def record():
         write_guard();user=current_user(csrf=True);rate_limit('tracking-write',60,900,user['id'])
         data=body();analysis_id=str(data.get('analysis_id',''));market=data.get('market')
-        if market not in MARKETS or not analysis_id:raise AccountError('Sélection non valide.')
+        if not valid_market(market) or not analysis_id:raise AccountError('Sélection non valide.')
         with database() as db:
             row=db.execute("SELECT result,created_at FROM account_analyses WHERE id=? AND user_id=? AND status='complete'",(analysis_id,user['id'])).fetchone()
         if not row:raise AccountError('Analyse enregistrée introuvable.',404)
         result=json.loads(row['result']);event=str(result.get('event_id',''));league=result.get('league')
         probability=(result.get('prediction') or {}).get('markets',{}).get(market)
+        player=stored_scorer(result,market)
+        if scorer_id(market):
+            if not player:raise AccountError('Buteur absent de cette analyse.',400)
+            probability=-1  # No calibrated player probability; never shown as a percentage.
         complements={'under_1_5':'over_1_5','under_2_5':'over_2_5','btts_no':'btts'}
         if probability is None and market in complements:
             opposite=(result.get('prediction') or {}).get('markets',{}).get(complements[market])
@@ -87,7 +104,7 @@ def init_app(app, fetch, base, leagues):
         with database() as db:
             db.execute('''INSERT INTO account_predictions(user_id,event_id,league,market,probability,label,home_id,away_id,starts_at,created_at,status)
               VALUES(?,?,?,?,?,?,?,?,?,?,'pending') ON CONFLICT(user_id,event_id,market) DO NOTHING''',
-              (user['id'],event,league,market,probability,result.get('home_name','Domicile')+' – '+result.get('away_name','Extérieur'),info['home_id'],info['away_id'],int(info['date'].timestamp()),now))
+              (user['id'],event,league,market,probability,result.get('home_name','Domicile')+' – '+result.get('away_name','Extérieur')+(' · '+player['name']+' buteur' if player else ''),info['home_id'],info['away_id'],int(info['date'].timestamp()),now))
         return jsonify(status='recorded')
 
     @bp.post('/api/tracking/tickets')
@@ -100,7 +117,7 @@ def init_app(app, fetch, base, leagues):
             raise AccountError('Un ticket doit contenir de 2 à 10 matchs.')
         normalized=[]
         for pick in picks:
-            if not isinstance(pick,dict) or not isinstance(pick.get('market'),str) or pick['market'] not in MARKETS or not isinstance(pick.get('analysis_id'),str):
+            if not isinstance(pick,dict) or not isinstance(pick.get('market'),str) or not valid_market(pick['market']) or not isinstance(pick.get('analysis_id'),str):
                 raise AccountError('Sélection non valide.')
             normalized.append((pick['analysis_id'],pick['market']))
         now=int(time.time())
@@ -151,6 +168,9 @@ def init_app(app, fetch, base, leagues):
                 ticket['selections']=[dict(r) for r in db.execute('''SELECT p.event_id,p.league,p.home_id,p.away_id,p.label,p.market,p.probability,p.status,p.home_score,p.away_score,p.starts_at
                   FROM account_ticket_legs l JOIN account_predictions p ON p.event_id=l.event_id AND p.market=l.market AND p.user_id=?
                   WHERE l.ticket_id=? ORDER BY l.position''',(user['id'],ticket['id'])).fetchall()]
+        for ticket in result:
+            for pick in ticket['selections']:
+                if scorer_id(pick['market']):pick['probability']=None
         return jsonify(tickets=result,next_offset=offset+5 if len(rows)>5 else None)
 
     @bp.get('/api/tracking/performance')
@@ -174,12 +194,22 @@ def init_app(app, fetch, base, leagues):
                     picks=db.execute("SELECT market,home_id,away_id FROM account_predictions WHERE user_id=? AND event_id=? AND status='pending'",(user['id'],row['event_id'])).fetchall()
                     for pick in picks:
                         if pick['home_id']!=info['home_id'] or pick['away_id']!=info['away_id']:continue
-                        status='void' if void else 'won' if resolve(pick['market'],hg,ag) else 'lost'
+                        if not void and scorer_id(pick['market']):
+                            from bankroll import scorer_result
+                            pid=scorer_id(pick['market'])
+                            team=next((str(b.get('team',{}).get('id')) for b in info['rosters'] if any(str(r.get('athlete',{}).get('id'))==pid for r in b.get('roster',[]))),None)
+                            if not team:continue
+                            status=scorer_result(info,dict(event_id=row['event_id'],player=dict(id=pid,team_id=team)))
+                            if status is None:continue
+                        else:
+                            status='void' if void else 'won' if resolve(pick['market'],hg,ag) else 'lost'
                         db.execute("UPDATE account_predictions SET status=?,home_score=?,away_score=?,settled_at=? WHERE user_id=? AND event_id=? AND market=? AND status='pending'",(status,hg,ag,int(time.time()),user['id'],row['event_id'],pick['market']))
             except (requests.RequestException,ValueError,KeyError,TypeError,StopIteration):errors+=1
         with database() as db:
             counts={r['status']:r['n'] for r in db.execute('SELECT status,count(*) AS n FROM account_predictions WHERE user_id=? GROUP BY status',(user['id'],)).fetchall()}
             recent=[dict(r) for r in db.execute('SELECT event_id,label,market,probability,status,home_score,away_score,starts_at FROM account_predictions WHERE user_id=? ORDER BY created_at DESC,event_id,market LIMIT 100',(user['id'],)).fetchall()]
+        for pick in recent:
+            if scorer_id(pick['market']):pick['probability']=None
         won,lost=counts.get('won',0),counts.get('lost',0)
         return jsonify(won=won,lost=lost,pending=counts.get('pending',0),void=counts.get('void',0),
                        success_pct=round(100*won/(won+lost),1) if won+lost else None,

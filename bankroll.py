@@ -114,7 +114,17 @@ def register(bp, user, source, leagues, resolve, score):
             if old:
                 with database() as db:return jsonify(snapshot(db,uid))
             if not rows or not isinstance(prices,list) or len(prices)!=len(rows):raise AccountError('Renseigne la cote de chaque sélection.')
-            payload=dict(data,request_key='archive:'+tid,title=rows[0]['ticket_title'],selections=[dict(league=r['league'],event_id=r['event_id'],home_id=r['home_id'],away_id=r['away_id'],market=r['market'],odds=prices[i]) for i,r in enumerate(rows)])
+            selections=[]
+            for i,r in enumerate(rows):
+                leg=dict(league=r['league'],event_id=r['event_id'],home_id=r['home_id'],away_id=r['away_id'],market=r['market'],odds=prices[i])
+                if r['market'].startswith('scorer:'):
+                    pid=r['market'].split(':',1)[1]
+                    info=source(r['league'],r['event_id'],30)
+                    team=next((str(b.get('team',{}).get('id')) for b in info.get('rosters',[]) if any(str(p.get('athlete',{}).get('id'))==pid for p in b.get('roster',[]))),None)
+                    if not team:raise AccountError('Présence du buteur à revérifier.')
+                    leg.update(market='anytime_scorer',player=dict(id=pid,team_id=team))
+                selections.append(leg)
+            payload=dict(data,request_key='archive:'+tid,title=rows[0]['ticket_title'],selections=selections)
             return create_manual(uid,payload)
         with database() as db:
             db.execute('SELECT * FROM account_bankroll WHERE user_id=?'+('' if db.sqlite else ' FOR UPDATE'),(uid,)).fetchone()

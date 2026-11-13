@@ -2,7 +2,7 @@
 (() => {
  const esc=escapeHtml, cache=new Map(), panels=new WeakMap();
  const labels={home:'Victoire domicile',draw:'Match nul',away:'Victoire extérieur',home_or_draw:'Double chance 1X',away_or_draw:'Double chance X2',over_1_5:'Plus de 1,5 but',over_2_5:'Plus de 2,5 buts',over_3_5:'Plus de 3,5 buts',under_1_5:'Moins de 1,5 but',under_2_5:'Moins de 2,5 buts',under_3_5:'Moins de 3,5 buts',btts:'Les deux équipes marquent',btts_no:'Les deux équipes marquent : non'};
- const label=(k,match)=>k.split('_and_').map(x=>x==='home'&&match?.home?.name?'Victoire '+match.home.name:x==='away'&&match?.away?.name?'Victoire '+match.away.name:labels[x]||x).join(' + ');
+ const label=(k,match)=>k.startsWith('scorer:')?((match?.scorer_names?.[k.split(':')[1]]||'Joueur')+' marque au moins un but'):k.split('_and_').map(x=>x==='home'&&match?.home?.name?'Victoire '+match.home.name:x==='away'&&match?.away?.name?'Victoire '+match.away.name:labels[x]||x).join(' + ');
  const number=v=>{const s=String(v??'').trim();return /^\d+(?:[.,]\d+)?$/.test(s)?Number(s.replace(',','.')):NaN;};
  const fmt=n=>n.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2});
  const date=v=>new Date(v).toLocaleString('fr-FR',{timeZone:'Europe/Paris'});

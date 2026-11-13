@@ -292,3 +292,34 @@ class MatchScorerChoices(unittest.TestCase):
    data['rosters'][0]['roster'][0][field]=True
    result=scorer.match_choices(server,analysis,now=NOW)
    self.assertNotIn('11',[p['player']['id'] for p in result['teams'][0]['choices']])
+
+ def test_missing_stats_and_form_use_actual_lineup(self):
+  analysis,data,server=self.setup_match()
+  data['leaders']=[];data['lastFiveGames']=[]
+  for block in data['rosters']:
+   for player in block['roster']:
+    player['position']={'abbreviation':'F'}
+    player['athlete']['displayName']='Player '+player['athlete']['id']
+  result=scorer.match_choices(server,analysis,now=NOW)
+  self.assertEqual(result['status'],'ok')
+  self.assertEqual([len(t['choices']) for t in result['teams']],[2,2])
+  self.assertTrue(all(p['basis']['selection_method']=='squad_role' for t in result['teams'] for p in t['choices']))
+ def test_missing_lineup_uses_identity_checked_team_squad(self):
+  analysis,data,server=self.setup_match();data['leaders']=[];data['lastFiveGames']=[];data['rosters']=[]
+  def load(url,*args,**kwargs):
+   if url.endswith('/summary'):return data
+   tid=url.split('/teams/')[-1].split('/')[0]
+   return dict(team={'id':tid},season={'year':NOW.year},athletes=[
+    dict(id=tid+'01',displayName='Keeper',position={'abbreviation':'GK'}),
+    dict(id=tid+'02',displayName='Forward',position={'abbreviation':'F'}),
+    dict(id=tid+'03',displayName='Midfielder',position={'abbreviation':'M'})])
+  server.fetch=load
+  result=scorer.match_choices(server,analysis,now=NOW)
+  self.assertEqual(result['status'],'ok')
+  for team in result['teams']:
+   self.assertEqual([p['player']['name'] for p in team['choices']],['Forward','Midfielder'])
+ def test_wrong_team_squad_cannot_supply_names(self):
+  analysis,data,server=self.setup_match();data['leaders']=[];data['lastFiveGames']=[];data['rosters']=[]
+  server.fetch=lambda url,*a,**k:data if url.endswith('/summary') else dict(team={'id':'99999'},athletes=[dict(id='101',displayName='Wrong player')])
+  result=scorer.match_choices(server,analysis,now=NOW)
+  self.assertTrue(all(not t['choices'] for t in result['teams']))

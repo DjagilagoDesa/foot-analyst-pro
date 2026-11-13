@@ -6,11 +6,12 @@ async function run(mode){
  const matches=Array.from({length:mode==='search-more'?12:4},(_,i)=>({id:String(i+1),league:'fra.1',date:new Date(base+3600000*(i+1)).toISOString(),state:'pre',completed:false,home:{id:String(i*2+1),name:'Home'+i},away:{id:String(i*2+2),name:'Away'+i}}));
  const c={Date:Clock,document:{getElementById:id=>nodes[id]},escapeHtml:String,renderAnalysisReport:()=>'',renderLockedAnalysis:()=>{},api:async()=>{
   feeds++;return {events:matches.map((m,i)=>({...m,state:feeds>1&&(mode==='all-invalid'||(i===0&&mode!=='search-more'))?'in':m.state}))};
- },window:{Accounts:{refresh:async()=>{},afterAnalysis:async()=>{},request:async()=>{analyses++;return ({status:'ok',prediction:{markets:mode==='search-more'&&analyses<=8?{}:{home_or_draw:78,btts:65,over_2_5:50,home_or_draw_and_btts:65}},home:{matches:10},away:{matches:10}});}},Tracking:{record:async p=>{recorded=p;return 0;},saveTicket:async()=>{if(mode==='elapsed')clock=base+20*3600000;}}}};
+ },window:{Accounts:{refresh:async()=>{},afterAnalysis:async()=>{},request:async()=>{analyses++;return ({status:'ok',scorer_choices:{teams:[{choices:[{rank:1,player:{id:String(100+analyses),name:'Buteur '+analyses},availability:'reported_starter',rationale:'Profil offensif'}]}]},prediction:{markets:mode==='search-more'&&analyses<=8?{}:{home_or_draw:78,btts:65,over_2_5:50,home_or_draw_and_btts:65}},home:{matches:10},away:{matches:10}});}},Tracking:{record:async p=>{recorded=p;return 0;},saveTicket:async()=>{if(mode==='elapsed')clock=base+20*3600000;}}}};
  vm.createContext(c);vm.runInContext(fs.readFileSync('custom-ticket.js','utf8').split('(()=>{')[0]+fs.readFileSync('daily-tickets.js','utf8'),c);
  await nodes.generateDailyTickets.onclick();
  const html=nodes.automaticTicketsResult.innerHTML;
  if(mode==='search-more'){assert(analyses>8,'search must continue past eight analyses when profiles remain incomplete');assert(html.includes('Ticket 1'));}
+ if(mode==='scorers'){assert(html.includes('Ticket 3 · Buteurs'));assert(html.includes('Buteur '));assert(recorded.some(p=>p.market.startsWith('scorer:')));}
  if(mode==='one-invalid'){
   assert(html.includes('Ticket 1'));assert(html.includes('Ticket 5'));assert(!html.includes('Home0'));assert(recorded.length>0);
  }
@@ -19,4 +20,12 @@ async function run(mode){
  assert(!html.includes('artificiellement'));assert(!html.includes('Ticket non proposé'));
  assert(!nodes.generateDailyTickets.disabled);
 }
-(async()=>{for(const mode of ['one-invalid','all-invalid','elapsed','search-more'])await run(mode);console.log('Daily tickets: invalid candidate isolated, all-invalid handled, kickoff during save blocked.');})().catch(e=>{console.error(e);process.exitCode=1;});
+(async()=>{for(const mode of ['one-invalid','all-invalid','elapsed','search-more','scorers'])await run(mode);console.log('Daily tickets: invalid candidate isolated, all-invalid handled, kickoff during save blocked.');})().catch(e=>{console.error(e);process.exitCode=1;});
+
+{
+ const ctx={};vm.createContext(ctx);vm.runInContext(fs.readFileSync('daily-tickets.js','utf8').split('(()=>{')[0],ctx);
+ const results=Array.from({length:3},(_,i)=>({match:{id:String(i),home:{id:String(i*2)},away:{id:String(i*2+1)}},analysis:{scorer_choices:{teams:[{choices:[{rank:1,player:{id:String(i+100),name:'Scorer '+i},availability:'reported_starter',rationale:'Forward'}]}]}}}));
+ const selected=ctx.dailyScorerSelections(results);
+ assert.equal(selected.length,3);assert(selected.every(r=>r.choice.market.startsWith('scorer:')));
+ assert(selected.every(r=>r.choice.probability===null));
+}

@@ -22,8 +22,22 @@ function mixedDailySelections(results){
  }
  return selected.length===3?selected:[];
 }
+function dailyScorerSelections(results){
+ const usedTeams=new Set(),selected=[];
+ for(const row of results){
+  const ids=[String(row.match.home.id),String(row.match.away.id)];
+  if(ids.some(id=>usedTeams.has(id)))continue;
+  const picks=(row.analysis.scorer_choices?.teams||[]).flatMap(t=>t.choices||[]).filter(p=>p.player?.id&&p.player?.name&&p.availability!=='bench');
+  picks.sort((a,b)=>a.rank-b.rank||((b.basis?.goals||0)/(b.basis?.appearances||1))-((a.basis?.goals||0)/(a.basis?.appearances||1)));
+  const pick=picks[0];if(!pick)continue;
+  const player=pick.player,market='scorer:'+player.id;
+  selected.push({...row,match:{...row.match,scorer_names:{[player.id]:player.name}},choice:{market,player,rationale:pick.rationale,probability:null}});
+  ids.forEach(id=>usedTeams.add(id));if(selected.length===3)break;
+ }
+ return selected;
+}
 function dailyProfilesReady(results){
- if(longDailySelections(results).length<5||mixedDailySelections(results).length<3)return false;
+ if(longDailySelections(results).length<5||mixedDailySelections(results).length<3||dailyScorerSelections(results).length<3)return false;
  return [['prudent',2],['balanced',3],['offensive',3]].every(([profile,count])=>{
   const teams=new Set();let found=0;
   for(const r of results){
@@ -93,9 +107,16 @@ async function dailyVerifiedSelections(results){
    const analyzedCount=results.length;results=await dailyVerifiedSelections(results);
    if(!results.length){out.innerHTML=message('Aucune rencontre encore à venir n’a pu être confirmée. Choisis une autre date dans « Crée mon ticket ».');return;}
    if(results.length<analyzedCount)notice.innerHTML+=message((analyzedCount-results.length)+' rencontre(s) écartée(s) après actualisation.');
-   const profiles=[['prudent','Ticket 1 · Prudent',2],['balanced','Ticket 2 · Équilibré',3],['offensive','Ticket 3 · Offensif',3],['long','Ticket 4 · Grand combiné',0],['mixed','Ticket 5 · Double chance + buts sur chaque match',3]];
+   const profiles=[['prudent','Ticket 1 · Prudent',2],['balanced','Ticket 2 · Équilibré',3],['scorers','Ticket 3 · Buteurs',3],['long','Ticket 4 · Grand combiné',0],['mixed','Ticket 5 · Double chance + buts sur chaque match',3]];
    const ticketsHtml=profiles.map(([profile,title,count])=>{
     if(profile==='long')return renderLongTicket(results,locked);
+    if(profile==='scorers'){
+     const selected=dailyScorerSelections(results);
+     if(selected.length<2){unavailable.push('Buteurs');return '';}
+     simulations.push({selected,title});toTrack.push(...selected.map(r=>({analysis:r.analysis,market:r.choice.market})));
+     return '<div class="panel premium"><h2>'+title+'</h2>'+selected.map(r=>'<div class="message"><strong>'+esc(r.match.home.name+' – '+r.match.away.name)+'</strong><p class="gold">'+esc(r.choice.player.name)+' marque au moins un but</p><p>'+esc(r.choice.rationale)+'</p></div>').join('')+'</div>';
+    }
+
     const choices=(profile==='mixed'?mixedDailySelections(results):results.map(r=>({...r,choice:ticketSelection(r.analysis.prediction.markets,profile,r.analysis.market_odds)})).filter(r=>r.choice).sort((a,b)=>b.choice.probability-a.choice.probability));
     const selected=[],teams=new Set();
     for(const r of choices){if(teams.has(String(r.match.home.id))||teams.has(String(r.match.away.id)))continue;selected.push(r);teams.add(String(r.match.home.id));teams.add(String(r.match.away.id));if(selected.length===count)break;}
