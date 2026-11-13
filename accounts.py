@@ -9,7 +9,7 @@ import time
 import uuid
 from contextlib import contextmanager
 from functools import wraps
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from flask import Blueprint, current_app, jsonify, request
@@ -537,7 +537,12 @@ def metered_analysis(func):
                            preview_sections=['Jugement du match','Arguments des deux équipes',
                                              'Surprises possibles','Confrontations passées','Probabilités'])
         if cached is not None:
-            if cached.get('league') and cached.get('status') == 'ok' and 'scorer_choices' not in cached:
+            scorer_data = cached.get('scorer_choices') or {}
+            try:
+                scorer_stale = (datetime.now(timezone.utc)-datetime.fromisoformat(scorer_data.get('observed_at',''))).total_seconds() >= 60
+            except (ValueError, TypeError):
+                scorer_stale = True
+            if cached.get('league') and cached.get('status') == 'ok' and (scorer_stale or scorer_data.get('status') == 'closed' and not scorer_data.get('live_supported')):
                 import app as server
                 from daily_scorer import match_choices
                 cached['scorer_choices'] = match_choices(server, cached)
