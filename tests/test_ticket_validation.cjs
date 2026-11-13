@@ -52,3 +52,8 @@ async function scenario(mode){
  if(['past','bad-date','bad-id'].includes(mode))assert.equal(calls.length,0);
 }
 (async()=>{for(const mode of ['ok','transient','live','postponed','canceled','missing','duplicate','wrong-team','rescheduled','unavailable','partial','elapsed','past','bad-date','bad-id'])await scenario(mode);console.log('Ticket validation: 14 scenarios, batched sources, identity, clock and unchanged picks OK');})().catch(e=>{console.error(e);process.exit(1);});
+// Repeated verified errors change selection order without rewriting percentages.
+selectionContext.window.OddsTicket={rank:choices=>choices};
+const corrected=selectionContext.ticketSelection({home_or_draw:80,btts:79},'prudent',null,{home_or_draw:10});
+assert.equal(corrected.market,'btts');assert.equal(corrected.probability,79);
+assert.equal(selectionContext.ticketSelection({home_or_draw:80},'prudent',null,{home_or_draw:10}).probability,80);

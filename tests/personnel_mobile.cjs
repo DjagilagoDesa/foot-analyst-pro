@@ -13,6 +13,7 @@ module.exports=async browser=>{
   window.testPersonnel={tracking_id:'saved-id',league:'fra.1',event_id:'123',home_id:'1',away_id:'2',home_name:'Paris',away_name:'Lyon',personnel_context:first,personnel_snapshots:[first]};
   window.Accounts={request:async(path,data)=>{window.calls.push({path,data});return {status:'updated',personnel_context:latest,personnel_snapshots:[first,latest],section:{title:'Compositions et disponibilités signalées',text:'Paris : titulaire signalé par la source. Confirmation officielle non vérifiée.',source_url:'https://www.espn.com/soccer/match/_/gameId/123'}};}};
  });
+ await page.addScriptTag({content:fs.readFileSync('index.html','utf8').match(/function cleanAnalysisText[^\n]+/)[0]});
  await page.addScriptTag({path:'personnel.js'});
  await page.evaluate(()=>window.Personnel.attach(document.getElementById('analysisResult'),window.testPersonnel));
  await page.getByRole('button',{name:'ACTUALISER LES EFFECTIFS',exact:false}).click();

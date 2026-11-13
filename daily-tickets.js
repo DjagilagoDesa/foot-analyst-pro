@@ -1,8 +1,8 @@
 /* Daily proposals use the same authenticated 10-match analyses as personal tickets. */
 function longDailySelections(results){
- const candidates=results.map(r=>({...r,choice:ticketSelection(r.analysis.prediction?.markets||{},'prudent',r.analysis.market_odds)}))
+ const candidates=results.map(r=>({...r,choice:ticketSelection(r.analysis.prediction?.markets||{},'prudent',r.analysis.market_odds,r.analysis.selection_penalties)}))
   .filter(r=>r.choice&&r.choice.probability>=75&&r.analysis.home?.matches>=10&&r.analysis.away?.matches>=10)
-  .sort((a,b)=>b.choice.probability-a.choice.probability);
+  .sort((a,b)=>selectionScore(b.choice)-selectionScore(a.choice));
  const selected=[],teams=new Set(),events=new Set();
  for(const r of candidates){
   const h=String(r.match.home.id),a=String(r.match.away.id),id=String(r.match.id);
@@ -12,8 +12,8 @@ function longDailySelections(results){
  return selected;
 }
 function mixedDailySelections(results){
- const candidates=results.map(r=>({...r,choice:ticketSelection(r.analysis.prediction?.markets||{},'mixed',r.analysis.market_odds)}))
-  .filter(r=>r.choice).sort((a,b)=>b.choice.probability-a.choice.probability);
+ const candidates=results.map(r=>({...r,choice:ticketSelection(r.analysis.prediction?.markets||{},'mixed',r.analysis.market_odds,r.analysis.selection_penalties)}))
+  .filter(r=>r.choice).sort((a,b)=>selectionScore(b.choice)-selectionScore(a.choice));
  const teams=new Set(),selected=[];
  for(const r of candidates){
   const home=String(r.match.home.id),away=String(r.match.away.id);
@@ -28,7 +28,7 @@ function dailyScorerSelections(results){
   const ids=[String(row.match.home.id),String(row.match.away.id)];
   if(ids.some(id=>usedTeams.has(id)))continue;
   const picks=(row.analysis.scorer_choices?.teams||[]).flatMap(t=>t.choices||[]).filter(p=>p.player?.id&&p.player?.name&&p.availability!=='bench');
-  picks.sort((a,b)=>a.rank-b.rank||((b.basis?.goals||0)/(b.basis?.appearances||1))-((a.basis?.goals||0)/(a.basis?.appearances||1)));
+  picks.sort((a,b)=>a.rank-b.rank||((b.basis?.goals||0)/(b.basis?.appearances||1))*(b.learning_factor||1)-((a.basis?.goals||0)/(a.basis?.appearances||1))*(a.learning_factor||1));
   const pick=picks[0];if(!pick)continue;
   const player=pick.player,market='scorer:'+player.id;
   selected.push({...row,match:{...row.match,scorer_names:{[player.id]:player.name}},choice:{market,player,rationale:pick.rationale,probability:null}});
@@ -41,7 +41,7 @@ function dailyProfilesReady(results){
  return [['prudent',2],['balanced',3],['offensive',3]].every(([profile,count])=>{
   const teams=new Set();let found=0;
   for(const r of results){
-   if(!ticketSelection(r.analysis.prediction?.markets||{},profile,r.analysis.market_odds))continue;
+   if(!ticketSelection(r.analysis.prediction?.markets||{},profile,r.analysis.market_odds,r.analysis.selection_penalties))continue;
    const ids=[String(r.match.home.id),String(r.match.away.id)];
    if(ids.some(id=>teams.has(id)))continue;
    ids.forEach(id=>teams.add(id));found++;
@@ -117,7 +117,7 @@ async function dailyVerifiedSelections(results){
      return '<div class="panel premium"><h2>'+title+'</h2>'+selected.map(r=>'<div class="message"><strong>'+esc(r.match.home.name+' – '+r.match.away.name)+'</strong><p class="gold">'+esc(r.choice.player.name)+' marque au moins un but</p><p>'+esc(r.choice.rationale)+'</p></div>').join('')+'</div>';
     }
 
-    const choices=(profile==='mixed'?mixedDailySelections(results):results.map(r=>({...r,choice:ticketSelection(r.analysis.prediction.markets,profile,r.analysis.market_odds)})).filter(r=>r.choice).sort((a,b)=>b.choice.probability-a.choice.probability));
+    const choices=(profile==='mixed'?mixedDailySelections(results):results.map(r=>({...r,choice:ticketSelection(r.analysis.prediction.markets,profile,r.analysis.market_odds,r.analysis.selection_penalties)})).filter(r=>r.choice).sort((a,b)=>selectionScore(b.choice)-selectionScore(a.choice)));
     const selected=[],teams=new Set();
     for(const r of choices){if(teams.has(String(r.match.home.id))||teams.has(String(r.match.away.id)))continue;selected.push(r);teams.add(String(r.match.home.id));teams.add(String(r.match.away.id));if(selected.length===count)break;}
     if(selected.length<count){unavailable.push(title.replace(/^Ticket \d+ · /,''));return '';}

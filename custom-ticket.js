@@ -10,7 +10,12 @@ function ticketMarkets(markets){
  }
  return values;
 }
-function ticketSelection(markets, profile, odds){
+function selectionScore(choice){return choice.probability-(choice.learning_penalty||0);}
+function feedbackRank(options,odds,penalties){
+ if(!penalties||!options.some(p=>Number.isFinite(penalties[p.market])&&penalties[p.market]>0))return window.OddsTicket?.rank(options,odds)||options.sort((a,b)=>b.probability-a.probability);
+ return options.map(p=>({...p,learning_penalty:Math.max(0,Math.min(10,Number(penalties[p.market])||0))})).sort((a,b)=>selectionScore(b)-selectionScore(a));
+}
+function ticketSelection(markets, profile, odds, penalties){
  markets=ticketMarkets(markets);
  const jointKeys=['home_or_draw','away_or_draw'].flatMap(side=>['btts','btts_no','over_1_5','over_2_5','under_1_5','under_2_5'].map(goal=>side+'_and_'+goal));
  const allowed=profile==='mixed'?jointKeys:['home','away','home_or_draw','away_or_draw','over_1_5','over_2_5','under_1_5','under_2_5','btts','btts_no'];
@@ -20,7 +25,7 @@ function ticketSelection(markets, profile, odds){
  const [min,max]=bands[profile]||bands.balanced;
  const pool=options.filter(x=>x.probability>=min&&x.probability<=max);
  if(!pool.length)return null;
- return (window.OddsTicket?.rank(pool,odds)||pool.sort((a,b)=>b.probability-a.probability||allowed.indexOf(a.market)-allowed.indexOf(b.market)))[0]||null;
+ return feedbackRank(pool,odds,penalties)[0]||null;
 }
 /* Re-check the source calendar once per league/date before finalizing a ticket. */
 function ticketAssertFuture(results){
@@ -121,7 +126,7 @@ async function ticketVerifyFixtures(results){
     if(d.status==='locked'){renderLockedAnalysis(target);el('customNotice').innerHTML=message('Premium est nécessaire pour poursuivre. Les analyses déjà obtenues restent dans ton historique.');return;}
     if(d.status!=='ok'){failures.push(name(m)+' : '+(d.message||'données insuffisantes'));continue;}
     d.market_odds=await window.OddsTicket?.load(m);
-    const leg=ticketSelection(d.prediction?.markets||{},profile,d.market_odds);
+    const leg=ticketSelection(d.prediction?.markets||{},profile,d.market_odds,d.selection_penalties);
     if(!leg){failures.push(name(m)+' : aucune probabilité exploitable.');continue;}
     results.push({match:m,analysis:d,...leg});
     }catch(error){if(error.code==='login_required')throw error;failures.push(name(m)+' : '+error.message);}

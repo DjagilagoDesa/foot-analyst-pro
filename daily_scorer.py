@@ -429,7 +429,7 @@ def match_choices(server, analysis, histories=None, now=None):
                 if player['team_id'] != team['team_id'] or player['id'] in seen: continue
                 seen.add(player['id'])
                 basis = pick['basis']
-                team['choices'].append(dict(rank=len(team['choices'])+1, player=player,
+                team['choices'].append(dict(rank=len(team['choices'])+1, ranking=pick['ranking'], player=player,
                     rationale=f"{basis['goals']} buts en {basis['appearances']} apparitions. "
                         + (('Match en cours : temps de jeu restant à vérifier.') if output['live'] else ('Titulaire annoncé.' if pick['availability'] == 'reported_starter' else 'Titularisation à confirmer.')),
                     availability=pick['availability'], basis=basis))

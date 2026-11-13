@@ -1,10 +1,10 @@
 /* Button-driven ticket creation, powered by the existing football model. */
-function builderSelection(markets,risk,type,odds){
+function builderSelection(markets,risk,type,odds,penalties){
  const values=ticketMarkets(markets);
  const types={all:['home','away','home_or_draw','away_or_draw','over_1_5','over_2_5','under_1_5','under_2_5','btts','btts_no'],double:['home_or_draw','away_or_draw'],goals:['over_1_5','over_2_5','under_1_5','under_2_5'],btts:['btts','btts_no'],joint:['home_or_draw','away_or_draw'].flatMap(s=>['btts','btts_no','over_1_5','over_2_5','under_1_5','under_2_5'].map(g=>s+'_and_'+g))};
  const [min,max]=({prudent:[75,100],balanced:[60,80],offensive:[45,65]})[risk]||[60,80];
  const choices=(types[type]||types.all).filter(k=>Number.isFinite(values[k])&&values[k]>=min&&values[k]<=max&&values[k]<100).map(market=>({market,probability:values[market]}));
- return (window.OddsTicket?.rank(choices,odds)||choices.sort((a,b)=>b.probability-a.probability))[0]||null;
+ return feedbackRank(choices,odds,penalties)[0]||null;
 }
 (()=>{
  const get=id=>document.getElementById(id),esc=escapeHtml;
@@ -41,7 +41,7 @@ function builderSelection(markets,risk,type,odds){
     if(d.status==='locked'){renderLockedAnalysis(target);return;}
     if(d.status!=='ok'){skipped.push(name+' : '+(d.message||'données insuffisantes'));continue;}
     d.market_odds=await window.OddsTicket?.load(match);
-    const choice=builderSelection(d.prediction?.markets||{},risk,type,d.market_odds);
+    const choice=builderSelection(d.prediction?.markets||{},risk,type,d.market_odds,d.selection_penalties);
     if(!choice){skipped.push(name+' : aucun pari ne respecte le profil et le type choisis');continue;}
     results.push({match,analysis:d,...choice});teams.add(String(match.home.id));teams.add(String(match.away.id));
    }

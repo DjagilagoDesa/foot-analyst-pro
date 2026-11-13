@@ -366,8 +366,21 @@ def analyze():
         from match_availability import collect as collect_personnel, apply_context
         apply_context(result, collect_personnel(sys.modules[__name__], league, home, away, result['event_id']))
     if result.get('status') in ('ok','insufficient_data'):
-        from daily_scorer import match_choices
+        from daily_scorer import match_choices, MODEL as SCORER_MODEL
         result['scorer_choices'] = match_choices(sys.modules[__name__], result, histories={'home':hm,'away':am})
+    if result.get('status')=='ok':
+        from learning import current, penalties, scorer_factor
+        from accounts import current_user
+        user = current_user(required=False)
+        feedback = current(user_id=user['id'] if user else None)
+        result['selection_penalties'] = penalties(feedback, league, result['model'], result['prediction']['markets'])
+        for team in (result.get('scorer_choices') or {}).get('teams',[]):
+            for pick in team.get('choices',[]):
+                proxy=dict(pick, model_version=SCORER_MODEL)
+                pick['learning_factor']=scorer_factor(feedback,proxy)
+            team['choices'].sort(key=lambda p: -(p.get('ranking',1/max(1,p['rank'])))*p['learning_factor'])
+            for rank,pick in enumerate(team['choices'],1):pick['rank']=rank
+        result['learning'] = {k:feedback[k] for k in ('version','as_of','status','eligible','scope')}
     if result.get('status')=='ok':result['report']=build_report(result, histories={'home':hm,'away':am})
     return jsonify(result)
 

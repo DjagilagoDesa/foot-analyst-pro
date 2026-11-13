@@ -19,7 +19,7 @@ from venue_test import build as build_venue, freeze as freeze_venue, report as v
 
 PARIS = ZoneInfo('Europe/Paris')
 INTERVAL = 900
-SELECTION_REVISION = 'daily-all-competitions-v4'
+SELECTION_REVISION = 'daily-feedback-v5'
 LIMIT = 120
 SCHEMA = DAILY_OPINION_SCHEMA
 GROUPS = [('prudent', 3, 'Mes 3 choix prudents'),
@@ -97,7 +97,7 @@ def candidates_for(result, group):
     return sorted([{'market': k, 'probability': markets[k]}
                    for k in keys if isinstance(markets.get(k), (int, float))
                    and math.isfinite(markets[k]) and low <= markets[k] <= high],
-                  key=lambda p: (-p['probability'], p['market']))
+                  key=lambda p: (-(p['probability'] - (result.get('selection_penalties') or {}).get(p['market'], 0)), p['market']))
 
 
 def extreme_outsider(result, market, now):
@@ -123,7 +123,12 @@ def extreme_outsider(result, market, now):
     return False
 
 
-def choose(results, existing, now, day):
+def result_model(result):
+    league = result['match']['league']
+    return ('poisson-multicompetition-10-v1' if any(g.get('competition', league) != league for rows in (result.get('history') or {}).values() for g in rows) else 'poisson-ucl-540d-v1' if league == 'uefa.champions' else MODEL_VERSION)
+
+
+def choose(results, existing, now, day, feedback=None):
     """Fill vacant slots only; published choices and their probabilities never change."""
     picks = copy.deepcopy(existing)
     used_events = {p['match']['id'] for p in picks}
@@ -133,11 +138,15 @@ def choose(results, existing, now, day):
         for r in results:
             if not upcoming(r['match'], now, day):
                 continue
+            if feedback is not None:
+                from learning import penalties
+                r = copy.deepcopy(r)
+                r['selection_penalties'] = penalties(feedback, r['match']['league'], result_model(r), r['prediction']['markets'])
             options = [option for option in candidates_for(r, group)
                        if not extreme_outsider(r, option['market'], now)]
             if options:
                 pool.append((r, options[0]))
-        pool.sort(key=lambda pair: (-pair[1]['probability'], pair[0]['match']['date'], pair[0]['match']['id']))
+        pool.sort(key=lambda pair: (-(pair[1]['probability'] - (pair[0].get('selection_penalties') or {}).get(pair[1]['market'], 0)), pair[0]['match']['date'], pair[0]['match']['id']))
         missing = count - sum(p['group'] == group for p in picks)
         for r, choice in pool:
             if missing <= 0:
@@ -165,7 +174,9 @@ def choose(results, existing, now, day):
                                   markets=r['prediction']['markets'],
                                   source_errors=r.get('source_errors'), history=r.get('history'),
                                   captured_at=now.isoformat())),
-                              model_version=('poisson-multicompetition-10-v1' if any(g.get('competition',m['league'])!=m['league'] for rows in (r.get('history') or {}).values() for g in rows) else 'poisson-ucl-540d-v1' if m['league']=='uefa.champions' else MODEL_VERSION), published_at=now.isoformat(), status='pending', home_score=None, away_score=None))
+                              model_version=result_model(r), published_at=now.isoformat(), status='pending', home_score=None, away_score=None))
+            if feedback is not None:
+                picks[-1]['learning'] = dict(version=feedback['version'], as_of=feedback['as_of'], penalty=(r.get('selection_penalties') or {}).get(choice['market'], 0))
             picks[-1]['selection_test'] = selection_decision(picks[-1], now)
             picks[-1]['venue_test'] = freeze_venue(r, now)
             used_events.add(m['id'])
@@ -304,6 +315,13 @@ class DailyOpinion:
                 except Exception:
                     self.app.logger.warning('Daily scorer selection unavailable')
                     scorer_meta=dict(source_errors=1,fixtures_examined=0)
+            from learning import current, scorer_factor
+            feedback = current(now)
+            for candidate in scorer_pool:
+                factor=scorer_factor(feedback,candidate)
+                candidate['learning']=dict(version=feedback['version'],as_of=feedback['as_of'],factor=factor)
+                candidate['ranking']*=factor
+            scorer_pool.sort(key=lambda p:(-p['ranking'],str(p['match']['id']),p['player']['id']))
             # Re-check the real clock after network calls: never publish a started match.
             publication = datetime.now(timezone.utc) if self.app.testing is False else now
             used_players={p['player']['id'] for p in scorers}
@@ -315,7 +333,9 @@ class DailyOpinion:
                 candidate=copy.deepcopy(candidate);candidate['published_at']=publication.isoformat()
                 scorers.append(candidate);used_players.add(candidate['player']['id']);used_matches.add(str(candidate['match']['id']))
             scorer=scorers[0] if scorers else None
-            picks = choose(results, existing, publication, day)
+            from learning import current
+            feedback = current(publication)
+            picks = choose(results, existing, publication, day, feedback)
             retain_team_odds(picks, matches, publication)
             updated = dict(day=day, selection_revision=SELECTION_REVISION, picks=picks, scorer=scorer, scorers=scorers, scorer_selection=scorer_meta, generated_at=board.get('generated_at') or publication.isoformat(),
                            checked_at=publication.isoformat(), source_errors=failures,
@@ -384,14 +404,25 @@ class DailyOpinion:
         for pick in board.get('picks', []):
             settled=pick['status'] in ('won','lost')
             missing_odds=recover_odds and settled and not pick.get('team_odds')
-            if pick['status'] != 'pending' and not missing_odds:
+            needs_verification=settled and not pick.get('settled_at')
+            if pick['status'] != 'pending' and not missing_odds and not needs_verification:
                 continue
             m = pick['match']
             try:
                 data=self.server.fetch(f"{self.server.ESPN}/{m['league']}/summary", {'event': m['id']}, ttl=120)
-                if missing_odds:
+                if missing_odds or needs_verification:
+                    try:
+                        # Legacy rows enter learning only after a fresh result verification.
+                        info = fixture_info(data)
+                        if (info['home_id'], info['away_id']) == (str(m['home']['id']), str(m['away']['id'])) and info['completed'] and info['state'] == 'post' and (info['period'] is None or int(info['period']) <= 2) and not any(x in info['name'] for x in ('EXTRA', 'PENALT', 'ABANDON', 'CANCEL')):
+                            h, a = score(info['home'].get('score')), score(info['away'].get('score'))
+                            if pick['status'] == ('won' if resolve(pick['market'], h, a) else 'lost'):
+                                pick.update(home_score=h, away_score=a)
+                                pick.setdefault('settled_at', datetime.now(timezone.utc).isoformat())
+                    except (KeyError,ValueError,TypeError,StopIteration,AttributeError):
+                        pass
                     from market_odds import historical_close
-                    quote=historical_close(data,pick)
+                    quote=historical_close(data,pick) if missing_odds else None
                     if quote:pick['team_odds']=quote
                     continue
                 info = fixture_info(data)
@@ -407,7 +438,7 @@ class DailyOpinion:
                     pick['status'] = 'void'
                 else:
                     h, a = score(info['home'].get('score')), score(info['away'].get('score'))
-                    pick.update(status='won' if resolve(pick['market'], h, a) else 'lost', home_score=h, away_score=a)
+                    pick.update(status='won' if resolve(pick['market'], h, a) else 'lost', home_score=h, away_score=a, settled_at=datetime.now(timezone.utc).isoformat())
                     if recover_odds and not pick.get('team_odds'):
                         try:
                             from market_odds import historical_close
@@ -426,10 +457,14 @@ class DailyOpinion:
     def settle_previous(self, day):
         with database() as db:
             rows = db.execute('SELECT day,payload FROM daily_opinion_boards WHERE day<? ORDER BY day', (day,)).fetchall()
+        verifications=0
         for row in rows:
             board = json.loads(row['payload'])
+            age=(datetime.fromisoformat(day)-datetime.fromisoformat(row['day'])).days
+            verify=age<=180 and verifications<10 and any(p.get('status') in ('won','lost') and not p.get('settled_at') for p in board.get('picks',[]))
+            if verify:verifications+=1
             recent=(datetime.fromisoformat(day)-datetime.fromisoformat(row['day'])).days<=7
-            if not any(p['status']=='pending' or (recent and p['status'] in ('won','lost') and not p.get('team_odds')) for p in board.get('picks',[])) and not any(p.get('status')=='pending' for p in scorer_picks(board)):
+            if not any(p['status']=='pending' or (recent and p['status'] in ('won','lost') and not p.get('team_odds')) for p in board.get('picks',[])) and not any(p.get('status')=='pending' for p in scorer_picks(board)) and not verify:
                 continue
             if recent:self.settle(board)
             else:self.settle(board,recover_odds=False)
@@ -515,6 +550,17 @@ def init_app(app, server):
                 db.execute('UPDATE daily_opinion_boards SET payload=? WHERE day=? AND payload=? AND lease_until<=?',
                     (json.dumps(board,ensure_ascii=False),day,row['payload'],int(now.timestamp())))
         response=jsonify(odds=quote)
+        response.headers['Cache-Control']='no-store'
+        return response
+
+    @app.get('/api/daily-opinion/learning')
+    def learning_report():
+        from learning import current
+        if not configured():return jsonify(status='unavailable'),503
+        from accounts import current_user
+        user=current_user(required=False)
+        response=jsonify(current(user_id=user['id'] if user else None))
+        response.headers['Vary']='Cookie'
         response.headers['Cache-Control']='no-store'
         return response
 

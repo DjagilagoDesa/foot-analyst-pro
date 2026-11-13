@@ -66,6 +66,7 @@
   let html='<div class="row"><strong class="gold">Avis du '+esc(date)+'</strong></div>';
   const p=board.performance;
   if(p)html+='<div class="opinion-performance"><h3>Performance</h3><div class="analysis"><div class="stat"><span>Réussite</span><b>'+(p.success_pct===null?'—':esc(p.success_pct)+' %')+'</b></div><div class="stat"><span>Gagnés</span><b>'+esc(p.won)+'</b></div><div class="stat"><span>Perdus</span><b>'+esc(p.lost)+'</b></div><div class="stat"><span>En attente</span><b>'+esc(p.pending)+'</b></div></div>'+'</div>';
+  html+='<details data-learning><summary>Bilan et amélioration de l’IA</summary><div data-learning-content></div></details>';
   if(board.status==='preparing')html+=message('Préparation des choix…');
   if(board.stale&&board.status!=='preparing')html+=message('Actualisation en retard.');
   html+=(board.groups||[]).map(group=>'<div class="opinion-group"><h3>'+esc(group.title)+'</h3>'+group.picks.map(p=>{
@@ -82,6 +83,18 @@
     try{await window.Bankroll.addSelection(pick);}catch(error){const feedback=button.closest('article').querySelector('[data-bank-feedback]');if(feedback)feedback.textContent=error.message;}
     finally{button.disabled=false;}
    });
+   const learning=target.querySelector('[data-learning]');
+   if(learning)learning.ontoggle=async()=>{
+    const content=learning.querySelector('[data-learning-content]');if(!learning.open){if(content.dataset.retry){content.innerHTML='';delete content.dataset.retry;}return;}if(content.innerHTML)return;
+    content.textContent='Chargement…';
+    try{
+     const report=await api('/api/daily-opinion/learning',15000);
+     const active=(report.rules||[]).filter(r=>r.penalty>0);
+     content.innerHTML='<p>'+esc(report.eligible)+' résultats vérifiés · '+esc(report.losses)+' perdus</p><p>'+esc(report.status==='active'?'Les erreurs récurrentes ajustent les prochaines sélections.':'Collecte en cours : au moins '+report.minimum_events+' matchs comparables avant un ajustement.')+'</p>'+
+      (active.length?'<p>'+esc([...new Set(active.map(r=>({home:'Victoire domicile',away:'Victoire extérieure',btts:'Les deux équipes marquent',over_2_5:'Plus de 2,5 buts',over_1_5:'Plus de 1,5 but',under_2_5:'Moins de 2,5 buts',home_or_draw:'Double chance 1X',away_or_draw:'Double chance X2'})[r.market]||r.market))].join(' · '))+'</p>':'')+
+      '<p>Buteurs : '+esc(report.scorer?.eligible||0)+' résultats vérifiés.</p>';
+    }catch{content.textContent='Bilan indisponible. Ferme puis rouvre pour réessayer.';content.dataset.retry='true';}
+   };
    const history=target.querySelector('[data-scorer-history]');if(history)history.ontoggle=()=>{if(history.open&&!history.querySelector('[data-scorer-history-content]').innerHTML)historyPage(history,1);};
    target.querySelectorAll('[data-scorer-match]').forEach(button=>button.onclick=()=>{const pick=scorerPicks(board).find(p=>String(p.player.id)===button.dataset.scorerMatch);if(pick)openMatch(pick.match,'home');});
    target.querySelectorAll('[data-opinion-match]').forEach(button=>button.onclick=()=>{
