@@ -231,3 +231,49 @@ class RecentPlayerEvidence(unittest.TestCase):
    if mode=='live':comp['status']['type']['state']='in'
    if mode=='extra_time':comp['status']['period']=4
    self.assertIsNone(scorer.recent_player_match(altered,game,tid,pid,NOW),mode)
+
+
+class MatchScorerChoices(unittest.TestCase):
+ def setup_match(self):
+  from types import SimpleNamespace
+  match,data=payload()
+  for index,pid in ((0,'12'),(1,'23')):
+   lead=copy.deepcopy(data['leaders'][index]['leaders'][0]['leaders'][0])
+   lead['athlete'].update(id=pid,displayName='Alternative '+pid)
+   lead['statistics'][0]['value']=2
+   data['leaders'][index]['leaders'][0]['leaders'].extend([lead,copy.deepcopy(lead)])
+   data['rosters'][index]['roster'].append(dict(athlete={'id':pid},starter=True,active=True))
+  analysis=dict(league=match['league'],event_id=match['id'],
+    home_id=match['home']['id'],away_id=match['away']['id'],
+    home_name=match['home']['name'],away_name=match['away']['name'])
+  server=SimpleNamespace(ESPN='test',fetch=lambda *a,**k:data)
+  return analysis,data,server
+ def test_two_distinct_ranked_players_for_each_team(self):
+  analysis,data,server=self.setup_match()
+  result=scorer.match_choices(server,analysis,now=NOW)
+  self.assertEqual(result['status'],'ok')
+  self.assertEqual([p['player']['id'] for p in result['teams'][0]['choices']],['11','12'])
+  for team in result['teams']:
+   self.assertEqual([p['rank'] for p in team['choices']],[1,2])
+   self.assertEqual(len({p['player']['id'] for p in team['choices']}),2)
+   self.assertTrue(all(p['player']['team_id']==team['team_id'] for p in team['choices']))
+ def test_injured_second_choice_is_not_replaced_with_invented_player(self):
+  analysis,data,server=self.setup_match()
+  data['injuries']=[dict(team={'id':analysis['home_id']},injuries=[dict(athlete={'id':'12'},status='Out')])]
+  result=scorer.match_choices(server,analysis,now=NOW)
+  self.assertEqual(result['status'],'partial')
+  self.assertEqual([p['player']['id'] for p in result['teams'][0]['choices']],['11'])
+ def test_started_and_wrong_fixture_have_no_choices(self):
+  for mode in ('started','mismatch'):
+   analysis,data,server=self.setup_match()
+   comp=data['header']['competitions'][0]
+   if mode=='started':comp['status']['type']['state']='in'
+   else:comp['id']='9999'
+   result=scorer.match_choices(server,analysis,now=NOW)
+   self.assertTrue(all(not t['choices'] for t in result['teams']))
+ def test_data_failure_does_not_break_analysis(self):
+  analysis,data,server=self.setup_match()
+  def failed(*args,**kwargs):raise RuntimeError('offline')
+  server.fetch=failed
+  result=scorer.match_choices(server,analysis,now=NOW)
+  self.assertEqual(result['status'],'unavailable')
