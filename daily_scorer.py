@@ -134,9 +134,10 @@ def supplement_form(server, data, match, now):
     return enriched
 
 
-def candidates(data,match,now):
+def candidates(data,match,now,allow_live=False):
     info=verified(data,match)
-    if info['state']!='pre' or info['completed'] or info['date']<=now or any(s in info['name'] for s in ('POSTPON','CANCEL','ABANDON','SUSPEND')):return []
+    live = allow_live and info['state'] == 'in'
+    if (not live and (info['state']!='pre' or info['date']<=now)) or info['completed'] or any(s in info['name'] for s in ('POSTPON','CANCEL','ABANDON','SUSPEND')):return []
     output=[]
     for side,other in [('home','away'),('away','home')]:
         team,opponent=match[side],match[other];team_id=str(team['id'])
@@ -160,6 +161,10 @@ def candidates(data,match,now):
                     labels={str(player_status.get(k,'')).lower() for k in ('type','name','abbreviation')}
                     if state not in ('active','') or labels & {'inactive','out','injured','suspended','doubtful','questionable'}:continue
                     ready=availability(data,team_id,pid)
+                    if live:
+                        row=next((r for r in roster(data,team_id) if str(r.get('athlete',{}).get('id'))==pid),None)
+                        if row and (row.get('subbedOut') is True or row.get('sentOff') is True or (stats(row.get('stats')).get('redCards') or 0)>0):continue
+                        if row and row.get('subbedIn') is True:ready='reported_starter'
                     if ready not in ('reported_starter','unconfirmed'):continue
                     # Shrink small samples; temper by observed attack and opposing defence.
                     context=max(.65,min(1.6,(own_avg+opponent_avg)/2/1.4))
@@ -311,7 +316,7 @@ def settle(server,pick,now):
 def match_choices(server, analysis, histories=None, now=None):
     """Two distinct, eligible scorers per team for a single upcoming fixture."""
     now = now or datetime.now(timezone.utc)
-    output = {'teams': [], 'observed_at': now.isoformat(), 'model_version': MODEL}
+    output = {'teams': [], 'observed_at': now.isoformat(), 'model_version': MODEL, 'live_supported': True}
     for side in ('home', 'away'):
         output['teams'].append(dict(team_id=str(analysis.get(side+'_id', '')),
             team_name=analysis.get(side+'_name') or side, choices=[]))
@@ -326,9 +331,10 @@ def match_choices(server, analysis, histories=None, now=None):
             home=dict(id=analysis['home_id'], name=analysis['home_name']),
             away=dict(id=analysis['away_id'], name=analysis['away_name']))
         verified(data, match)
-        if info['state'] != 'pre' or info['completed'] or info['date'] <= now:
+        if info['state'] not in ('pre', 'in') or info['completed'] or (info['state'] == 'pre' and info['date'] <= now):
             output['status'] = 'closed'
             return output
+        output['live'] = info['state'] == 'in'
         data = copy.deepcopy(data)
         # Reuse the histories already fetched by the analysis, without more requests.
         for side in ('home', 'away'):
@@ -343,12 +349,12 @@ def match_choices(server, analysis, histories=None, now=None):
                     awayTeamId=away, homeTeamScore=hg, awayTeamScore=ag,
                     gameResult='W' if own > other else 'L' if own < other else 'D'))
             if rows: data.setdefault('lastFiveGames', []).append(dict(team={'id': team_id}, events=rows))
-        pool = candidates(data, match, now)
+        pool = candidates(data, match, now, allow_live=True)
         missing = [t['team_id'] for t in output['teams']
             if len({p['player']['id'] for p in pool if p['player']['team_id'] == t['team_id']}) < 2]
         if missing:
             data, _ = domestic_evidence(server, data, match, missing, now)
-            pool = candidates(data, match, now)
+            pool = candidates(data, match, now, allow_live=True)
         pool.sort(key=lambda p: (-p['ranking'], p['player']['id']))
         for team in output['teams']:
             seen = set()
@@ -359,7 +365,7 @@ def match_choices(server, analysis, histories=None, now=None):
                 basis = pick['basis']
                 team['choices'].append(dict(rank=len(team['choices'])+1, player=player,
                     rationale=f"{basis['goals']} buts en {basis['appearances']} apparitions. "
-                        + ('Titulaire annoncé.' if pick['availability'] == 'reported_starter' else 'Titularisation à confirmer.'),
+                        + (('Match en cours : temps de jeu restant à vérifier.') if output['live'] else ('Titulaire annoncé.' if pick['availability'] == 'reported_starter' else 'Titularisation à confirmer.')),
                     availability=pick['availability'], basis=basis))
                 if len(team['choices']) == 2: break
         output['status'] = 'ok' if all(len(t['choices']) == 2 for t in output['teams']) else 'partial'
