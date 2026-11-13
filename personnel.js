@@ -59,11 +59,9 @@
         if(result.section){
           section.querySelector('h3').textContent=result.section.title;
           let p=section.querySelector(':scope > p');if(!p){p=document.createElement('p');section.insertBefore(p,controls);}
-          p.textContent=result.section.text;
+          p.textContent=cleanAnalysisText(result.section.text);
           let link=section.querySelector(':scope > a');if(link)link.remove();
-          if(/^https:\/\/www\.espn\.com\/soccer\/match\/_\/gameId\/\d+$/.test(result.section.source_url||'')){
-            link=document.createElement('a');link.href=result.section.source_url;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Consulter la source ESPN';section.insertBefore(link,controls);
-          }
+
         }
         draw();
         if(result.status!=='updated'&&!ended())status.textContent='Pas de nouvelle information vérifiée. '+(context?.observed_at?'Dernière consultation conservée : '+stamp(context.observed_at)+'.':'Réessaie avant le match.');
